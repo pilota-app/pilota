@@ -1,0 +1,6 @@
+/* Lo genera la pieza «pagina» desde docs/pagina.json → «acento»: el color de Pilota sobre los tokens de «tema». Para otro
+   color, cambia pagina.json y corre pieza.py generar . pagina; lo propio de la app va en un archivo suyo, no aquí. */
+:root {
+  --acento-claro: #2f5fd0;
+  --acento-oscuro: #7fa2ff;
+}

@@ -1,0 +1,195 @@
+{
+ "formato": 1,
+ "nota": "Lo trae la pieza «pagina» (no lo edites aquí: se pone al día con pieza.py actualizar). Lo que ya sabe Pieza: qué pide y a qué se conecta cada pieza, y las preguntas que toda app tiene. La página (docs/index.html) lo muestra y arma su JSON-LD de estos mismos textos.",
+ "red": {
+  "actualizaciones": {
+   "dominios": "api.github.com · github.com · objects.githubusercontent.com · release-assets.githubusercontent.com",
+   "lista": [
+    "api.github.com",
+    "github.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com"
+   ],
+   "es": "Para saber si hay una versión nueva (al abrir y cada 6 horas) y bajarla de los Releases del repositorio de la app cuando tú lo pides. Antes de instalarla se comprueba su huella SHA-256.",
+   "en": "To check for a new version (on launch and every 6 hours) and download it from the app's repository Releases when you ask. Its SHA-256 fingerprint is checked before installing."
+  },
+  "catalogo": {
+   "dominios": "raw.githubusercontent.com",
+   "lista": [
+    "raw.githubusercontent.com"
+   ],
+   "es": "Solo cuando abres el catálogo de la comunidad: baja la lista y lo que eliges del repositorio del catálogo, sin seguir redirecciones, y comprueba la huella de cada archivo. No se manda nada tuyo.",
+   "en": "Only when you open the community catalog: it downloads the list and what you pick from the catalog repository, without following redirects, and checks each file's fingerprint. Nothing of yours is sent."
+  },
+  "transcribir": {
+   "dominios": "huggingface.co",
+   "lista": [
+    "huggingface.co"
+   ],
+   "es": "Solo para bajar el modelo de voz (whisper) la primera vez, cuando lo pides. Se comprueba con su huella SHA-256 y desde ahí la transcripción pasa en tu computador.",
+   "en": "Only to download the voice model (whisper) the first time, when you ask. It's checked against its SHA-256 fingerprint, and from then on transcription happens on your computer."
+  }
+ },
+ "ia": {
+  "es": "Si la usas, Claude Code, Codex o Gemini se conectan a su proveedor con tu cuenta y reciben solo lo que la app les pasa para esa tarea. Corren sin herramientas y sin tu memoria personal.",
+  "en": "If you use it, Claude Code, Codex or Gemini connect to their provider with your account and receive only what the app gives them for that task. They run without tools and without your personal memory."
+ },
+ "permisos": {
+  "notificaciones": {
+   "nombre": {
+    "es": "Avisos",
+    "en": "Notifications"
+   },
+   "sistema": {
+    "es": "Mac",
+    "en": "Mac"
+   },
+   "es": "macOS te pregunta la primera vez que la app quiere avisarte algo, nunca al abrirla. Puedes decir que no y la app sigue funcionando.",
+   "en": "macOS asks you the first time the app wants to notify you, never on launch. You can say no and the app keeps working."
+  },
+  "llavero": {
+   "nombre": {
+    "es": "Llavero",
+    "en": "Keychain"
+   },
+   "sistema": {
+    "es": "Mac",
+    "en": "Mac"
+   },
+   "es": "Para guardar las llaves que tú le das (por ejemplo, la de un servicio que conectas) en el Llavero de tu Mac, solo en este Mac. Nunca se escriben en un archivo.",
+   "en": "To keep the keys you give it (for example, for a service you connect) in your Mac's Keychain, only on this Mac. They are never written to a file."
+  },
+  "microfono": {
+   "nombre": {
+    "es": "Micrófono",
+    "en": "Microphone"
+   },
+   "sistema": {
+    "es": "Mac",
+    "en": "Mac"
+   },
+   "es": "Solo para grabar tu voz cuando tú lo pides. La transcripción pasa en tu computador.",
+   "en": "Only to record your voice when you ask. Transcription happens on your computer."
+  },
+  "credenciales": {
+   "nombre": {
+    "es": "Credenciales",
+    "en": "Credentials"
+   },
+   "sistema": {
+    "es": "Windows",
+    "en": "Windows"
+   },
+   "es": "Para guardar las llaves que tú le das en el Administrador de credenciales de Windows, solo para tu usuario. Nunca se escriben en un archivo.",
+   "en": "To keep the keys you give it in Windows Credential Manager, only for your user. They are never written to a file."
+  },
+  "llaverolinux": {
+   "nombre": {
+    "es": "Llavero",
+    "en": "Keyring"
+   },
+   "sistema": {
+    "es": "Linux",
+    "en": "Linux"
+   },
+   "es": "Para guardar las llaves que tú le das en el llavero de tu sesión (gnome-keyring o KWallet). Si no tienes uno, la app no guarda nada.",
+   "en": "To keep the keys you give it in your session keyring (gnome-keyring or KWallet). If you don't have one, the app saves nothing."
+  }
+ },
+ "sin_permisos": {
+  "es": "Ninguno especial del sistema: ni cámara, ni micrófono, ni avisos. Solo abre lo que tú eliges.",
+  "en": "No special system permissions: no camera, microphone or notifications. It only opens what you pick."
+ },
+ "sin_red": {
+  "es": "A nada: la app no sale a internet por su cuenta.",
+  "en": "Nothing: the app doesn't go online on its own."
+ },
+ "preguntas": {
+  "actualizar": {
+   "p": {
+    "es": "¿Cómo se actualiza? ¿Pierdo algo?",
+    "en": "How does it update? Do I lose anything?"
+   },
+   "r": {
+    "es": "Al abrir y cada 6 horas, la app revisa si hay una versión nueva en sus Releases de GitHub y te avisa dentro de la app, en Ajustes. Si la instalas, la baja, comprueba su huella SHA-256, reemplaza la app y vuelve a abrirla. Nunca en medio de algo que esté haciendo. Tus datos viven fuera de la app: actualizar no los toca.",
+    "en": "On launch and every 6 hours, the app checks its GitHub Releases for a new version and tells you inside the app, in Settings. If you install it, it downloads it, checks its SHA-256 fingerprint, replaces the app and reopens it. Never in the middle of something it's doing. Your data lives outside the app: updating doesn't touch it."
+   }
+  },
+  "actualizar_a_mano": {
+   "p": {
+    "es": "¿Cómo se actualiza? ¿Pierdo algo?",
+    "en": "How does it update? Do I lose anything?"
+   },
+   "r": {
+    "es": "Baja la versión nueva desde los Releases de GitHub (en «Descargar») y reemplaza la anterior. Tus datos viven fuera de la app: no se pierden.",
+    "en": "Download the new version from the GitHub Releases (in “Download”) and replace the old one. Your data lives outside the app: nothing is lost."
+   }
+  },
+  "verificar_mac_windows": {
+   "p": {
+    "es": "¿Por qué mi computador dice que no puede verificar la app?",
+    "en": "Why does my computer say it can't verify the app?"
+   },
+   "r": {
+    "es": "Porque es un proyecto gratis que no paga los certificados de Apple ni de Microsoft. En macOS 15: abre la app una vez, ve a Ajustes del Sistema → Privacidad y seguridad y, abajo, toca «Abrir igualmente». En Windows: si aparece «Windows protegió tu PC», toca «Más información» → «Ejecutar de todas formas». Cada descarga tiene su huella SHA-256 en el Release y el código de cada versión está en GitHub.",
+    "en": "Because it's a free project that doesn't pay for Apple or Microsoft certificates. On macOS 15: open the app once, go to System Settings → Privacy & Security and, at the bottom, click “Open Anyway”. On Windows: if “Windows protected your PC” appears, click “More info” → “Run anyway”. Every download has its SHA-256 fingerprint in the Release, and each version's code is on GitHub."
+   }
+  },
+  "verificar_mac": {
+   "p": {
+    "es": "¿Por qué mi computador dice que no puede verificar la app?",
+    "en": "Why does my computer say it can't verify the app?"
+   },
+   "r": {
+    "es": "Porque es un proyecto gratis que no paga los certificados de Apple ni de Microsoft. En macOS 15: abre la app una vez, ve a Ajustes del Sistema → Privacidad y seguridad y, abajo, toca «Abrir igualmente». Cada descarga tiene su huella SHA-256 en el Release y el código de cada versión está en GitHub.",
+    "en": "Because it's a free project that doesn't pay for Apple or Microsoft certificates. On macOS 15: open the app once, go to System Settings → Privacy & Security and, at the bottom, click “Open Anyway”. Every download has its SHA-256 fingerprint in the Release, and each version's code is on GitHub."
+   }
+  },
+  "verificar_windows": {
+   "p": {
+    "es": "¿Por qué mi computador dice que no puede verificar la app?",
+    "en": "Why does my computer say it can't verify the app?"
+   },
+   "r": {
+    "es": "Porque es un proyecto gratis que no paga los certificados de Apple ni de Microsoft. En Windows: si aparece «Windows protegió tu PC», toca «Más información» → «Ejecutar de todas formas». Cada descarga tiene su huella SHA-256 en el Release y el código de cada versión está en GitHub.",
+    "en": "Because it's a free project that doesn't pay for Apple or Microsoft certificates. On Windows: if “Windows protected your PC” appears, click “More info” → “Run anyway”. Every download has its SHA-256 fingerprint in the Release, and each version's code is on GitHub."
+   }
+  },
+  "datos": {
+   "p": {
+    "es": "¿Dónde están mis datos?",
+    "en": "Where is my data?"
+   }
+  },
+  "ia": {
+   "p": {
+    "es": "¿Qué IA uso? ¿Tengo que pagar otra?",
+    "en": "Which AI do I use? Do I have to pay for another one?"
+   },
+   "r": {
+    "es": "La tuya: Claude Code, Codex o Gemini, con tu propia cuenta. La app no tiene una IA propia ni te cobra por usarla: corre la que ya tienes, sin herramientas y sin tu memoria personal, y solo le pasa lo que hace falta.",
+    "en": "Yours: Claude Code, Codex or Gemini, with your own account. The app has no AI of its own and doesn't charge you for one: it runs the one you already have, without tools or your personal memory, and only gives it what's needed."
+   }
+  },
+  "permisos": {
+   "p": {
+    "es": "¿Qué permisos pide y a qué se conecta?",
+    "en": "What permissions does it ask for and what does it connect to?"
+   },
+   "r": {
+    "es": "Lo justo, y todo está en «Permisos e internet»: sale de las piezas que usa la app, así nunca dice de más ni de menos. Nunca manda nada tuyo a un servidor nuestro: no tenemos.",
+    "en": "Only what's needed, and it's all in “Permissions and internet”: it comes from the building blocks the app uses, so it never says more or less than the truth. It never sends anything of yours to a server of ours: we don't have one."
+   }
+  },
+  "costo": {
+   "p": {
+    "es": "¿Cuánto cuesta?",
+    "en": "How much does it cost?"
+   },
+   "r": {
+    "es": "Nada. Es gratis y de código abierto, sin cuentas ni publicidad.",
+    "en": "Nothing. It's free and open source, with no accounts or ads."
+   }
+  }
+ }
+}

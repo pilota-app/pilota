@@ -1,0 +1,5 @@
+{"id": "neon", "categoria": "ciudad", "nombre": "Neón", "emoji": "🌃", "idioma": "es", "autor": "Pieza",
+ "descripcion": "Oscuro de ciudad de noche, con rosado y cian.", "categorias": ["Ciudad", "Divertido"],
+ "tema": {"base": "oscuro", "colores": {"fondo": "#0d0b14", "panel": "#171325", "acento": "#ff5fae", "sobre-acento": "#1a0b14", "linea": "#2e2645"}},
+ "textos": {"saludo": "La ciudad no duerme", "vacio": "Nada por aquí. Prende las luces.", "listo": "Brillante"},
+ "listas": {"elogios": ["¡Luces encendidas!", "Brilla.", "Imparable."], "rangos": ["Calle", "Barrio", "Avenida", "Ciudad"]}}

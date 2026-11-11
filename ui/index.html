@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Política de contenido: solo corre el código de la app (nada en línea ni de afuera) y no se conecta a internet. Si algo de la
+     persona llegara a colarse en el HTML, el navegador no lo ejecuta. La revisa pruebas/contrato.py (pieza «contrato»). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+<title>Pilota</title>
+<link rel="stylesheet" href="tema.css">
+<link rel="stylesheet" href="componentes.css">
+<link rel="stylesheet" href="bienvenida.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="pz-toast" role="status" aria-live="polite" data-sin-traducir></div>
+<script src="i18n.js"></script>
+<script src="host.js"></script>
+<script src="tema.js"></script>
+<script src="componentes.js"></script>
+<script src="bienvenida.js"></script>
+<script src="mcp.js"></script>
+<script src="panel.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

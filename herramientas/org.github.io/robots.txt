@@ -1,0 +1,4 @@
+# Para el repo pilota-app/pilota-app.github.io (la raíz del sitio de la organización): copia este archivo ahí.
+User-agent: *
+Allow: /
+Sitemap: https://pilota-app.github.io/pilota/sitemap.xml

@@ -1,0 +1,5 @@
+{"id": "espacio", "categoria": "espacio", "nombre": "Espacio", "emoji": "🚀", "idioma": "es", "autor": "Pieza",
+ "descripcion": "Vidrio sobre un cielo de noche, con luces violeta y ámbar.", "categorias": ["Espacio", "Ciencia ficción"],
+ "tema": {"base": "vidrio", "colores": {"acento": "#ffb020", "sobre-acento": "#1f1b2e"}},
+ "textos": {"saludo": "Bienvenida a bordo", "vacio": "Aquí todavía no hay nada. Despeguemos.", "listo": "Misión cumplida"},
+ "listas": {"elogios": ["Despegue perfecto.", "Órbita estable.", "Aterrizaje suave."], "rangos": ["Cadete", "Piloto", "Capitana", "Almirante"]}}

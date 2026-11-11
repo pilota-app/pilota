@@ -1,0 +1,43 @@
+# Publica la página de Pilota (docs/) y la vista previa de la app con datos ficticios (ui/ en /demo/) en GitHub Pages.
+# Lo generó la pieza «pagina» de Pieza. Pages: Settings → Pages → Source: GitHub Actions.
+# Permisos mínimos: todo el workflow solo lee; solo el job que publica puede escribir en Pages (pages + id-token).
+name: Página
+on:
+  push:
+    branches: [main]
+    paths: [docs/**, ui/**, .github/workflows/pagina.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pagina
+  cancel-in-progress: true
+jobs:
+  armar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Armar el sitio (docs/ en la raíz, ui/ en /demo/; sin pagina.json ni pagina-comunes.json)
+        run: |
+          mkdir -p _sitio
+          cp -R docs/. _sitio/
+          rm -f _sitio/pagina.json _sitio/pagina-comunes.json
+          mkdir -p _sitio/demo
+          cp -R ui/. _sitio/demo/
+          test -f _sitio/demo/index.html
+          test -f _sitio/index.html
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with: { path: _sitio }
+  publicar:
+    needs: armar
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment: { name: github-pages, url: "${{ steps.despliegue.outputs.page_url }}" }
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

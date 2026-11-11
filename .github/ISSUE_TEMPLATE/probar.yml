@@ -1,0 +1,33 @@
+name: 🧪 Lo probé en mi computador / I tested it on my device
+description: Cuéntanos cómo le fue a Pilota en tu sistema. / Tell us how Pilota did on your system.
+labels: [probar]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ¡Gracias! Probar en un equipo de verdad es de las ayudas que más sirven.
+        Usa solo datos ficticios. / Thanks! Testing on a real device is one of the most useful things you can do. Fictional data only.
+  - type: dropdown
+    id: sistema
+    attributes:
+      label: Sistema / System
+      options: [Mac, Otro / Other]
+    validations: { required: true }
+  - type: input
+    id: detalle
+    attributes:
+      label: Versión del sistema y cómo instalaste / OS version and how you installed
+      placeholder: macOS 15 · instalar.sh
+    validations: { required: true }
+  - type: checkboxes
+    id: revisado
+    attributes:
+      label: Lo que funcionó / What worked
+      options:
+        - label: Se instaló y abrió (y el aviso de app sin firmar fue claro) / It installed and opened (and the unsigned-app warning was clear)
+        - label: Lo primero fue elegir el idioma / The first thing was choosing the language
+        # La app: suma aquí 3 a 5 cosas que se prueban en esta app (lo principal que hace), una por línea, en los dos idiomas.
+  - type: textarea
+    id: problemas
+    attributes:
+      label: Lo que falló o se vio raro (capturas bienvenidas) / What failed or looked odd (screenshots welcome)

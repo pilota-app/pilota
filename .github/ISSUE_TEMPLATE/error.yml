@@ -1,0 +1,25 @@
+name: 🐞 Algo falla / Something's broken
+description: Cuéntanos qué pasó. Solo con datos ficticios. / Tell us what happened, with fictional data only.
+labels: [error]
+body:
+  - type: textarea
+    id: que
+    attributes:
+      label: ¿Qué pasó? / What happened?
+      description: Qué hiciste, qué esperabas y qué pasó en cambio. Nunca pegues datos reales tuyos ni de otras personas.
+    validations: { required: true }
+  - type: dropdown
+    id: sistema
+    attributes:
+      label: Sistema / System
+      options: [Mac, Vista previa en el navegador / Browser preview]
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes:
+      label: Versión de Pilota / Pilota version
+      description: Ajustes → Acerca de.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Algo más (capturas, pasos para repetirlo) / Anything else

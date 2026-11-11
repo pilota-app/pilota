@@ -1,0 +1,26 @@
+# Dependabot: avisa cuando hay versiones nuevas de las actions (fijadas por SHA) y de los crates de Rust de la app
+# nativa (escritorio/: Tauri, fijados en Cargo.lock) y abre un pull request para revisarlas.
+# `cooldown`: espera unos días antes de proponer una versión recién publicada; si una action o un paquete fue secuestrado, casi
+# siempre se descubre y se retira en ese plazo. Las alertas de seguridad no esperan. Nada se junta solo: cada PR se revisa.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
+    groups:
+      actions: { patterns: ["*"] }
+    commit-message: { prefix: "Actions" }
+  - package-ecosystem: cargo
+    directory: /escritorio
+    # Los crates son de la pieza «host-tauri»: suben en Pieza, con sus pruebas, y llegan con «Pieza al día».
+    # Aquí solo llegan las alertas de seguridad (0 = sin PR de versiones nuevas).
+    open-pull-requests-limit: 0
+    ignore:
+      # glib 0.18 llega con Tauri en Linux (gtk3). La versión arreglada (0.20) necesita gtk4: llega cuando Tauri cambie.
+      - dependency-name: glib
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7, semver-major-days: 30 }
+    groups:
+      escritorio: { patterns: ["*"] }
+    commit-message: { prefix: "Dependencias" }

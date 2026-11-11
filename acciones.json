@@ -1,0 +1,558 @@
+{
+ "formato": 1,
+ "acciones": {
+  "backtestCorrer": {
+   "script": "backtest.py",
+   "args": [
+    "correr"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "backtestListo",
+   "limite": 600,
+   "pieza": "app"
+  },
+  "backtestEstado": {
+   "script": "backtest.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "backtestEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "calibracionCorrer": {
+   "script": "calibrar.py",
+   "args": [
+    "correr"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "calibracionLista",
+   "limite": 1800,
+   "pieza": "app"
+  },
+  "calibracionEstado": {
+   "script": "calibrar.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "calibracionEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "ejecutorEstado": {
+   "script": "operar_prueba.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "ejecutorEstadoListo",
+   "limite": 120,
+   "pieza": "app"
+  },
+  "estadoArrancar": {
+   "script": "estado.py",
+   "args": [
+    "arrancar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "estadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "estadoReiniciar": {
+   "script": "estado.py",
+   "args": [
+    "reiniciar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "saldo": {
+     "tipo": "entero",
+     "min": 0,
+     "max": 1000000
+    }
+   },
+   "responde": "estadoReinicioListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "frenosDesbloquear": {
+   "script": "frenos.py",
+   "args": [
+    "desbloquear"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "frenosListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "frenosEstado": {
+   "script": "frenos.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "frenosEstadoListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "frenosPausar": {
+   "script": "frenos.py",
+   "args": [
+    "pausar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "pausar": {
+     "tipo": "entero",
+     "min": 0,
+     "max": 1
+    }
+   },
+   "responde": "frenosListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "historialDescargar": {
+   "script": "historial.py",
+   "args": [
+    "descargar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "historialListo",
+   "progreso": "historialProgreso",
+   "limite": "trabajo",
+   "pieza": "app"
+  },
+  "historialDetener": {
+   "script": "historial.py",
+   "args": [
+    "detener"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "historialEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "historialEstado": {
+   "script": "historial.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "historialEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "indicadoresEstado": {
+   "script": "indicadores.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "indicadoresEstadoListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "listaIA": {
+   "script": "ia.py",
+   "args": [
+    "lista"
+   ],
+   "entrada": null,
+   "datos": {},
+   "responde": "iaLista",
+   "limite": 30,
+   "pieza": "ia"
+  },
+  "mcpConectar": {
+   "script": "mcp_conectar.py",
+   "args": [
+    "$orden",
+    "$cliente"
+   ],
+   "entrada": null,
+   "datos": {
+    "orden": {
+     "tipo": "enum",
+     "valores": [
+      "conectar",
+      "quitar"
+     ]
+    },
+    "cliente": {
+     "tipo": "enum",
+     "valores": [
+      "claude_desktop",
+      "claude_code",
+      "codex",
+      "gemini",
+      "antigravity"
+     ]
+    }
+   },
+   "eco": [
+    "orden",
+    "cliente"
+   ],
+   "cola": "escritura",
+   "responde": "mcpListo",
+   "limite": 120,
+   "pieza": "mcp"
+  },
+  "mcpEstado": {
+   "script": "mcp_conectar.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": null,
+   "datos": {},
+   "responde": "mcpListo",
+   "limite": 60,
+   "pieza": "mcp"
+  },
+  "minimoCalcular": {
+   "script": "minimo_viable.py",
+   "args": [
+    "calcular"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "capital": {
+     "tipo": "entero",
+     "min": 0,
+     "max": 1000000
+    }
+   },
+   "responde": "minimoCalculoListo",
+   "limite": 120,
+   "pieza": "app"
+  },
+  "minimoEstado": {
+   "script": "minimo_viable.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "capital": {
+     "tipo": "entero",
+     "min": 0,
+     "max": 1000000
+    }
+   },
+   "responde": "minimoEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "modosAjustar": {
+   "script": "propuestas.py",
+   "args": [
+    "ajustar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "vencimiento": {
+     "tipo": "entero",
+     "min": 5,
+     "max": 60
+    },
+    "monto": {
+     "tipo": "entero",
+     "min": 1,
+     "max": 1000000
+    }
+   },
+   "responde": "modosAjustado",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "modosDecidir": {
+   "script": "propuestas.py",
+   "args": [
+    "decidir"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "modosDecidido",
+   "limite": 180,
+   "pieza": "app"
+  },
+  "modosElegir": {
+   "script": "propuestas.py",
+   "args": [
+    "modo"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "modo": {
+     "tipo": "texto",
+     "max": 20
+    },
+    "confirmaciones": {
+     "tipo": "entero",
+     "min": 0,
+     "max": 2
+    }
+   },
+   "responde": "modosElegido",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "modosEstado": {
+   "script": "propuestas.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "modosEstadoListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "modosResponder": {
+   "script": "propuestas.py",
+   "args": [
+    "responder"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "id": {
+     "tipo": "texto",
+     "max": 80
+    },
+    "si": {
+     "tipo": "entero",
+     "min": 0,
+     "max": 1
+    }
+   },
+   "responde": "modosRespondido",
+   "limite": 120,
+   "pieza": "app"
+  },
+  "motorApagar": {
+   "script": "motor.py",
+   "args": [
+    "apagar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "motorEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "motorEncender": {
+   "script": "motor.py",
+   "args": [
+    "encender"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "motorListo",
+   "progreso": "motorProgreso",
+   "limite": "trabajo",
+   "pieza": "app"
+  },
+  "motorEstado": {
+   "script": "motor.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "motorEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "motorRevisar": {
+   "script": "motor.py",
+   "args": [
+    "revisar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "motorRevisado",
+   "limite": 120,
+   "pieza": "app"
+  },
+  "muestreoApagar": {
+   "script": "muestreo.py",
+   "args": [
+    "apagar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "muestreoEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "muestreoEncender": {
+   "script": "muestreo.py",
+   "args": [
+    "encender"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "muestreoListo",
+   "progreso": "muestreoProgreso",
+   "limite": "trabajo",
+   "pieza": "app"
+  },
+  "muestreoEstado": {
+   "script": "muestreo.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "muestreoEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "panelEstado": {
+   "script": "panel.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "panelEstadoListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "panelLocal": {
+   "script": "panel.py",
+   "args": [
+    "local"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "moneda": {
+     "tipo": "texto",
+     "max": 8
+    },
+    "tasa": {
+     "tipo": "entero",
+     "min": 0,
+     "max": 100000000
+    }
+   },
+   "responde": "panelLocalListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "probarIA": {
+   "script": "ia.py",
+   "args": [
+    "probar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "ia": {
+     "tipo": "enum",
+     "valores": [
+      "claude",
+      "codex",
+      "gemini"
+     ]
+    }
+   },
+   "responde": "iaProbada",
+   "limite": 150,
+   "pieza": "ia"
+  },
+  "puntajeEstado": {
+   "script": "puntaje.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "puntajeEstadoListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "puntajeMedir": {
+   "script": "puntaje.py",
+   "args": [
+    "medir"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "puntajeTramosListos",
+   "limite": 900,
+   "pieza": "app"
+  },
+  "senalesEstado": {
+   "script": "senales.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "senalesEstadoListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "tamanoEstado": {
+   "script": "tamano.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "tamanoEstadoListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "velasDescargar": {
+   "script": "velas.py",
+   "args": [
+    "descargar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "dias": {
+     "tipo": "entero",
+     "min": 1,
+     "max": 90
+    }
+   },
+   "responde": "velasDescargaLista",
+   "limite": 900,
+   "pieza": "app"
+  },
+  "velasEstado": {
+   "script": "velas.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "dias": {
+     "tipo": "entero",
+     "min": 1,
+     "max": 90
+    }
+   },
+   "responde": "velasEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  }
+ }
+}

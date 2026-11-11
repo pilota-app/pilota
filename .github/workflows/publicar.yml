@@ -1,0 +1,101 @@
+# Publica una versión de Pilota sola: basta con subir «version» en app.json y hacer push a main. Compila con Tauri en cada
+# sistema (Mac ), arma cada descarga con su huella SHA-256 y crea el Release vX.Y.Z con nombres fijos (los
+# usan instalar.sh, instalar.ps1 y el actualizador de la app): Pilota-macOS.zip (+ .sha256).
+# Si la versión ya existe, no hace nada. Actions fijadas por SHA (Dependabot las sube), permisos mínimos, sin credenciales guardadas
+# y ninguna expresión de GitHub dentro de `run:` (pasan por `env:`).
+# Generado por la pieza «empaquetado» de Pieza desde app.json: si lo cambias, desde ahí es de la app y Pieza ya no lo toca.
+name: Publicar versión
+on:
+  push:
+    branches: [main]
+    paths: ["app.json"]
+    tags: ["v*"]
+  workflow_dispatch:
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+# Todo lee; solo el último paso (crear el Release) puede escribir.
+permissions:
+  contents: read
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      publicar: ${{ steps.v.outputs.publicar }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      # correr.sh también prueba la interfaz: necesita Playwright (la misma versión que revisar.yml).
+      - name: Playwright para las pruebas de la interfaz
+        if: hashFiles('pruebas/interfaz.mjs') != ''
+        run: |
+          npm i --no-save --ignore-scripts --prefix "$RUNNER_TEMP/pw" playwright@1.56.1
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Pruebas rápidas (no se publica una versión rota)
+        env: { PLAYWRIGHT: "${{ runner.temp }}/pw/node_modules/playwright" }
+        run: |
+          if [ -f pruebas/correr.sh ]; then SIN_RUST=1 bash pruebas/correr.sh   # la app nativa la compila cada sistema más abajo
+          else [ ! -f pruebas/contrato.py ] || python3 pruebas/contrato.py
+            if ls pruebas/test_*.py >/dev/null 2>&1; then python3 -m unittest discover -s pruebas -p 'test_*.py'; fi; fi
+      - id: v
+        env: { GH_TOKEN: "${{ github.token }}", REF: "${{ github.ref }}", REF_NOMBRE: "${{ github.ref_name }}" }
+        run: |
+          if [[ "$REF" == refs/tags/v* ]]; then V="${REF_NOMBRE#v}"
+          else V=$(python3 -c "import json;print(json.load(open('app.json'))['version'])"); fi
+          [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Versión inválida: $V"; exit 1; }
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "publicar=false" >> "$GITHUB_OUTPUT"; echo "v$V ya está publicada: nada que hacer."
+          else echo "publicar=true" >> "$GITHUB_OUTPUT"; echo "Se publicará v$V"; fi
+
+  empaquetar:
+    needs: version
+    if: needs.version.outputs.publicar == 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { so: mac, runner: macos-15 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults: { run: { shell: bash } }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Lo que Tauri necesita en Linux
+        if: matrix.so == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev xvfb
+      - name: Versión (la del Release, en app.json de esta copia)
+        env: { VERSION: "${{ needs.version.outputs.version }}" }
+        run: python3 -c "import json,os;d=json.load(open('app.json',encoding='utf-8'));d['version']=os.environ['VERSION'];json.dump(d,open('app.json','w',encoding='utf-8'),ensure_ascii=False,indent=1)"
+      # Exactamente lo de Cargo.lock (--locked dentro de empaquetar.sh y de cargo tauri build).
+      - name: Empaquetar
+        env: { SO: "${{ matrix.so }}" }
+        run: bash herramientas/empaquetar.sh "$SO"
+      - name: La app de Linux abre (pantalla virtual)
+        if: matrix.so == 'linux'
+        run: |
+          [ -f escritorio/pruebas/arranque.sh ] || { echo "Sin escritorio/pruebas/arranque.sh: no la abro."; exit 0; }
+          bash escritorio/pruebas/arranque.sh dist/Pilota-Linux.AppImage
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with: { name: "${{ matrix.so }}", path: "dist/Pilota-*" }
+
+  release:
+    needs: [version, empaquetar]
+    permissions:
+      contents: write
+    if: needs.empaquetar.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with: { path: descargas, merge-multiple: true }
+      - name: Crear el Release
+        env: { GH_TOKEN: "${{ github.token }}", VERSION: "${{ needs.version.outputs.version }}", REPO: "${{ github.repository }}", SHA: "${{ github.sha }}" }
+        run: |
+          V="v$VERSION"
+          ls -la descargas
+          for f in Pilota-macOS.zip ; do
+            [ -f "descargas/$f" ] && [ -f "descargas/$f.sha256" ] || { echo "Falta $f o su huella"; exit 1; }
+          done
+          gh release create "$V" descargas/* --repo "$REPO" --target "$SHA" --title "Pilota $V" --generate-notes

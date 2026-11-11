@@ -1,0 +1,438 @@
+{
+ "formato": 1,
+ "piezas": {
+  "tema": {
+   "version": "0.3.0",
+   "archivos": {
+    "ui/tema.css": "d009fd0b0a9cf952b19cac82715c5fadb92bfdbe122a93db5c522c6fc69e56e6",
+    "ui/tema.js": "d476607ea31535a91fd2a81e7eef81558bfbbfc03dd772b447d7b359f9913dd4"
+   },
+   "ficha": {
+    "requiere": [],
+    "permisos": {},
+    "red": []
+   }
+  },
+  "universos": {
+   "version": "0.1.0",
+   "archivos": {
+    "ui/universos.js": "484c7c6c6264e66321212f9a06032faf94f450e53d53b1211c91dc97ca239252",
+    "bin/universo_formato.py": "e4194647a045187e7f6e56a713b41de2a90b0514fc2523ea45f394af21864952",
+    "ui/universos/espacio.json": "49e703882d2b058c183a298ea5f74dc579eb3388be174e8ae33ceb846e880a58",
+    "ui/universos/bosque.json": "0bc470e70fba14d2fb43f8c84edab52240da55be9581ac7b9a2672607ec1e7e4",
+    "ui/universos/neon.json": "6b01f5bea4ee4234e39bc2a3a0d0557631031d910d49dec91558ac756a551fc6"
+   },
+   "ficha": {
+    "requiere": [
+     "tema"
+    ],
+    "permisos": {},
+    "red": []
+   }
+  },
+  "nucleo": {
+   "version": "0.7.1",
+   "archivos": {
+    "bin/nucleo.py": "1a1fd2b119d3f7ac3ade50fbce479b72494bffb406d5ad70136733b354af824f"
+   },
+   "ficha": {
+    "requiere": [],
+    "permisos": {},
+    "red": []
+   }
+  },
+  "trabajos": {
+   "version": "0.2.2",
+   "archivos": {
+    "bin/trabajos.py": "fe1640aec0f3f364968501f169d4b9b58f6a746e72f81f338b027f5c392bcde3",
+    "escritorio/src/pieza/progreso.rs": "7ffc66f2f47bef96415542dc025817fc52b53c65c3228c82c10f7c260f032645"
+   },
+   "ficha": {
+    "requiere": [
+     "nucleo"
+    ],
+    "permisos": {},
+    "red": []
+   }
+  },
+  "ia": {
+   "version": "0.7.2",
+   "archivos": {
+    "bin/ia.py": "519ff39d336e358abc696cd500435f4c00a9aac27186d362c98dcfaf597375ee"
+   },
+   "ficha": {
+    "requiere": [
+     "nucleo"
+    ],
+    "permisos": {},
+    "red": []
+   },
+   "acciones": {
+    "probarIA": {
+     "script": "ia.py",
+     "args": [
+      "probar"
+     ],
+     "entrada": "archivo",
+     "datos": {
+      "ia": {
+       "tipo": "enum",
+       "valores": [
+        "claude",
+        "codex",
+        "gemini"
+       ]
+      }
+     },
+     "responde": "iaProbada",
+     "limite": 150
+    },
+    "listaIA": {
+     "script": "ia.py",
+     "args": [
+      "lista"
+     ],
+     "entrada": null,
+     "datos": {},
+     "responde": "iaLista",
+     "limite": 30
+    }
+   }
+  },
+  "i18n": {
+   "version": "0.3.1",
+   "archivos": {
+    "ui/i18n.js": "3f4d071fd5b2b137cb0a6413e4d1e588ae79081a61f21e3f7d240cf3cf55bce9"
+   },
+   "ficha": {
+    "requiere": [],
+    "permisos": {},
+    "red": []
+   }
+  },
+  "componentes": {
+   "version": "0.3.1",
+   "archivos": {
+    "ui/componentes.js": "fd5eafba3affb59be9506c57f38eff7a712297371621fe070b2b6d0ce3dfdf80",
+    "ui/componentes.css": "101586f0fa7aa509f42b626de378c5ad32d176da5a4c0ad85b081a47908fe56f"
+   },
+   "ficha": {
+    "requiere": [
+     "i18n",
+     "tema"
+    ],
+    "permisos": {},
+    "red": []
+   }
+  },
+  "mcp": {
+   "version": "0.1.0",
+   "archivos": {
+    "bin/mcp.py": "97278a8b6699bbf89be5ea4dc3240cd77c701cdcf337a12b2225835438e7ec8d",
+    "bin/mcp_servidor.py": "c8b536943698905c653585f9643e3dc15f492b5af16f15986a55c07e3c52004a",
+    "bin/mcp_conectar.py": "69f1fa4a13feb7df120c2d8dc7493da6ebc8ff1e1d7d2bb2d40dfcb0189da9bf",
+    "ui/mcp.js": "2f57cdbfbc6de39118c824cb3320074bebf76f3df51043de1458af5c00cdbeb2"
+   },
+   "ficha": {
+    "requiere": [
+     "nucleo",
+     "ia",
+     "i18n",
+     "componentes"
+    ],
+    "permisos": {},
+    "red": []
+   },
+   "acciones": {
+    "mcpEstado": {
+     "script": "mcp_conectar.py",
+     "args": [
+      "estado"
+     ],
+     "entrada": null,
+     "datos": {},
+     "responde": "mcpListo",
+     "limite": 60
+    },
+    "mcpConectar": {
+     "script": "mcp_conectar.py",
+     "args": [
+      "$orden",
+      "$cliente"
+     ],
+     "entrada": null,
+     "datos": {
+      "orden": {
+       "tipo": "enum",
+       "valores": [
+        "conectar",
+        "quitar"
+       ]
+      },
+      "cliente": {
+       "tipo": "enum",
+       "valores": [
+        "claude_desktop",
+        "claude_code",
+        "codex",
+        "gemini",
+        "antigravity"
+       ]
+      }
+     },
+     "eco": [
+      "orden",
+      "cliente"
+     ],
+     "cola": "escritura",
+     "responde": "mcpListo",
+     "limite": 120
+    },
+    "mcpReparar": {
+     "script": "mcp_conectar.py",
+     "args": [
+      "reparar"
+     ],
+     "entrada": null,
+     "datos": {},
+     "cola": "escritura",
+     "responde": null,
+     "limite": 120
+    }
+   },
+   "una_vez": [
+    "bin/mcp_herramientas.py"
+   ]
+  },
+  "host-ui": {
+   "version": "0.3.0",
+   "archivos": {
+    "ui/host.js": "07505d7d288b0fdfa0d3a31430a57331f59198e2ebd413d3adf1f244883d501f"
+   },
+   "ficha": {
+    "requiere": [],
+    "permisos": {},
+    "red": []
+   }
+  },
+  "bienvenida": {
+   "version": "0.4.1",
+   "archivos": {
+    "ui/bienvenida.js": "0265e1d4f6f9cea46eff5d0df1d1098c28bd0d889e0b26e8a8fb3936c8ccbd12",
+    "ui/bienvenida.css": "cebd589f28a4fc2f1e08e143abd5b1a6531f8060dc346f53d2b9479b7c995719"
+   },
+   "ficha": {
+    "requiere": [
+     "i18n"
+    ],
+    "permisos": {},
+    "red": []
+   }
+  },
+  "contrato": {
+   "version": "0.1.3",
+   "archivos": {
+    "pruebas/contrato.py": "8b73f2e8b42df6a8c42910d1aa2e07588d4e3673672896b72fc19df889ea96e3"
+   },
+   "ficha": {
+    "requiere": [],
+    "permisos": {},
+    "red": []
+   }
+  },
+  "actualizaciones": {
+   "version": "0.5.2",
+   "archivos": {
+    "escritorio/src/pieza/actualizaciones.rs": "e241b86c0f678c0f7cd1fd21dcf290a45f46506ac75c000e5f8b6c75b6d8116c"
+   },
+   "ficha": {
+    "requiere": [],
+    "permisos": {},
+    "red": [
+     "api.github.com",
+     "github.com",
+     "objects.githubusercontent.com",
+     "release-assets.githubusercontent.com"
+    ]
+   }
+  },
+  "host-tauri": {
+   "version": "0.1.3",
+   "archivos": {
+    "escritorio/src/pieza/mod.rs": "92f9a2a855b9f855b15a9a9112c5d87debc101a7d5ac8b39a2e02f67d38f37b1",
+    "escritorio/src/pieza/enchufe.rs": "e5047cc286eefa5b30d67af3463f45f94d69923830e9aa84ab507140e2108a48",
+    "escritorio/src/pieza/procesador.rs": "26d0b99438559b45539fe252354fa609015974c7ae2391194de5b0936ebf1b04",
+    "escritorio/src/pieza/protocolo.rs": "b19b87bb18ac63841871cad19da256372986ffe52512a6389fc87a1c59ca518b",
+    "escritorio/src/pieza/sistema.rs": "ecaef6d2c859ddf9b5b4dd707e1828932aa812f4e99ac670c25ec4527426457c",
+    "escritorio/src/pieza/vigilante.rs": "6be8519e7c8f9996e30af4c4f78695994966eb8476a4900eb9bbb840a583973d",
+    "escritorio/src/pieza/host.rs": "b8c32422a164bce77fc3fd35ac23af1b2282fd124e5fa84d6d34a2c080d57dff",
+    "escritorio/iconos/32x32.png": "0c334ce1216ed797b3adf0a255bb68e22189ef538fe4a303180ef6c7e07ed7be",
+    "escritorio/iconos/128x128.png": "c86e3d530fc01c4bf60952a4005e269a6899a52aa3ca441b51e52e3afbd7dd5b",
+    "escritorio/iconos/128x128@2x.png": "8eb6cfbd01f498c1496e592d5ae169954b8448ae92e519863d7179d32e32ae73",
+    "escritorio/iconos/icon.icns": "bf63be44517a9ff5836916c204289a8ee905ebf45fdf28f01f75cd7f42fae65f",
+    "escritorio/iconos/icon.ico": "c9447636799599b281ae73a7a3b420869d9011248d18ad1231ce54b285f1ff7a",
+    "escritorio/iconos/icono.png": "3381c19a5e021e87e403b89f41ca097c4744e2699ccabc320c8131bf886a870e"
+   },
+   "ficha": {
+    "requiere": [
+     "nucleo",
+     "host-ui"
+    ],
+    "permisos": {
+     "mac": [
+      {
+       "clave": "Notificaciones",
+       "por": "solo si la app usa avisos: macOS pregunta la primera vez"
+      },
+      {
+       "clave": "Llavero",
+       "por": "solo si la app usa secretos: quedan en el Llavero de la persona, solo en este Mac"
+      }
+     ],
+     "windows": [
+      {
+       "clave": "Credenciales de Windows",
+       "por": "solo si la app usa secretos: quedan en el Administrador de credenciales de la persona"
+      }
+     ],
+     "linux": [
+      {
+       "clave": "Secret Service (gnome-keyring o KWallet)",
+       "por": "solo si la app usa secretos; sin llavero no se guarda nada"
+      }
+     ]
+    },
+    "red": []
+   },
+   "generados": {
+    "escritorio/Cargo.toml": "96bd314a9728111697633be3e96ceb8008283b0bc96412dfcb0cc14e49e151bb",
+    "escritorio/Info.plist": "f65b9552a6654eab35c94d15badc09f3d09a993cd3ec3cfad63c3c7b507c0e57",
+    "escritorio/build.rs": "8af41c0062014fc594e4bb9899e60ee9930ab57d4cf0c73041ff557d6ec736e6",
+    "escritorio/pruebas/arranque.sh": "621c262fab24b8ac30f3b605dd912371919b986e6945be99d9ec9e31b519c946",
+    "escritorio/tauri.conf.json": "46de304dbab1209373fe64f64979e44ef3c68a881e23471d64f2eb3d02ffc081",
+    "escritorio/vacio/index.html": "67ca47fddba42aa37eea776f98f23d74590ebbec348d84a3ba244545cef9fb9a"
+   },
+   "una_vez": [
+    "escritorio/src/main.rs"
+   ]
+  },
+  "empaquetado": {
+   "version": "0.2.2",
+   "archivos": {
+    "herramientas/python.lock": "a038e911e34657048ee048b563506591fc62fdeaa08fb071926b54da57b75d42"
+   },
+   "ficha": {
+    "requiere": [
+     "host-tauri"
+    ],
+    "permisos": {},
+    "red": []
+   },
+   "generados": {
+    ".github/workflows/publicar.yml": "fb933bd1fb2ac282305acf8b262d3f9d0925760a8f4bf875675d46f560121f77",
+    "build.sh": "881b5c299351a9de501bab3f0cac430ba01515fcb573b6d4d8caa8555d33179a",
+    "escritorio/herramientas/preparar.sh": "586be844795253d6a58e5241c4764d777e4731b0df05bca5826617005b51af66",
+    "herramientas/empaquetar.sh": "43a3a294e1d0fe3c5cbebf2b6a571714e2a0fe98d44ada31fa10bc94df25a865",
+    "instalar.sh": "94a9344738e980f3394b11941a11689fe298effb4316fdbb27f0122d2a4d563d"
+   }
+  },
+  "pagina": {
+   "version": "0.1.3",
+   "archivos": {
+    "docs/pagina.js": "c9e58a2e25475ad54735db260f4399809f8f20751abe6c2a6eff44466de68a43",
+    "docs/pagina.css": "61bfe8b32e7d864f37540c48e38be7f25035390a0f54ba7a7773d2b640f8ee6c",
+    "docs/tema.css": "d009fd0b0a9cf952b19cac82715c5fadb92bfdbe122a93db5c522c6fc69e56e6",
+    "docs/sello.svg": "570728f16d129abfbc097419174d53491d7a5e58507dc3e679a592e23464dcf9",
+    "docs/sello-en.svg": "5fb96b00af24dd3782c6a316d31be7c1c8b0cc5feafc1308464a31c9ad3c4822",
+    "docs/pagina-comunes.json": "300c22e72e26795ad3874d1ed8ada820ad2a902de9975663abc9cbdbac4110ad",
+    "herramientas/pagina_capturas.mjs": "722d477d56dcab5859a646e716779acbf5f6426f5fa387222b045f8d6d80f5a4"
+   },
+   "ficha": {
+    "requiere": [],
+    "permisos": {},
+    "red": []
+   },
+   "generados": {
+    ".github/workflows/pagina.yml": "44db2cd328c86ede77b570deba17d7d93e19c2ab2e524662a734caa30306c433",
+    "docs/colores.css": "f6c3ef7ac6b1495f3c55dcccbc1a11870217e2d64f0270763cbfa153d83482e5",
+    "docs/index.html": "c24574148bd7391da5ccf5a2b360701ce1a1f0f7ed6a6435fc12a4dc6480f4ca",
+    "docs/sitemap.xml": "00d4c2a95803c073867d686aa0cd0dd78adb8ff8b116a48e2cb8ae1c185f3f4b",
+    "herramientas/org.github.io/index.html": "7db6b380b03293914a8302f25d6f56393dedd724e4478803620e85f7d5b12fdf",
+    "herramientas/org.github.io/robots.txt": "af05da9fdf1f3e0751c9a12b94feba39e215710cfed14d5a78c7c7dc59b365b6"
+   },
+   "una_vez": [
+    "docs/favicon.svg",
+    "docs/pagina.json"
+   ]
+  },
+  "esqueleto": {
+   "version": "0.2.1",
+   "archivos": {},
+   "ficha": {
+    "requiere": [
+     "nucleo",
+     "host-ui",
+     "i18n",
+     "tema",
+     "componentes",
+     "bienvenida",
+     "contrato"
+    ],
+    "permisos": {},
+    "red": []
+   },
+   "una_vez": [
+    "README.md",
+    "bin/ejemplo.py",
+    "pruebas/contrato_app.py",
+    "pruebas/correr.sh",
+    "pruebas/interfaz.mjs",
+    "pruebas/test_app.py",
+    "ui/app.css",
+    "ui/app.js",
+    "ui/demo.json",
+    "ui/index.html"
+   ]
+  },
+  "github": {
+   "version": "0.3.1",
+   "archivos": {},
+   "ficha": {
+    "requiere": [],
+    "permisos": {},
+    "red": []
+   },
+   "generados": {
+    ".claude/settings.json": "3f631db8a31c18e215313f6af051769001c740a97112167593a66b7222e4b936",
+    ".github/ISSUE_TEMPLATE/config.yml": "cf8234d629cf31e556bb8f9d80960bc5b3f900b9a845b5b27b705961c345d64a",
+    ".github/ISSUE_TEMPLATE/error.yml": "29dafddead2e91b4df4dd70dbdcd0d73b7bb0f8229bf28da8f18351d56a3658a",
+    ".github/ISSUE_TEMPLATE/idea.yml": "172db55389e1b657876f1994068f791b3761f5f234e498ab8b561d10e00330bc",
+    ".github/dependabot.yml": "206ba4c61cc33e2c74eda7bd70c78418fa47f65f741bf3edc16bfacda77b1ec3",
+    ".github/workflows/pieza-al-dia.yml": "107931ebcd4c9094e85e2f8c2a3c2febc23ba24f1a246193a53ae8b41e09a5a4",
+    ".github/workflows/revisar.yml": "59dcab75b13ca6e7fdf3fd28e59d0749388a5ca0b07a3d340d2274e9b0e31a15",
+    ".github/workflows/wiki.yml": "13441bd3b18bded102eecf9637c87e3f63d0cbf67f796041f442c4afc213eb89",
+    "herramientas/revisar_privacidad.sh": "73aa3a2b66a61b1f9c8d06af8840a9f24725ed4f2156245283b0b94dfae6cfd4"
+   },
+   "una_vez": [
+    ".claude/agents/pilota-privacidad.md",
+    ".claude/agents/pilota-revisor.md",
+    ".github/ISSUE_TEMPLATE/probar.yml",
+    ".github/pull_request_template.md",
+    ".gitignore",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CLAUDE.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "GEMINI.md",
+    "LICENSE",
+    "SECURITY.md",
+    "docs/wiki/Home.md",
+    "docs/wiki/Instalar.md",
+    "docs/wiki/Preguntas-frecuentes.md",
+    "docs/wiki/Primeros-pasos.md",
+    "docs/wiki/_Sidebar.md"
+   ]
+  }
+ }
+}

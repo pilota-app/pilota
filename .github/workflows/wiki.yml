@@ -1,0 +1,46 @@
+# Publica la wiki desde docs/wiki/: cada archivo .md es una página (Home.md es la portada; _Sidebar.md, el menú).
+# La wiki se escribe y se revisa como el resto del repo (por pull request); este workflow solo la copia.
+# Una sola vez, a mano: pestaña «Wiki» → «Create the first page» → «Save» (GitHub no deja crearla de otra forma).
+# Si la wiki no existe todavía, el workflow avisa y termina sin fallar.
+name: wiki
+on:
+  push:
+    branches: [main]
+    paths: ["docs/wiki/**"]
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+jobs:
+  publicar:
+    runs-on: ubuntu-24.04
+    # Escribir en la wiki pide contents: write (la wiki es otro repo git del mismo dueño).
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Copiar docs/wiki a la wiki
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          REPO: "${{ github.repository }}"
+          SHA: "${{ github.sha }}"
+        run: |
+          [ -d docs/wiki ] || { echo "Sin docs/wiki: nada que publicar."; exit 0; }
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.wiki.git"
+          if ! git clone -q --depth 1 "$URL" wiki 2>/dev/null; then
+            echo "::warning::La wiki aún no existe. Créala una vez: pestaña «Wiki» → «Create the first page» → «Save»."
+            exit 0
+          fi
+          # La wiki es un espejo de docs/wiki: lo que se borra allá también se borra aquí.
+          find wiki -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R docs/wiki/. wiki/
+          cd wiki
+          git add -A
+          if git diff --cached --quiet; then echo "La wiki ya está al día."; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Wiki al día con docs/wiki (${SHA:0:7})"
+          git push -q origin HEAD
+          echo "✓ Wiki publicada."

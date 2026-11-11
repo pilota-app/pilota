@@ -1,0 +1,40 @@
+# Pilota: la app nativa de Mac, Windows y Linux (pieza «host-tauri» de Pieza). Rust + Tauri, con la interfaz de ui/ y
+# los scripts de bin/. Generado por Pieza desde app.json y las piezas instaladas: si lo cambias, desde ahí es de la app.
+[package]
+name = "pilota"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-only"
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-single-instance = "2"
+serde = "1"
+serde_json = "1"
+regex = { version = "1", default-features = false, features = ["std", "unicode-perl"] }
+url = "2"
+libc = "0.2"
+notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+notify-rust = "4"
+arboard = { version = "3", default-features = false }
+opener = { version = "0.9", features = ["reveal"] }
+rfd = { version = "0.15", default-features = false, features = ["gtk3"] }
+trash = "5"
+sys-locale = "0.3"
+ureq = { version = "3", features = ["json"] }
+sha2 = "0.11"
+base64 = "0.22"
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+
+[build-dependencies]
+tauri-build = "2"
+
+# Liviano: un solo binario chico (sin símbolos) y rápido.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

@@ -1,0 +1,5 @@
+{"id": "bosque", "categoria": "naturaleza", "nombre": "Bosque", "emoji": "🌲", "idioma": "es", "autor": "Pieza",
+ "descripcion": "Claro y tranquilo, con verdes de bosque y tierra.", "categorias": ["Naturaleza", "Minimalista"],
+ "tema": {"base": "claro", "colores": {"fondo": "#f3f6f1", "panel": "#ffffff", "acento": "#2f6b3f", "sobre-acento": "#ffffff", "linea": "#d6e0d2"}},
+ "textos": {"saludo": "Buen día", "vacio": "Todavía no hay nada. Planta la primera semilla.", "listo": "Listo, como hoja en otoño"},
+ "listas": {"elogios": ["Crece fuerte.", "Buenas raíces.", "Florece."], "rangos": ["Semilla", "Brote", "Árbol", "Bosque"]}}

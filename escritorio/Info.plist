@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Lo que Tauri suma al Info.plist de Pilota en Mac: los permisos de app.json → empaquetado.permisos (con su texto) y
+     la barra de menú. Generado por Pieza («host-tauri»). -->
+<plist version="1.0">
+<dict>
+	<key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+</dict>
+</plist>

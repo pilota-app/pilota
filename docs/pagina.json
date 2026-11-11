@@ -1,0 +1,29 @@
+{
+ "_la_app": "Lo propio de la página de Pilota: completa cada texto en español e inglés y corre python3 <pieza>/herramientas/pieza.py generar . pagina. Todo es texto plano (se escapa). Lo que ya sabe Pieza (permisos, a qué se conecta, preguntas comunes) no va aquí: sale de docs/pagina-comunes.json y de las piezas de la app.",
+ "formato": 1,
+ "titulo": {"es": "Pilota — La app: lo que es, en una línea (título para buscadores)", "en": "Pilota — The app: what it is, in one line (title for search engines)"},
+ "descripcion": {"es": "La app: dos frases para buscadores (unos 155 caracteres).", "en": "The app: two sentences for search engines (about 155 characters)."},
+ "frase": {"es": "La app: la frase grande de la portada.", "en": "The app: the big headline."},
+ "intro": {"es": "La app: un párrafo corto con lo que hace y para quién.", "en": "The app: a short paragraph with what it does and for whom."},
+ "categoria": "UtilitiesApplication",
+ "licencia": "AGPL-3.0",
+ "licencia_url": "https://www.gnu.org/licenses/agpl-3.0.html",
+ "acento": {"claro": "#2f5fd0", "oscuro": "#7fa2ff"},
+ "descargas": true,
+ "demo": true,
+ "datos": {"es": "En tu computador (en Mac, en ~/Library/Application Support/Pilota). Son archivos en formato abierto. No hay servidores ni cuentas: nada sale de ahí sin que lo pidas.", "en": "On your computer (on Mac, in ~/Library/Application Support/Pilota). They're open-format files. There are no servers or accounts: nothing leaves it unless you ask."},
+ "usa": {"notificaciones": false, "llavero": false, "microfono": false},
+ "funciones": [
+  {"titulo": {"es": "La app: una función", "en": "The app: a feature"}, "texto": {"es": "Qué resuelve, en una o dos frases.", "en": "What it solves, in one or two sentences."}}
+ ],
+ "pasos": [],
+ "comparacion": null,
+ "capturas": [],
+ "preguntas": [],
+ "permisos": [],
+ "red": [],
+ "comunidad": [
+  {"titulo": {"es": "Aporta", "en": "Contribute"}, "texto": {"es": "Con o sin programar, con o sin IA.", "en": "With or without code, with or without AI."}, "url": "https://github.com/pilota-app/pilota/blob/main/CONTRIBUTING.md"},
+  {"titulo": {"es": "Cuéntanos", "en": "Tell us"}, "texto": {"es": "Ideas, dudas y errores.", "en": "Ideas, questions and bugs."}, "url": "https://github.com/pilota-app/pilota/issues/new/choose"}
+ ]
+}

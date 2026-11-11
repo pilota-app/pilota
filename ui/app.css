@@ -1,0 +1,144 @@
+/* Pilota: lo propio de la interfaz. Los colores son los tokens de la pieza «tema» (tema.css: --fondo, --panel, --texto,
+   --texto-suave, --linea, --acento…); un color nuevo va como par --x-claro/--x-oscuro con light-dark(). Botones, diálogos y filas
+   son los de «componentes» (.pz-boton, .pz-principal, .pz-campo, .pz-pie…). La app: el acento de la marca y lo propio. */
+:root {
+  /* Lo propio de Pilota: el amarillo de «prueba» (dinero ficticio) y el verde de «al día». Cada color, su par claro/oscuro. */
+  --prueba-fondo-claro: #fff3cd; --prueba-fondo-oscuro: #4a3a00;
+  --prueba-texto-claro: #5c4600; --prueba-texto-oscuro: #ffe79a;
+  --prueba-linea-claro: #e6cf8a; --prueba-linea-oscuro: #6b5400;
+  --aldia-fondo-claro: #e3f2e1; --aldia-fondo-oscuro: #1e3a1c;
+  --aldia-texto-claro: #1f5d1a; --aldia-texto-oscuro: #bde8b8;
+  /* Y el morado de «real» (dinero de verdad): la banda nunca se parece a la de prueba. */
+  --real-fondo-claro: #ede4fb; --real-fondo-oscuro: #2e1f4d;
+  --real-texto-claro: #44277e; --real-texto-oscuro: #ddcbff;
+  --real-linea-claro: #c4aef0; --real-linea-oscuro: #553a8c;
+  --prueba-fondo: light-dark(var(--prueba-fondo-claro), var(--prueba-fondo-oscuro));
+  --prueba-texto: light-dark(var(--prueba-texto-claro), var(--prueba-texto-oscuro));
+  --prueba-linea: light-dark(var(--prueba-linea-claro), var(--prueba-linea-oscuro));
+  --aldia-fondo: light-dark(var(--aldia-fondo-claro), var(--aldia-fondo-oscuro));
+  --aldia-texto: light-dark(var(--aldia-texto-claro), var(--aldia-texto-oscuro));
+  --real-fondo: light-dark(var(--real-fondo-claro), var(--real-fondo-oscuro));
+  --real-texto: light-dark(var(--real-texto-claro), var(--real-texto-oscuro));
+  --real-linea: light-dark(var(--real-linea-claro), var(--real-linea-oscuro));
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+@media (pointer: coarse), (max-width: 760px) { :root { --pz-boton-alto: var(--pz-tactil); --pz-chip-alto: var(--pz-tactil); } }
+.barra { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--linea); background: var(--panel); }
+.barra h1 { margin: 0; font-size: 18px; }
+.contenido { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+.contenido h2 { margin: 0 0 4px; font-size: 20px; }
+.suave { color: var(--texto-suave); margin: 0 0 8px; }
+
+/* La banda del modo: fija, arriba de todo y de un color distinto en prueba y en real. Nunca hay duda de con qué dinero se juega.
+   Se queda pegada arriba al bajar por la pantalla (los diálogos van en z-index 50: la banda nunca les pasa por encima). */
+.banda { position: sticky; top: 0; z-index: 3; margin: 0; padding: 8px 16px; text-align: center; font-weight: 600; letter-spacing: 0.01em; }
+.banda-prueba { background: var(--prueba-fondo); color: var(--prueba-texto); border-bottom: 1px solid var(--prueba-linea); }
+.banda-real { background: var(--real-fondo); color: var(--real-texto); border-bottom: 1px solid var(--real-linea); }
+
+/* La pantalla principal (panel.js): la mascota, el saldo con su piso, los medidores, las posiciones y lo último que hice. */
+.panel { margin: 0 0 32px; }
+.panel h3 { margin: 24px 0 0; font-size: 15px; }
+/* La ayuda corta de cada término va pegada a lo que explica: el piso, el puntaje y la exigencia se leen en el mismo lugar. */
+.panel .ayuda { margin: 4px 0 8px; }
+/* La mascota: la carita, lo que cuenta de la decisión de ahora y la línea del día. */
+.mascota { display: flex; align-items: flex-start; gap: 12px; margin: 16px 0; padding: 12px 14px; border: 1px solid var(--linea); border-radius: var(--radio-chico, 8px); background: var(--panel); }
+/* Los cinco ánimos se ven de lejos: la carita cambia y el borde de la izquierda también. */
+.mascota-cara { flex: 0 0 auto; font-size: 32px; line-height: 1.1; }
+.mascota-cara::before { content: "🤖"; }
+.mascota-cara[data-animo="atento"]::before { content: "🤖👀"; font-size: 24px; }
+.mascota-cara[data-animo="dudando"]::before { content: "🤖❓"; font-size: 24px; }
+.mascota-cara[data-animo="operando"]::before { content: "🤖⚙️"; font-size: 24px; }
+.mascota-cara[data-animo="neutral"]::before { content: "🤖"; opacity: 0.7; }
+.mascota-cara[data-animo="frenado"]::before { content: "🤖✋"; font-size: 24px; }
+.mascota-dice { min-width: 0; }
+.mascota-animo { margin: 0; font-size: 13px; color: var(--texto-suave); text-transform: uppercase; letter-spacing: 0.04em; }
+.mascota-texto { margin: 2px 0 0; font-weight: 600; }
+/* Por qué: el motivo con su número, en su propia frase y sin negrita (lo que cuenta manda). */
+.mascota-porque { margin: 4px 0 0; color: var(--texto-suave); }
+.mascota-dia { margin: 4px 0 0; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.mascota[data-animo="atento"] { border-left: 3px solid var(--tenue); }
+.mascota[data-animo="dudando"] { border-left: 3px solid var(--acento); }
+.mascota[data-animo="operando"] { border-left: 3px solid var(--aldia-texto, var(--verde)); }
+.mascota[data-animo="neutral"] { border-left: 3px solid var(--texto-suave); }
+.mascota[data-animo="frenado"] { border-color: var(--prueba-linea); background: var(--prueba-fondo); color: var(--prueba-texto); }
+.mascota[data-animo="frenado"] .mascota-animo, .mascota[data-animo="frenado"] .mascota-porque,
+.mascota[data-animo="frenado"] .mascota-dia { color: inherit; }
+/* El saldo: el monto grande, su referencia en moneda local y dónde está la línea del piso. */
+.saldo { margin: 16px 0; }
+.saldo-monto { margin: 0; font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.saldo-local { margin: 2px 0 8px; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.saldo-linea { margin: 4px 0 0; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.piso { position: relative; height: 10px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+.piso-barra { display: block; height: 100%; border-radius: 999px; background: var(--acento); }
+/* Un medidor por par: el puntaje de su mejor oportunidad y, encima, la línea de la exigencia. */
+.medidores { list-style: none; margin: 12px 0; padding: 0; border: 1px solid var(--linea); border-radius: var(--radio-chico, 8px); overflow: hidden; }
+.medidor { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 10px 14px; background: var(--panel); }
+.medidor + .medidor { border-top: 1px solid var(--linea); }
+.medidor-par { font-weight: 600; min-width: 8em; }
+.medidor-nota { color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.medidor-barra { position: relative; flex: 1 0 100%; height: 12px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+.medidor-valor { display: block; height: 100%; border-radius: 999px; background: var(--texto-suave); }
+.medidor-valor.pasa { background: var(--acento); }
+.medidor-exigencia { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--texto); }
+.medidor > .serie-detalle { flex: 1 0 100%; }
+/* Lo que lleva ganado una posición: el verde es el mismo de «al día». */
+.serie-detalle.gana { color: var(--aldia-texto); font-weight: 600; }
+/* El motor: hace cuánto miró, qué pasó mientras nadie miraba y el aviso de que solo trabaja con el equipo encendido. */
+.panel-motor { margin: 16px 0 0; }
+.panel-motor-linea { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; }
+/* La cuenta atrás de una propuesta no es un detalle más: es el tiempo que queda para responder. */
+.panel .cuenta { color: var(--texto); font-weight: 600; }
+
+/* El estado de los datos: lo primero que se lee. Mientras falte historial, dice qué falta. */
+.estado-datos { margin: 16px 0; padding: 12px 14px; border-radius: var(--radio-chico, 8px); background: var(--panel-2); }
+.estado-datos p { margin: 0; font-weight: 600; }
+.estado-datos.listo { border-left: 3px solid var(--acento); }
+.estado-datos.falta { border-left: 3px solid var(--prueba-texto); }
+.motivos { margin: 8px 0 0; padding-left: 20px; color: var(--texto-suave); font-weight: 400; }
+
+/* Una fila por par y temporalidad. A lo angosto se apila: nada se sale. */
+.series { list-style: none; margin: 16px 0; padding: 0; border: 1px solid var(--linea); border-radius: var(--radio-chico, 8px); overflow: hidden; }
+.serie { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 10px 14px; background: var(--panel); }
+.serie + .serie { border-top: 1px solid var(--linea); }
+.serie-par { font-weight: 600; min-width: 9em; }
+.serie-detalle { color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.serie-estado { padding: 2px 8px; border-radius: 999px; font-size: 13px; background: var(--panel-2); color: var(--texto-suave); }
+.serie-estado[data-estado="listo"] { background: var(--aldia-fondo); color: var(--aldia-texto); }
+.serie-estado[data-estado="incompleto"] { background: var(--prueba-fondo); color: var(--prueba-texto); }
+/* La ayuda corta de cada término: siempre a la vista, en palabras de persona. */
+.ayuda { margin: 8px 0; color: var(--texto-suave); font-size: 14px; }
+.contenido h2 + .ayuda { margin-top: 4px; }
+
+/* El capital mínimo viable: el monto grande primero y, abajo, de dónde sale. */
+.minimo { margin: 16px 0; }
+.minimo-monto { margin: 8px 0 0; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.minimo-cabe { margin: 0 0 8px; font-weight: 600; }
+.minimo-cabe.alcanza { color: var(--aldia-texto); }
+.minimo-cabe.falta { color: var(--prueba-texto); }
+/* Los dos trabajos en segundo plano (los 3 años y el muestreo): el porcentaje y el tiempo que falta, siempre a la vista. */
+.trabajo { margin: 16px 0; }
+.avance { display: block; width: 100%; height: 10px; margin: 0 0 8px; border: 0; border-radius: 999px; background: var(--panel-2); appearance: none; }
+.avance::-webkit-progress-bar { border-radius: 999px; background: var(--panel-2); }
+.avance::-webkit-progress-value { border-radius: 999px; background: var(--acento); transition: width 0.2s; }
+.avance::-moz-progress-bar { border-radius: 999px; background: var(--acento); }
+.trabajo-pct { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.trabajo-linea { margin: 2px 0 0; color: var(--texto-suave); }
+.tramos { list-style: none; margin: 12px 0 8px; padding: 0; border: 1px solid var(--linea); border-radius: var(--radio-chico, 8px); overflow: hidden; }
+.tramo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 14px; background: var(--panel); }
+.tramo + .tramo { border-top: 1px solid var(--linea); }
+.tramo-nombre { font-weight: 600; min-width: 6em; }
+/* Los indicadores: cuántas series están al día, una fila por par y temporalidad y, abajo, el contexto de BTC y el costo. */
+.indicadores { margin: 16px 0; }
+.indicadores-resumen { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.indicadores-linea { margin: 2px 0 0; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.indicadores h3 { margin: 20px 0 0; font-size: 15px; }
+/* Un freno que no deja entrar (el filtro de BTC) se lee distinto: no es un dato más, es la razón por la que no se opera. */
+.indicadores-linea.freno { color: var(--prueba-texto); font-weight: 600; }
+.serie-detalle.freno { color: var(--prueba-texto); font-weight: 600; }
+/* Arrancar frenado no es un dato más: el resumen se lee distinto hasta que la persona lo revisa. */
+.indicadores-resumen.freno { color: var(--prueba-texto); }
+/* El puntaje: las siete notas de una oportunidad van dentro de su fila, a lo ancho y una debajo de la otra. */
+.serie > .tramos { flex: 1 0 100%; margin: 8px 0 0; }
+.pantalla-idioma { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.pantalla-idioma > .pieza-bv { width: min(460px, 100%); padding: 24px; border: 1px solid var(--linea); border-radius: 12px; background: var(--panel); }
