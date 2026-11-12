@@ -9,6 +9,14 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
 - Pilota ahora se ordena en seis pestañas: En vivo, Comparar, Movimientos, Cabina, Dinero real y Avanzado (lo técnico). *Pilota
   is now organized in six tabs: Live, Compare, Moves, Cockpit, Real money and Advanced (the technical part).*
+- Nuevo: gráfico de velas en vivo, como el de un trader. El precio se mueve cada segundo, las compras y las ventas del robot
+  aparecen como flechas de color con un aviso al instante, y puedes prender bandas de Bollinger, medias, volumen y RSI con un
+  botón. *New: a live candlestick chart, like a trader's. The price moves every second, the robot's buys and sells show up as
+  colored arrows with an instant alert, and you can turn on Bollinger Bands, moving averages, volume and RSI with one tap.*
+- El robot ahora está conectado a Binance en vivo y reacciona en el segundo en que cierra cada vela (antes revisaba cada 5
+  minutos). *The robot is now connected to Binance live and reacts the second each candle closes (before, it checked every 5
+  minutes).*
+- Arreglado: ya no pueden quedar dos motores corriendo a la vez. *Fixed: two engines can no longer run at the same time.*
 - Nuevo: cinco perfiles para el robot: Holding, Conservador, Equilibrado, Trader y Scalper, del más lento al más rápido. *New: five
   profiles for the robot: Holding, Conservative, Balanced, Trader and Scalper, from slowest to fastest.*
 - Nuevo: «En vivo». Eliges un perfil y un monto ficticio, y el robot opera solo con precios reales de Binance. Ves cuánto vale,

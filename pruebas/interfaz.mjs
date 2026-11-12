@@ -88,8 +88,8 @@ await page.waitForSelector("#descargar");
 {
   const cab = await abrir("?demo&idioma=es", 1280, { plegado: true });
   await cab.waitForSelector("#pestana-vivo .perfiles");
-  assert.equal(await cab.locator('[role="tab"]').count(), 6, "seis pestañas");
-  assert.equal(await cab.locator('[role="tab"][aria-selected="true"]').getAttribute("id"), "tab-vivo", "parte en «En vivo»");
+  assert.equal(await cab.locator('.pestanas [role="tab"]').count(), 6, "seis pestañas");
+  assert.equal(await cab.locator('.pestanas [role="tab"][aria-selected="true"]').getAttribute("id"), "tab-vivo", "parte en «En vivo»");
   assert.equal(await cab.locator(".perfil").count(), 5, "los cinco perfiles");
   assert.equal(await cab.getAttribute('.perfil[data-perfil="equilibrado"]', "aria-checked"), "true", "el sugerido viene elegido");
   assert.ok(await cab.locator("#pestana-como").isHidden(), "lo técnico vive en su pestaña");
@@ -100,6 +100,24 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.inputValue("#vivo-monto"), "300", "lo escrito sigue ahí al volver a pintar");
   await cab.click("#vivo-empezar");
   await cab.waitForSelector(".vivo-saldo");
+  // El gráfico en vivo: velas en un lienzo, el precio que se mueve solo y los indicadores que se prenden con un botón.
+  await cab.waitForSelector("#grafico-lienzo");
+  await cab.waitForFunction(() => /\d/.test(document.getElementById("precio-BTCFDUSD").textContent), null, { timeout: 10000 });
+  const precio1 = await cab.textContent("#precio-BTCFDUSD");
+  await cab.waitForFunction((p) => document.getElementById("precio-BTCFDUSD").textContent !== p, precio1, { timeout: 10000 });
+  assert.match(await cab.textContent("#pestana-vivo .conexion"), /En vivo: conectado a Binance/);
+  assert.equal(await cab.getAttribute('[data-graf-ind="bb"]', "aria-pressed"), "true", "Bollinger viene prendido");
+  await cab.click('[data-graf-ind="rsi"]');
+  assert.equal(await cab.locator(".grafico-caja.con-rsi").count(), 1, "el RSI suma su panel");
+  await cab.click('[data-graf-t="1h"]');
+  assert.equal(await cab.getAttribute('[data-graf-t="1h"]', "aria-pressed"), "true");
+  await cab.waitForFunction(() => {           // el gráfico de 1 h se dibujó (llega un momento después)
+    const c = document.getElementById("grafico-lienzo");
+    if (!c || !c.width) return false;
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i]) return true;
+    return false;
+  }, null, { timeout: 5000 });
   assert.match(await cab.textContent(".vivo-perfil"), /Perfil Trader/);
   assert.match(await cab.textContent(".vivo-saldo"), /Pusiste 300 USDT ficticios/);
   assert.equal(await cab.locator(".vivo .robot").count(), 1, "el robot está dibujado");

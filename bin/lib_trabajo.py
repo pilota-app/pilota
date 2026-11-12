@@ -29,7 +29,7 @@ def proyecto():
 
 
 def ruta_plan(tipo):
-    if tipo not in ("historial", "muestreo", "motor"):
+    if tipo not in ("historial", "muestreo", "motor", "vivo"):
         raise ValueError(f"No conozco ese trabajo: {tipo!r}")
     return os.path.join(lib_datos.carpeta_mercado(), tipo + ".json")
 

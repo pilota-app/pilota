@@ -645,6 +645,36 @@
    "datos": {},
    "responde": "vivoListo",
    "limite": 30
+  },
+  "vivoEncender": {
+   "script": "vivo.py",
+   "args": [
+    "encender"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "vivoTerminado",
+   "progreso": "vivoProgreso",
+   "limite": "trabajo"
+  },
+  "vivoGrafico": {
+   "script": "vivo.py",
+   "args": [
+    "grafico"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "par": {
+     "tipo": "texto",
+     "max": 12
+    },
+    "temporalidad": {
+     "tipo": "texto",
+     "max": 4
+    }
+   },
+   "responde": "graficoListo",
+   "limite": 30
   }
  }
 }

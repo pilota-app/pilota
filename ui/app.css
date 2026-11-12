@@ -443,3 +443,53 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
   .mov-texto { grid-column: 2; }
   .vivo-saldo-monto { font-size: 32px; }
 }
+/* El gráfico en vivo */
+:root { --graf-media20-claro: #b07208; --graf-media20-oscuro: #f0b43c; --graf-media50-claro: #7a3fc4; --graf-media50-oscuro: #b892f0;
+  --graf-media20: light-dark(var(--graf-media20-claro), var(--graf-media20-oscuro));
+  --graf-media50: light-dark(var(--graf-media50-claro), var(--graf-media50-oscuro)); }
+.grafico { padding: 16px 16px 10px; }
+.grafico-cabeza { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.grafico-pares { display: flex; gap: 6px; }
+.graf-par { display: grid; gap: 0; min-width: 120px; padding: 6px 12px; border: 1px solid var(--linea); border-radius: 10px;
+  background: var(--fondo); color: var(--texto); text-align: left; font: inherit; cursor: pointer; }
+.graf-par[aria-selected="true"] { border-color: var(--acento); background: color-mix(in srgb, var(--acento) 8%, var(--fondo)); }
+.graf-par:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+.graf-par-nombre { color: var(--texto-suave); font-size: 12px; font-weight: 700; }
+.graf-par-precio { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; border-radius: 4px; }
+.graf-par-precio[data-tic="sube"] { color: var(--gana); animation: tic-sube 0.9s ease-out; }
+.graf-par-precio[data-tic="baja"] { color: var(--pierde); animation: tic-baja 0.9s ease-out; }
+@keyframes tic-sube { from { background: color-mix(in srgb, var(--gana) 28%, transparent); } to { background: transparent; } }
+@keyframes tic-baja { from { background: color-mix(in srgb, var(--pierde) 28%, transparent); } to { background: transparent; } }
+.grafico-indicadores { margin-bottom: 8px; }
+.chip-ind[aria-pressed="true"] { border-color: var(--acento); }
+.grafico-caja { position: relative; }
+.grafico-caja canvas { display: block; width: 100%; height: 380px; cursor: crosshair; }
+.grafico-caja.con-rsi canvas { height: 470px; }
+.grafico-vacio { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; }
+.grafico-dato { min-height: 1.4em; margin: 6px 0 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.grafico-destello { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 10px 18px; border-radius: 999px;
+  font-size: 16px; font-weight: 700; color: #fff; background: var(--acento); box-shadow: 0 6px 24px rgb(0 0 0 / 0.25); white-space: nowrap; }
+.grafico-destello[data-tipo="compra"], .grafico-destello[data-tipo="gana"] { background: var(--gana); }
+.grafico-destello[data-tipo="pierde"] { background: var(--pierde); }
+.grafico-destello.anda { animation: destello 6s ease-out forwards; }
+@keyframes destello { 0% { opacity: 0; transform: translate(-50%, -8px) scale(0.9); } 6% { opacity: 1; transform: translate(-50%, 0) scale(1.06); }
+  12% { transform: translate(-50%, 0) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+.conexion { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 14px; font-weight: 600; color: var(--texto-suave); }
+.conexion-punto { width: 10px; height: 10px; flex: 0 0 auto; border-radius: 50%; background: var(--texto-suave); }
+.conexion[data-estado="en_vivo"] { color: var(--gana); }
+.conexion[data-estado="en_vivo"] .conexion-punto { background: var(--gana); animation: latido 1.6s ease-in-out infinite; }
+.conexion[data-estado="conectando"] .conexion-punto { background: var(--acento); animation: latido 0.8s ease-in-out infinite; }
+.conexion[data-estado="apagado"] { color: var(--prueba-texto); }
+@keyframes latido { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 50%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }
+.centro > .grafico { margin-bottom: 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .graf-par-precio, .grafico-destello.anda, .conexion-punto { animation: none !important; }
+}
+@media (max-width: 520px) {
+  .graf-par { min-width: 0; flex: 1; }
+  .grafico-caja canvas { height: 300px; }
+  .grafico-destello { font-size: 14px; white-space: normal; text-align: center; width: 86%; }
+}
+@media (max-width: 520px) {
+  .pestana span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; }
+}

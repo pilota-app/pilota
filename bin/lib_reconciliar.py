@@ -29,6 +29,7 @@ Lo que no se negocia aquí:
 """
 import math
 
+import lib_candado
 import lib_datos
 import lib_ejecutor_prueba
 import lib_ejecutor_real
@@ -226,6 +227,13 @@ def anotar_ventana(plan, v, cobertura, ahora_ms):
 # ── Una revisión ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 def reconciliar(ahora_ms=None, plan=None, mercado=None, decidir=None):
+    """Una revisión a la vez, aunque la pidan dos procesos (el motor y el robot en vivo): las dos leen y escriben el mismo
+    estado firmado. La segunda espera a que termine la primera (`lib_candado`)."""
+    with lib_candado.candado("revision", espera=60):
+        return _reconciliar(ahora_ms, plan, mercado, decidir)
+
+
+def _reconciliar(ahora_ms=None, plan=None, mercado=None, decidir=None):
     """Una revisión del motor, que al arrancar o al despertar es la reconciliación: los frenos aplicados, las velas de
     1 m que faltaban recorridas, lo huérfano cerrado, la ventana sin cobertura escrita y el resumen de lo que pasó.
 

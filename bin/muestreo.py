@@ -31,6 +31,7 @@ y las velas de 1 m, donde siempre (`<datos>/mercado/velas/<PAR>-1m.json`).
 """
 import time
 
+import lib_candado
 import lib_datos
 import lib_trabajo
 import nucleo
@@ -198,6 +199,15 @@ def estado(d=None, ahora_ms=None):
 
 
 def encender(d=None, cliente=None, ahora_ms=None, dias=lib_datos.DIAS_MINUTOS, dormir=time.sleep, ciclos=0, latir=True):
+    """Uno solo a la vez: si ya hay uno corriendo (otra ventana de la app, o uno que quedó vivo), este no parte."""
+    try:
+        with lib_candado.unico(TIPO):
+            return _encender(d, cliente, ahora_ms, dias, dormir, ciclos, latir)
+    except lib_candado.YaCorriendo:
+        return {"ok": False, "datos": estado(d)["datos"], "error": "ya_corriendo"}
+
+
+def _encender(d=None, cliente=None, ahora_ms=None, dias=lib_datos.DIAS_MINUTOS, dormir=time.sleep, ciclos=0, latir=True):
     """Muestrea cada `CICLO_SEGUNDOS` hasta que le pidan parar. Todo lo que no es `d` solo se pasa en las pruebas (`ciclos`
     corta después de unas vueltas; la acción no corta sola: la corta «Detener» o el cierre de la app)."""
     cliente = cliente or lib_datos.Binance()
@@ -218,7 +228,7 @@ def encender(d=None, cliente=None, ahora_ms=None, dias=lib_datos.DIAS_MINUTOS, d
         lib_trabajo.publicar(t, resumen(plan))
 
     error = ""
-    while not t.detenido() and not (ciclos and vuelta >= ciclos):
+    while not t.detenido() and not (ciclos and vuelta >= ciclos) and not lib_candado.huerfano():
         vuelta += 1
         guardadas, muestreada = [], False
         try:

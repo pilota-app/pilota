@@ -61,7 +61,10 @@ cuentas ni publicidad; nada personal en el código (Ana Pérez, Matías Soto). B
 | `ui/panel.js` | La pantalla principal dibujada (`PilotaPanel.crear`): la mascota y su línea diaria, el saldo con su piso y su referencia local, los medidores, las posiciones, las propuestas con su cuenta atrás (`latir`), el motor y el registro. Las etiquetas que ya existen se las pasa `ui/app.js`. |
 | `bin/lib_perfiles.py` | Los cinco perfiles (`PERFILES`, `ORDEN`, `SUGERIDO`): qué temporalidades mira cada uno, la ganancia/riesgo mínima, el riesgo por operación y cuántas posiciones (`acepta`, `relacion`, `tamano`), y las velas de 5 m armadas con las de 1 m (`agrupar`, `serie`). No es una acción. |
 | `bin/lib_piloto.py` | El robot en vivo, solo en prueba: empezar con un perfil y un monto (`empezar`, `detener`), la vuelta que engancha el motor (`decidir`: con perfil opera el perfil, sin perfil o en real deciden los tres modos), las señales de la última vela cerrada (`senales_de_ahora`), el holding por partes y lo que lee la pantalla (`estado`, `movimientos`). No es una acción. |
-| `bin/vivo.py` | Las tres acciones del robot en vivo: `estado`, `empezar` (perfil y monto) y `detener`. |
+| `bin/vivo.py` | Las acciones del robot en vivo: `estado`, `empezar` (perfil y monto), `detener`, `grafico` (velas, marcas de compra y venta y líneas de lo abierto) y el trabajo `encender` (el flujo de Binance al segundo: guarda cada vela de 1 m al cerrar y revisa en ese mismo instante). |
+| `bin/lib_flujo.py` | El flujo de Binance en vivo por WebSocket, solo biblioteca estándar: un solo destino (`HOST`, `PUERTO`, `ruta_de`), el saludo revisado, marcos con tope, ping/pong, silencio que corta (`SILENCIO_MAXIMO`) y cada mensaje revisado (`vela_de`). Solo lectura. No es una acción. |
+| `bin/lib_candado.py` | Una sola cosa a la vez entre procesos: un solo trabajo de cada tipo (`unico`, `YaCorriendo`), una revisión a la vez (`candado`) y el trabajo que quedó sin app (`huerfano`). No es una acción. |
+| `ui/grafico.js` | El gráfico de velas en vivo en un `<canvas>` (`PilotaGrafico.crear`): 1 m, 5 m, 1 h y 4 h, Bollinger, medias, volumen y RSI con un botón, las flechas de compra y venta, las líneas de entrada, stop y objetivo, el precio que se mueve cada segundo y el destello de color de cada operación. |
 | `bin/lib_simulacion.py` | «Si hubiera puesto X»: el historial como una cartera con tamaño y frenos (`cartera`, con `perfil` y sus `movimientos`), comprar BTC y esperar, el holding por partes (`holding`), el scalper sobre 5 m (`ops_rapidas`) y los cinco perfiles lado a lado (`comparar`). No es una acción (la corre `bin/simular.py`). |
 | `ui/vivo.js` | Las pestañas «En vivo», «Comparar» (con la película de movimientos) y «Movimientos» (`PilotaVivo.crear`). Los movimientos se cuentan en frases completas desde los códigos del registro. |
 | `ui/centro.js` | Las pestañas de arriba y «Dinero real» (requisitos, llave de Binance e interruptor). |
@@ -96,7 +99,8 @@ suelta (`bajar_tramo(..., recortar_desde=…)`).
 Reglas que no se cambian sin pensarlo dos veces (`bin/lib_datos.py`):
 - **Solo velas cerradas.** La vela en curso no se guarda: sus valores todavía pueden cambiar.
 - **La red solo va a `api.binance.com` por https**, solo a las rutas de `RUTAS`, sin redirecciones y sin los proxies del entorno.
-  Mientras Pilota no tenga la pieza «Red», el candado vive en `pedir_api`.
+  Mientras Pilota no tenga la pieza «Red», el candado vive en `pedir_api`. La única otra salida es el flujo público de velas en
+  vivo (`bin/lib_flujo.py`): `stream.binance.com:9443` por TLS, solo la ruta de velas de los pares que se operan, solo lectura.
 - **Los límites de la API se respetan**: ante 429 o 418 se espera lo que pide Binance (`Retry-After`, tope `ESPERA_MAXIMA`) y se
   reintenta hasta `INTENTOS` veces; igual ante un 5xx o un corte de red.
 - **Continuidad antes de calcular**: `huecos()` revisa paso por paso (hora por hora en `1h`). Una serie con hoyos, corta o
@@ -633,8 +637,14 @@ Reglas que no se cambian sin pensarlo dos veces:
   (`sin_datos`). Por eso el muestreo deja al día también las velas de 1 h, 4 h y 1 d (`muestreo.velas_al_dia`).
 - **Las compras del holding viven en `estado/piloto.json`**, no en el estado firmado: es dinero ficticio y no tiene órdenes.
   Cada compra queda en el registro (`compra_holding`).
-- **Pilota prepara sola lo que falta al abrir** (`prepararSola` en `ui/app.js`): los mínimos, el muestreo, el historial y,
-  con el robot en marcha, el motor. Cada cosa se pide una vez por sesión; en la vista previa no, salvo con `?auto`.
+- **Pilota prepara sola lo que falta al abrir** (`prepararSola` en `ui/app.js`): el flujo en vivo (siempre, también en la vista
+  previa), los mínimos, el muestreo y el historial. Cada cosa se pide una vez por sesión; en la vista previa solo el flujo,
+  salvo con `?auto`.
+- **Reacciona al cerrar la vela, no antes.** El flujo (`vivo.py encender`) muestra la vela en curso cada segundo, pero se decide
+  con velas cerradas, igual que en el pasado: la revisión corre en el segundo en que cierra cada minuto. En prueba, un stop o
+  un objetivo se aplica al cerrar el minuto con el precio del nivel; en real la protección vive en Binance y salta al instante.
+- **El gráfico no decide nada**: muestra las velas guardadas más la que se está formando, las marcas del registro y las líneas
+  de lo abierto. Sus indicadores se calculan en la pantalla con las mismas fórmulas de `lib_indicadores*`.
 
 ## La pantalla principal
 
@@ -695,8 +705,12 @@ Pilota tiene tres:
 | `historial` (`bin/historial.py`) | Los **3 años** de las 12 series, por etapas (`1d`, `4h`, `1h`: de lo más barato a lo más caro). | `historialEstado`, `historialDescargar`, `historialDetener` |
 | `muestreo` (`bin/muestreo.py`) | Cada **5 minutos**: el mejor precio de compra y de venta y los últimos trades de los dos pares que se operan, más las velas de 1 m de los últimos 30 días al día. | `muestreoEstado`, `muestreoEncender`, `muestreoApagar` |
 | `motor` (`bin/motor.py`) | Cada **5 minutos**: la revisión que reconcilia (frenos, velas de 1 m perdidas, lo huérfano y la ventana sin cobertura). | `motorEstado`, `motorRevisar`, `motorEncender`, `motorApagar` |
+| `vivo` (`bin/vivo.py`) | **Siempre conectado**: el flujo de Binance al segundo. Cada segundo publica la vela en curso y, al cerrar cada minuto, guarda la vela y hace la revisión completa en ese instante. | `vivoEncender` (progreso `vivoProgreso`) |
 
 Reglas que no se cambian sin pensarlo dos veces:
+- **Uno solo de cada tipo** (`lib_candado.unico`): si ya hay un motor, un muestreo o un flujo corriendo, el segundo contesta
+  `ya_corriendo` y no parte. Y **una revisión a la vez**: `lib_reconciliar.reconciliar` toma su candado, así el motor y el flujo
+  pueden convivir sin pisar el estado firmado. **Si la app se cierra de golpe, el trabajo termina solo** (`huerfano`).
 - **Se guarda en cada página.** `lib_datos.bajar_tramo` guarda las velas y el plan en cada pedido que trae algo nuevo, y revisa
   «Detener» **antes** de cada pedido. Así «Detener» y «Seguir donde quedó» no pierden ni repiten nada, y cerrar la app tampoco.
 - **«Empezar» y «Seguir donde quedó» son la misma acción**: el plan en disco (`siguiente` de cada serie) dice desde dónde va.

@@ -30,6 +30,8 @@
     real: null, realOcupado: false, campos: {},
     // El robot en vivo (bin/vivo.py), el perfil que se está eligiendo y la película de la comparación.
     vivo: null, vivoPerfil: "equilibrado", vivoMonto: 100, vivoOcupado: false, vivoElegir: false, peli: null,
+    // El gráfico en vivo (ui/grafico.js) y el flujo de Binance (bin/vivo.py encender): conectado o no.
+    graf: null, flujo: null,
     // Lo que Pilota prepara sola al abrir: cada cosa se pide una sola vez por sesión.
     auto: {} };
   // La llave y el secreto mientras se escriben: solo en memoria, nunca en E (que se puede mirar en las pruebas) ni en
@@ -1411,8 +1413,16 @@
   });
   // ── «Cómo pienso»: cada pieza por separado, con sus números (la pestaña de lo técnico) ──
   const centroUI = PilotaCentro.crear({ i18n, esc, numero, usdt, porcentaje, fechaHora });
+  const graficoUI = PilotaGrafico.crear({ i18n, esc, numero, usdt });
+  E.graf = graficoUI.estadoInicial();
   const vivoUI = PilotaVivo.crear({ i18n, esc, numero, usdt, porcentaje, fechaHora, robot: panelUI.robot,
-    motivoCorto: (c) => MOTIVO_CORTO[c] || "otro motivo" });
+    motivoCorto: (c) => MOTIVO_CORTO[c] || "otro motivo", grafico: () => graficoUI.html(E) });
+  // Pide las velas del gráfico (las cerradas, las marcas y las líneas de lo abierto) del par y la temporalidad elegidos.
+  function pedirGrafico() {
+    E.graf.cargando = !E.graf.datos;
+    E.graf.minutos = {};
+    host.enviar("vivoGrafico", { par: E.graf.par, temporalidad: E.graf.temporalidad });
+  }
   function comoPienso() {
     const series = (E.datos && Array.isArray(E.datos.series)) ? E.datos.series : [];
     return `
@@ -1552,6 +1562,7 @@
     }
     i18n.traducirDOM(raiz);
     ui.despuesDePintar();
+    graficoUI.montar(raiz, E);
   }
 
   // ── Lo que hace la persona ──
@@ -1563,6 +1574,16 @@
     if (!b) return;
     if (b.dataset.pestana) irA(b.dataset.pestana);
     else if (b.dataset.irPestana) irA(b.dataset.irPestana);
+    else if (b.dataset.grafPar || b.dataset.grafT) {
+      if (b.dataset.grafPar) E.graf.par = b.dataset.grafPar;
+      if (b.dataset.grafT) E.graf.temporalidad = b.dataset.grafT;
+      E.graf.datos = null;
+      pedirGrafico();
+      pintar();
+    } else if (b.dataset.grafInd) {
+      E.graf.ind[b.dataset.grafInd] = !E.graf.ind[b.dataset.grafInd];
+      pintar();
+    }
     else if (b.dataset.perfil) {
       E.vivoPerfil = b.dataset.perfil;
       pintar();
@@ -1802,6 +1823,7 @@
     E.pestana = id;
     if (id === "comparar" && !E.sim.ultima) host.enviar("simularEstado", {});
     if (id === "vivo" || id === "movimientos") host.enviar("vivoEstado", {});
+    if (id === "vivo") pedirGrafico();
     if (id !== "comparar" && E.peli) E.peli.jugando = false;
     if (id === "operar") host.enviar("realEstado", {});
     pintar();
@@ -1842,18 +1864,41 @@
   // por sesión. En la vista previa no (ahí cada botón se prueba a mano), salvo con ?auto.
   function prepararSola() {
     const enDemo = host.plataforma === "web" && !new URLSearchParams(location.search).has("auto");
-    if (enDemo || !E.iniciada) return;
+    if (!E.iniciada) return;
     const una = (clave, accion, datos = {}) => {
       if (E.auto[clave]) return;
       E.auto[clave] = true;
       host.enviar(accion, datos);
     };
+    // El flujo de Binance en vivo: el gráfico y el robot reaccionan al segundo. Es de solo lectura y va siempre.
+    if (E.vivo && !(E.vivo.flujo && E.vivo.flujo.corriendo)) una("flujo", "vivoEncender");
+    if (enDemo) return;
     if (E.minimo && !E.minimo.calculado) una("minimo", "minimoCalcular", { capital: CAPITAL_PRUEBA });
     if (E.muestreo && !E.muestreo.corriendo) una("muestreo", "muestreoEncender");
     const h = E.historial;
     if (h && !h.corriendo && !(Number(h.pct) >= 100 && h.continuo !== false)) una("historial", "historialDescargar");
-    if (E.vivo && E.vivo.activo && E.motor && !E.motor.corriendo) una("motor", "motorEncender");
   }
+  // Una compra o una venta que acaba de pasar, en una frase de color (verde compra o ganó, rojo perdió).
+  function avisoEvento(l) {
+    const o = l.orden || {}, r = l.resultado || {}, moneda = String(l.par || "").replace(/(FDUSD|USDT)$/, "");
+    if (["entrada_ruptura", "entrada_rebote", "compra_holding"].includes(l.razon) && (l.razon === "compra_holding" || o.estado === "llenada")) {
+      return { tipo: "compra", texto: Tp("Compré {moneda} a {precio}", { moneda, precio: usdt(o.precio) }),
+        marca: { par: l.par, ms: l.ms, tipo: "compra", precio: o.precio } };
+    }
+    if (["objetivo", "stop", "stop_movil", "cierre_manual"].includes(l.razon)) {
+      const neto = Number(r.neto) || 0;
+      return { tipo: neto > 0 ? "gana" : "pierde",
+        texto: Tp(neto > 0 ? "Vendí {moneda} a {precio}: gané {neto}" : "Vendí {moneda} a {precio}: perdí {neto}",
+          { moneda, precio: usdt(r.precio), neto: usdt(Math.abs(neto)) }),
+        marca: { par: l.par, ms: l.ms, tipo: "venta", precio: r.precio, neto } };
+    }
+    if (["entrada_ruptura", "entrada_rebote"].includes(l.razon)) {
+      return { tipo: "espera", texto: Tp("Dejé una compra de {moneda} esperando en {precio}", { moneda, precio: usdt(o.precio) }),
+        marca: { par: "", ms: l.ms } };
+    }
+    return null;
+  }
+  window.addEventListener("resize", () => graficoUI.dibujar());
   // La película de la comparación: solo se vuelve a pintar su recuadro, no la pantalla entera.
   function pintarPeli() {
     const el = document.getElementById("peli");
@@ -1871,6 +1916,8 @@
   // El robot en vivo se mira de nuevo cada 30 segundos mientras su pestaña está a la vista (el motor decide cada 5 min).
   setInterval(() => {
     if (bv.activa || !E.vivo || !E.vivo.activo || !["vivo", "movimientos"].includes(E.pestana)) return;
+    if (E.flujo && E.flujo.conectado) return;     // con el flujo conectado, lo nuevo llega solo
+
     host.enviar("vivoEstado", {});
     host.enviar("motorEstado", {});
   }, 30000);
@@ -1905,6 +1952,7 @@
         host.enviar("simularEstado", {});    // la última simulación con monto, si hay
         host.enviar("realEstado", {});       // y si hay llave de Binance, los requisitos y si el dinero real está encendido
         host.enviar("vivoEstado", {});       // y el robot en vivo: con qué perfil, cuánto vale y qué hizo
+        pedirGrafico();                      // y las velas del gráfico en vivo
         const q = new URLSearchParams(location.search).get("pestana");
         if (q && centroUI.PESTANAS.includes(q)) E.pestana = q;
       }
@@ -1915,6 +1963,7 @@
       const antes = E.vivo;
       E.vivoOcupado = false;
       if (r && r.datos) E.vivo = r.datos;
+      if (r && r.datos && r.datos.flujo) E.flujo = { ...(E.flujo || {}), ...r.datos.flujo };
       if (r && r.ok === false) toast(Tp(vivoUI.ERRORES_VIVO[r.error] || "No se pudo."), { error: true });
       else if (E.vivo && E.vivo.activo && !(antes && antes.activo && antes.desde_ms === E.vivo.desde_ms)) {
         if (antes !== null) {
@@ -1923,12 +1972,48 @@
           host.enviar("estadoArrancar", {});
           host.enviar("panelEstado", {});
           host.enviar("realEstado", {});
-          // Sin el motor encendido, nadie da las vueltas: se enciende al empezar.
-          if (!(E.motor && E.motor.corriendo)) { E.encendiendoMotor = true; host.enviar("motorEncender", {}); }
+          // Sin el flujo de Binance, nadie mira: se conecta al empezar (uno solo: el Python no deja abrir dos).
+          if (!(E.flujo && E.flujo.corriendo)) host.enviar("vivoEncender", {});
         }
       }
       prepararSola();
       pintar();
+    },
+    // El flujo en vivo: cada segundo, la vela en curso; al cerrar una vela, la revisión y lo que pasó.
+    vivoProgreso(e) {
+      const a = e && e.trabajo && e.trabajo.avance;
+      if (!a) return;
+      const antes = E.flujo || {};
+      E.flujo = { ...antes, corriendo: true, conectado: !!a.conectado, error: a.error || "", revision_ms: a.revision_ms };
+      for (const [par, v] of Object.entries(a.velas || {})) graficoUI.vela(E, par, v);
+      let repintar = antes.conectado !== E.flujo.conectado;
+      if (a.vivo) { E.vivo = a.vivo; repintar = true; }
+      for (const l of a.eventos || []) {
+        const aviso = avisoEvento(l);
+        if (!aviso) continue;
+        graficoUI.marca(E, aviso.marca);
+        repintar = true;
+        setTimeout(() => graficoUI.destello(aviso.texto, aviso.tipo), 0);
+        toast(aviso.texto);
+      }
+      if (a.eventos && a.eventos.length) pedirGrafico();     // las marcas y las líneas, como quedaron en disco
+      if (repintar && ["vivo", "movimientos"].includes(E.pestana)) pintar();
+    },
+    vivoTerminado(r) {
+      E.flujo = { ...(E.flujo || {}), corriendo: r && r.error === "ya_corriendo", conectado: false };
+      if (r && r.datos) E.vivo = r.datos;
+      pintar();
+    },
+    graficoListo(r) {
+      if (!(r && r.ok && r.datos)) return;
+      if (r.datos.par !== E.graf.par || r.datos.temporalidad !== E.graf.temporalidad) return;   // llegó tarde: ya cambiaste
+      const enCurso = E.graf.datos && E.graf.datos.velas.length && E.graf.datos.velas[E.graf.datos.velas.length - 1];
+      E.graf.datos = { ...r.datos, velas: r.datos.velas.map((v) => [...v]), marcas: r.datos.marcas || [], niveles: r.datos.niveles || [] };
+      const vel = E.graf.datos.velas;
+      if (enCurso && enCurso.enCurso && (!vel.length || vel[vel.length - 1][0] < enCurso[0])) vel.push(enCurso);
+      const habia = E.graf.cargando;
+      E.graf.cargando = false;
+      if (habia) pintar(); else graficoUI.dibujar();
     },
     // ── El centro de operaciones: la simulación con monto y el paso a real ──
     simularEstadoListo(r) {
@@ -2446,10 +2531,64 @@
         operaciones: perfil === "holding" ? 12 : n, movimientos, movimientos_total: movimientos.length };
     });
   }
+  // El gráfico de la vista previa: una caminata al azar, siempre la misma para el mismo par, que termina en el precio de
+  // ahora; el flujo de la vista previa la sigue moviendo cada segundo y, de vez en cuando, compra o vende.
+  const PRECIO_DEMO = { BTCFDUSD: 71780, ETHFDUSD: 2027 };
+  function azar(semilla) {
+    let x = semilla >>> 0;
+    return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+  }
+  function graficoDemo(par, t) {
+    const paso = { "1m": 60000, "5m": 300000, "1h": 3600000, "4h": 14400000 }[t] || 60000;
+    const r = azar(par.length * 7919 + paso / 1000), n = 260, fin = Math.floor(Date.now() / paso) * paso;
+    const vol = (PRECIO_DEMO[par] || 100) * 0.0009 * Math.sqrt(paso / 60000);
+    const velas = [];
+    let p = (DEMO.precio && DEMO.precio[par]) || PRECIO_DEMO[par];
+    // Se camina hacia atrás desde el precio de ahora: la última vela cierra justo ahí.
+    for (let i = 1; i <= n; i++) {
+      const c = p, o = c - (r() - 0.5) * vol * 2, h = Math.max(o, c) + r() * vol, l = Math.min(o, c) - r() * vol;
+      velas.unshift([fin - i * paso, o, h, l, c, 2 + r() * 8]);
+      p = o;
+    }
+    const v = (k) => velas[n - k];
+    const marcas = [{ ms: v(40)[0], tipo: "compra", precio: v(40)[3] }, { ms: v(26)[0], tipo: "venta", precio: v(26)[2], neto: 0.75 },
+      { ms: v(14)[0], tipo: "compra", precio: v(14)[3] }];
+    const ultimo = velas[n - 1][4];
+    const niveles = DEMO.vivo && DEMO.vivo.activo && DEMO.vivo.perfil !== "holding"
+      ? [{ tipo: "entrada", precio: ultimo * 0.998 }, { tipo: "stop", precio: ultimo * 0.988 }, { tipo: "objetivo", precio: ultimo * 1.012 }] : [];
+    DEMO.precio = { ...(DEMO.precio || {}), [par]: ultimo };
+    return { par, temporalidad: t, paso_ms: paso, velas, marcas, niveles };
+  }
+  function flujoDemo(c) {
+    if (DEMO.flujo) return;
+    const r = azar(42), velas = {};
+    let tic = 0;
+    DEMO.flujo = setInterval(() => {
+      tic++;
+      const ahora = Date.now(), minuto = Math.floor(ahora / 60000) * 60000;
+      for (const par of Object.keys(PRECIO_DEMO)) {
+        const p0 = (DEMO.precio && DEMO.precio[par]) || PRECIO_DEMO[par];
+        const p = p0 * (1 + (r() - 0.5) * 0.0008);
+        DEMO.precio = { ...(DEMO.precio || {}), [par]: p };
+        const v = velas[par] && velas[par][0] === minuto ? velas[par] : [minuto, p0, p0, p0, p0, 0];
+        velas[par] = [minuto, v[1], Math.max(v[2], p), Math.min(v[3], p), p, v[5] + r() * 0.4];
+      }
+      const eventos = [];
+      if (DEMO.vivo && DEMO.vivo.activo && tic % 20 === 0) {
+        const p = DEMO.precio.BTCFDUSD, ms = Date.now();
+        eventos.push((tic / 20) % 2
+          ? { ms, fecha: new Date(ms).toISOString(), par: "BTCFDUSD", razon: "entrada_rebote", orden: { precio: p, monto: 60, estado: "llenada" }, resultado: {} }
+          : { ms, fecha: new Date(ms).toISOString(), par: "BTCFDUSD", razon: "objetivo", orden: {}, resultado: { precio: p, neto: 0.42 } });
+      }
+      c.responder("vivoProgreso", { t: "estado", trabajo: { id: "20260210T140500-f1u70", tipo: "vivo",
+        avance: { conectado: true, error: "", ms: Date.now(), velas, eventos, ...(eventos.length ? { vivo: vivoDemo() } : {}) } } });
+    }, 1000);
+  }
   // El robot en vivo de la vista previa: parte sin perfil; al empezar, ya hizo unas cosas en las últimas horas.
   function vivoDemo() {
     const v = DEMO.vivo;
-    if (!v) return { formato: 1, activo: false, perfil: "", monto: 0, movimientos: [], posiciones: [], tenencias: [] };
+    const flujo = { corriendo: !!DEMO.flujo, conectado: !!DEMO.flujo };
+    if (!v) return { formato: 1, activo: false, perfil: "", monto: 0, movimientos: [], posiciones: [], tenencias: [], flujo };
     const h = 3600000, t0 = v.desde_ms, m = v.monto;
     const linea = (ms, razon, par, orden, resultado) => ({ ms, fecha: new Date(ms).toISOString(), par, razon, orden, resultado });
     const movs = v.perfil === "holding"
@@ -2472,7 +2611,7 @@
     return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
       ganancia_relativa: valor / m - 1, efectivo: holding ? m * 11 / 12 : m * 1.0037 - m * 0.25, posiciones, tenencias,
       ultima: holding ? { decision: "esperando", proxima_ms: t0 + 7 * 24 * h } : { decision: "sin_senal" },
-      movimientos: movs };
+      movimientos: movs, flujo };
   }
   function realDemo() {
     DEMO.real = DEMO.real || { conectado: false, pista: "", conexion: { ok: false }, activo: false, cuenta: { existe: false } };
@@ -2503,6 +2642,8 @@
         c.responder("mcpListo", { ok: true, ...mcpDemo(), orden: d.orden, cliente: d.cliente });
       });
       case "vivoEstado": return c.responder("vivoListo", { ok: true, datos: vivoDemo() });
+      case "vivoGrafico": return c.luego(120, () => c.responder("graficoListo", { ok: true, datos: graficoDemo(d.par, d.temporalidad) }));
+      case "vivoEncender": return flujoDemo(c);
       case "vivoEmpezar": return c.luego(400, () => {
         DEMO.vivo = { perfil: d.perfil, monto: Number(d.monto), activo: true, desde_ms: Date.now() - 3 * 3600000 };
         c.responder("vivoListo", { ok: true, datos: vivoDemo() });

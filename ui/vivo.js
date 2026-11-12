@@ -42,7 +42,7 @@ window.PilotaVivo = (() => {
     no_es_prueba: "Con el dinero real encendido no hago pruebas: primero vuelve a prueba.",
   };
 
-  function crear({ i18n, esc, numero, usdt, porcentaje, fechaHora, robot, motivoCorto }) {
+  function crear({ i18n, esc, numero, usdt, porcentaje, fechaHora, robot, motivoCorto, grafico }) {
     const { Tp, frase } = i18n;
     const nombre = (p) => (PERFILES[p] || {}).nombre || "";
     const moneda = (par) => String(par || "").replace(/(FDUSD|USDT)$/, "");
@@ -168,12 +168,12 @@ window.PilotaVivo = (() => {
     }
     function vivo(E) {
       const v = E.vivo || {};
-      const motor = E.motor || {};
       const hay = !!v.perfil && v.monto > 0;
       if (!hay || E.vivoElegir) {
         return `<div class="centro">
           <header class="centro-cabeza"><h2>Mira operar a tu robot</h2>
             <p class="ayuda">Elige un perfil y un monto. Pilota opera desde ahora con dinero ficticio y precios reales de Binance, con todas sus reglas y frenos. Así ves cómo se porta antes de arriesgar nada.</p></header>
+          ${grafico ? grafico() : ""}
           ${selector(E)}
           ${hay ? `<button type="button" class="pz-boton" id="vivo-volver">Volver sin cambiar nada</button>` : ""}</div>`;
       }
@@ -181,7 +181,8 @@ window.PilotaVivo = (() => {
       const animo = !activo ? "neutral" : (v.ultima && v.ultima.decision === "frenado" ? "frenado"
         : ((v.posiciones || []).some((p) => p.estado === "abierta") || (v.tenencias || []).some((t) => t.cantidad > 0) ? "operando" : "atento"));
       const movs = (v.movimientos || []).slice(0, 6);
-      const apagado = activo && !motor.activo;
+      const f = E.flujo || {};
+      const conexion = f.conectado ? "en_vivo" : (f.corriendo ? "conectando" : "apagado");
       return `<div class="centro vivo">
         <div class="tarjeta vivo-cabeza">
           ${robot(animo)}
@@ -189,8 +190,13 @@ window.PilotaVivo = (() => {
             <p class="vivo-perfil">${activo ? frase("Perfil {perfil} · operando desde el {fecha}", { perfil: Tp(nombre(v.perfil)), fecha: dia(v.desde_ms) })
               : frase("Perfil {perfil} · detenido", { perfil: Tp(nombre(v.perfil)) })}</p>
             <p class="vivo-piensa">${vuelta(v)}</p>
-            ${apagado ? `<p class="freno-texto">El motor está apagado: el robot no está mirando. Solo opera con Pilota abierta.</p>` : ""}
+            <p class="conexion" data-estado="${conexion}"><span class="conexion-punto" aria-hidden="true"></span>${{
+              en_vivo: "En vivo: conectado a Binance. Reacciono en el segundo en que cierra cada vela.",
+              conectando: "Conectando con Binance…",
+              apagado: "Sin conexión con Binance: el robot no está mirando. Solo opera con Pilota abierta.",
+            }[conexion]}</p>
           </div></div>
+        ${grafico ? grafico() : ""}
         <div class="tarjeta vivo-saldo" data-signo="${signo(v.ganancia)}">
           <p class="vivo-saldo-titulo">Cuánto vale ahora</p>
           <p class="vivo-saldo-monto" data-sin-traducir>${esc(v.valor == null ? "–" : usdt(v.valor))}</p>
