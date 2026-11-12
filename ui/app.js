@@ -24,7 +24,13 @@
     estado: null, reiniciando: false, tamano: null, frenos: null, pausando: false, desbloqueando: false,
     ejecutor: null, ejecutando: false, motor: null, revisandoMotor: false, encendiendoMotor: false,
     modos: null, decision: null, decidiendo: false, respondiendo: "", cambiandoModo: "",
-    panel: null, guardandoLocal: false, pidiendoPanel: false };
+    panel: null, guardandoLocal: false, pidiendoPanel: false,
+    // El centro de operaciones: la pestaña de arriba, la simulación con monto y el paso a real.
+    pestana: "ahora", sim: { monto: 100, dias: 90, corriendo: false, ultima: null }, simVivo: false,
+    real: null, realOcupado: false, campos: {} };
+  // La llave y el secreto mientras se escriben: solo en memoria, nunca en E (que se puede mirar en las pruebas) ni en
+  // el HTML. Se borran apenas se mandan.
+  const secretos = { "real-llave": "", "real-secreto": "" };
   const raiz = document.getElementById("app");
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => "&#" + c.charCodeAt(0) + ";");
 
@@ -50,15 +56,17 @@
     retener: (...a) => bv.retener(...a),               // mientras se elige el idioma, los avisos esperan
     elegirIA: (id) => { E.config.ia = id; host.enviar("config", { ia: id }); },
   });
-  const toast = (frase_, o) => ui.aviso(frase_, o);
+  // Los avisos de la app llegan ya traducidos (Tp): `traducido` evita traducirlos dos veces. Las piezas (MCP, bienvenida)
+  // mandan su texto en español y ui.aviso lo traduce.
+  const toast = (frase_, o) => ui.aviso(frase_, { ...o, traducido: true });
 
   // ── Conectar a tu IA (MCP): pieza «mcp». Solo lectura y apagada hasta que la persona conecta su IA en Ajustes. ──
-  const mcpUI = PiezaMCP.crear({ i18n, host, pintar, app: NOMBRE, aviso: (t, o) => toast(t, o),
+  const mcpUI = PiezaMCP.crear({ i18n, host, pintar, app: NOMBRE, aviso: (t, o) => ui.aviso(t, o),
     ejemplo: "¿Qué decidió Pilota hoy y con qué puntaje?" });
 
   // ── Bienvenida: pieza «bienvenida». El idioma siempre primero y solo en la pantalla; después, los pasos de la app. ──
   const bv = PiezaBienvenida.crear({
-    i18n, pintar, mostrarAviso: (...a) => toast(...a),
+    i18n, pintar, mostrarAviso: (...a) => ui.aviso(...a),
     guardarIdioma: (c) => { E.config.idioma_ui = c; host.enviar("config", { idioma_ui: c }); },
     cargarIdioma: (c) => cargarIdioma(c),
     terminar: () => { E.config.bienvenida = true; host.enviar("config", { bienvenida: true }); },
@@ -696,8 +704,8 @@
       neto: () => frase("deja {hay} por operación", { hay: porcentaje(x.hay, 2) }),
       usdt: () => frase("rendimiento {hay}", { hay: porcentaje(x.hay, 1) }),
       caida: () => frase("cayó {hay} y el piso está en {pide}", { hay: porcentaje(x.hay, 1), pide: porcentaje(x.pide, 0) }),
-      plan: () => esc(Tp(ETIQUETA_PLAN[x.hay] || x.hay)),
-      nueva: () => esc(x.hay ? Tp("es la primera vez con este tramo") : Tp("este tramo ya se había usado")),
+      plan: () => frase(ETIQUETA_PLAN[x.hay] || "sin casos suficientes"),
+      nueva: () => (x.hay ? frase("es la primera vez con este tramo") : frase("este tramo ya se había usado")),
     };
     return `<li class="tramo"><span class="tramo-nombre">${ETIQUETA_CRITERIO[x.que] || x.que}</span>
       <span class="serie-estado" data-estado="${x.pasa ? "listo" : "incompleto"}">${x.pasa ? "Pasa" : "No pasa"}</span>
@@ -781,6 +789,11 @@
     piso_absoluto: "el piso absoluto", piso: "el piso del capital de referencia", diario: "el freno del día",
     racha: "la racha de pérdidas", comision: "la comisión maker", fdusd: "el precio de FDUSD",
     esperando: "las 24 horas de espera",
+    // Lo que deja escrito una propuesta, el tamaño o el conector real.
+    no_claro: "puntaje no claramente alto", monto_mayor: "monto sobre tu tope", sin_disponible: "sin disponible en USDT",
+    bajo_minimo: "bajo el mínimo de Binance", sin_proteccion: "Binance no aceptó la protección", cruzaria: "el precio ya pasó",
+    sin_saldo: "sin saldo en Binance", sin_llave: "sin llave de Binance", sin_conexion: "sin conexión con Binance",
+    binance: "Binance dijo que no", rechazada: "dijiste que no", vencida: "nadie respondió",
   };
   // Por qué quedó anotada una línea (bin/lib_registro.py: RAZONES). Cada paso usa las suyas; el registro acepta solo
   // estos códigos, así que nunca hay una línea sin palabras.
@@ -808,7 +821,7 @@
     if (r.por) partes.push(frase("cerró por {que}", { que: Tp(ETIQUETA_CIERRE[r.por] || r.por) }));
     if (typeof r.neto === "number") partes.push(frase("dejó {n}", { n: usdt(r.neto) }));
     if (typeof r.saldo === "number") partes.push(frase("saldo {n}", { n: usdt(r.saldo) }));
-    if (r.motivo) partes.push(frase("motivo: {que}", { que: Tp(MOTIVO_CORTO[r.motivo] || r.motivo) }));
+    if (r.motivo) partes.push(frase("motivo: {que}", { que: Tp(MOTIVO_CORTO[r.motivo] || "otro motivo") }));
     return partes.join(" · ");
   }
   function filaRegistro(l) {
@@ -1238,7 +1251,7 @@
     if (m.estado === "error") return frase(ERRORES[m.error] || "No se pudo.");
     if (!hace) return "Todavía no he hecho ninguna revisión: Pilota solo trabaja con el equipo encendido.";
     return `${hace} · ${m.estado === "interrumpido"
-      ? Tp("se cortó al cerrarse la app") : Tp("apagado: nadie está mirando los cruces")}`;
+      ? frase("se cortó al cerrarse la app") : frase("apagado: nadie está mirando los cruces")}`;
   }
   // Una ventana sin cobertura: el rato en que un stop no se habría aplicado. Queda escrita en vez de taparse.
   function ventanaMotor(v) {
@@ -1315,7 +1328,7 @@
     return `<li class="tramo"><span class="tramo-nombre">${ETIQUETA_MODO[m.modo] || m.modo}</span>
       <span class="serie-estado" data-estado="${estado}">${etiqueta}</span>
       <span class="serie-detalle">${QUE_HACE_MODO[m.modo] || ""}</span>
-      ${m.puede ? "" : `<span class="serie-detalle freno">${Tp(MOTIVOS_MODO[m.motivo] || MOTIVOS_FRENOS[m.motivo] || "Este modo no se puede usar ahora.")}</span>`}
+      ${m.puede ? "" : `<span class="serie-detalle freno">${frase(MOTIVOS_MODO[m.motivo] || MOTIVOS_FRENOS[m.motivo] || "Este modo no se puede usar ahora.")}</span>`}
       ${m.actual || !m.puede ? "" : `<span class="serie-detalle"><button type="button" class="pz-boton" data-modo="${esc(m.modo)}"${E.cambiandoModo ? " disabled" : ""}>${m.modo === "automatico" ? "Activar el automático" : "Usar este modo"}</button></span>`}</li>`;
   }
   // Una propuesta esperando: el puntaje, la razón, el monto en USDT, el stop y cuánto le queda antes de vencer.
@@ -1325,12 +1338,12 @@
     return `<li class="serie">
       <span class="serie-par" data-sin-traducir>${esc(donde)}</span>
       <span class="serie-estado" data-estado="listo">${frase("Puntaje {n}", { n: numero(p.puntaje, 0) })}</span>
-      <span class="serie-detalle">${Tp(ETIQUETA_ESTRATEGIA[p.estrategia] || p.estrategia)}</span>
+      <span class="serie-detalle">${frase(ETIQUETA_ESTRATEGIA[p.estrategia] || p.estrategia)}</span>
       <span class="serie-detalle">${frase("Compro {monto} a {precio}, con stop en {stop} y objetivo en {objetivo}: arriesgo {arriesgado}.", {
         monto: usdt(p.monto), precio: numero(p.entrada), stop: numero(p.stop), objetivo: numero(p.objetivo),
         arriesgado: usdt(p.arriesgado) })}</span>
       <span class="serie-detalle">${frase("Vence en {tiempo}: si no me respondes, la dejo pasar.", { tiempo: duracion(p.queda_ms / 1000) })}</span>
-      ${p.motivo ? `<span class="serie-detalle">${Tp(MOTIVOS_PREGUNTA[p.motivo] || "Te pregunto antes de abrir esto.")}</span>` : ""}
+      ${p.motivo ? `<span class="serie-detalle">${frase(MOTIVOS_PREGUNTA[p.motivo] || "Te pregunto antes de abrir esto.")}</span>` : ""}
       <span class="serie-detalle">
         <button type="button" class="pz-boton pz-principal" data-propuesta="${esc(p.id)}" data-si="1"${esperando ? " disabled" : ""}>${esperando ? "Un momento…" : "Sí, ábrela"}</button>
         <button type="button" class="pz-boton" data-propuesta="${esc(p.id)}" data-si="0"${esperando ? " disabled" : ""}>No, me quedo en USDT</button></span></li>`;
@@ -1358,15 +1371,15 @@
           <ul class="series" aria-label="Propuestas esperando">${esperan.map(filaPropuesta).join("")}</ul>`
         : `<p class="indicadores-linea">${frase("No tengo nada propuesto. La mejor oportunidad de ahora puntúa {n} y la exigencia es {exigencia}.", {
             n: numero((d.mejor || {}).puntaje, 0), exigencia: numero(d.exigencia, 0) })}</p>`}
-      ${dec ? `<p class="indicadores-linea">${Tp(TEXTO_DECISION[dec.decision] || "Todavía no he decidido nada.")}</p>` : ""}
+      ${dec ? `<p class="indicadores-linea">${frase(TEXTO_DECISION[dec.decision] || "Todavía no he decidido nada.")}</p>` : ""}
       ${dec && dec.motivo && MOTIVOS_PREGUNTA[dec.motivo]
-        ? `<p class="indicadores-linea">${Tp(MOTIVOS_PREGUNTA[dec.motivo])}</p>` : ""}
+        ? `<p class="indicadores-linea">${frase(MOTIVOS_PREGUNTA[dec.motivo])}</p>` : ""}
       <p class="indicadores-linea">${frase("Hoy vencieron {n} propuestas: una que nadie responde vence siempre, y eso también queda en el registro.", { n: numero(d.vencidas_hoy, 0) })}</p>
       <h3>Cuánto espera una propuesta</h3>
       <div class="pz-seg" role="group" aria-label="Cuánto espera una propuesta">${venc}</div>
       <h3>Hasta cuánto opero solo en semiautomático</h3>
       <div class="pz-seg" role="group" aria-label="Hasta cuánto opero solo">${montos}</div>
-      ${(d.motivos || []).map((m) => `<p class="indicadores-linea freno">${Tp(MOTIVOS_MODO[m.codigo] || MOTIVOS_FRENOS[m.codigo] || TEXTO_DECISION[m.codigo] || "Ahora no abro ninguna entrada nueva.")}</p>`).join("")}
+      ${(d.motivos || []).map((m) => `<p class="indicadores-linea freno">${frase(MOTIVOS_MODO[m.codigo] || MOTIVOS_FRENOS[m.codigo] || TEXTO_DECISION[m.codigo] || "Ahora no abro ninguna entrada nueva.")}</p>`).join("")}
       <p class="suave">Tras cualquier freno vuelvo a manual, y mientras el modelo no esté calibrado el semiautomático y el automático quedan apagados: lo que el modelo promete todavía no está probado.</p>
       <div class="pz-pie">
         <button type="button" class="pz-boton" id="modos-decidir"${E.decidiendo ? " disabled" : ""}>${E.decidiendo ? "Mirando…" : "Mirar ahora"}</button></div></div>`;
@@ -1380,17 +1393,13 @@
       motivoCorto: MOTIVO_CORTO, motivosFrenos: MOTIVOS_FRENOS, motivosTamano: MOTIVOS_TAMANO,
       pregunta: MOTIVOS_PREGUNTA, cosasMotor: COSAS_MOTOR },
   });
-  function principal() {
+  // ── «Cómo pienso»: cada pieza por separado, con sus números (la pestaña de lo técnico) ──
+  const centroUI = PilotaCentro.crear({ i18n, esc, numero, usdt, porcentaje, fechaHora });
+  function comoPienso() {
     const series = (E.datos && Array.isArray(E.datos.series)) ? E.datos.series : [];
-    return `<header class="barra"><h1 data-sin-traducir>${esc(NOMBRE)}</h1>
-      <button type="button" class="pz-boton" id="abrir-ajustes">Ajustes</button></header>
-      ${banda()}
-      <main class="contenido">
-        ${panelUI.html(E.panel, { respondiendo: E.respondiendo })}
-        <details class="por-dentro" id="por-dentro">
-        <summary>Ver cómo lo pensé, paso a paso</summary>
+    return `
         <h2>Cómo trabaja Pilota, paso a paso</h2>
-        <p class="ayuda">Debajo está cada pieza por separado, con sus números: de dónde salen los datos, cómo se puntúa una oportunidad, cuánto se pone en cada operación y qué la frena. Nada de lo de arriba sale de otra parte.</p>
+        <p class="ayuda">Aquí está cada pieza por separado, con sus números: de dónde salen los datos, cómo se puntúa una oportunidad, cuánto se pone en cada operación y qué la frena. Lo que ves en «Ahora» no sale de otra parte.</p>
         <h2>Datos del mercado</h2>
         <p class="suave">${frase("Velas cerradas de Binance de los últimos {n} días. Pilota decide solo con velas cerradas y continuas.", { n: (E.datos && E.datos.dias) || DIAS })}</p>
         ${estadoDatos()}
@@ -1464,7 +1473,20 @@
         <p class="ayuda">${frase("**Propuesta**: una operación que te ofrezco con su puntaje, su razón, su monto en USDT y su stop, y que espera lo que elijas: 5, 15 o 60 minutos. Si nadie responde, vence. Siempre: no hay ningún camino donde el silencio opere.")}</p>
         <p class="ayuda">El modo lo eliges tú, pero no manda sobre nada más: el puntaje, la exigencia, el tamaño y los frenos son los mismos en los tres. Tras cualquier freno vuelvo a manual.</p>
         ${modos()}
-        </details>
+`;
+  }
+  function principal() {
+    const real = !!(E.real && E.real.activo);
+    return `<header class="barra"><h1 data-sin-traducir>${esc(NOMBRE)}</h1>
+      ${centroUI.pestanas(E.pestana, { real, esperando: E.panel && E.panel.esperando })}
+      <button type="button" class="pz-boton" id="abrir-ajustes">Ajustes</button></header>
+      ${banda()}
+      <main class="contenido">
+        ${centroUI.panel("ahora", E.pestana, panelUI.html(E.panel, { respondiendo: E.respondiendo }))}
+        ${centroUI.panel("simular", E.pestana, centroUI.simular(E))}
+        ${centroUI.panel("operar", E.pestana, centroUI.operar(E))}
+        ${centroUI.panel("historial", E.pestana, panelUI.registro(E.panel))}
+        ${centroUI.panel("como", E.pestana, comoPienso())}
       </main>`;
   }
   function ajustes() {
@@ -1504,6 +1526,11 @@
         pie: '<button type="button" class="pz-boton pz-principal" data-pz-cerrar>Listo</button>' }) : "")
       + ui.capas();
     for (const id of abiertos) { const d = raiz.querySelector(`details#${CSS.escape(id)}`); if (d) d.open = true; }
+    // Lo que la persona estaba escribiendo sigue ahí después de volver a pintar.
+    for (const [id, v] of Object.entries({ ...E.campos, ...secretos })) {
+      const el = document.getElementById(id);
+      if (el && v !== "" && v != null) el.value = v;
+    }
     i18n.traducirDOM(raiz);
     ui.despuesDePintar();
   }
@@ -1515,7 +1542,73 @@
     if (mcpUI.manejarClic(ev)) return;
     const b = ev.target.closest("button");
     if (!b) return;
-    if (b.id === "abrir-ajustes") abrirAjustes();
+    if (b.dataset.pestana) irA(b.dataset.pestana);
+    else if (b.dataset.simMonto) {
+      E.sim.monto = Number(b.dataset.simMonto);
+      delete E.campos["sim-monto"];
+      pintar();
+    } else if (b.dataset.simDias) {
+      E.sim.dias = Number(b.dataset.simDias);
+      pintar();
+    } else if (b.id === "sim-correr") {
+      const monto = Math.round(Number(E.campos["sim-monto"] ?? E.sim.monto));
+      if (!(monto >= 10 && monto <= 1000000)) { toast(Tp("Elige un monto entre 10 y 1.000.000 USDT."), { error: true }); return; }
+      E.sim = { ...E.sim, monto, corriendo: true };
+      pintar();
+      host.enviar("simularCorrer", { monto, dias: E.sim.dias });
+    } else if (b.id === "sim-vivo") {
+      const monto = Math.round(Number(E.campos["sim-monto"] ?? E.sim.monto));
+      if (!(monto >= 10 && monto <= 1000000)) { toast(Tp("Elige un monto entre 10 y 1.000.000 USDT."), { error: true }); return; }
+      const si = await ui.confirmar({ titulo: "¿Empezar la prueba en vivo?",
+        texto: "Tu cuenta de prueba parte de nuevo con {monto} ficticios y Pilota empieza a mirar el mercado. Queda anotado en el registro.",
+        valores: { monto: usdt(monto) }, si: "Empezar" });
+      if (!si) return;
+      E.reiniciando = true;
+      E.simVivo = true;
+      pintar();
+      host.enviar("estadoReiniciar", { saldo: monto });
+    } else if (b.id === "real-conectar") {
+      const llave = (secretos["real-llave"] || "").trim(), secreto = (secretos["real-secreto"] || "").trim();
+      if (!/^[A-Za-z0-9]{32,128}$/.test(llave) || !/^[A-Za-z0-9]{32,128}$/.test(secreto)) {
+        toast(Tp(centroUI.ERRORES_REAL.formato), { error: true });
+        return;
+      }
+      E.realOcupado = true;
+      secretos["real-llave"] = "";
+      secretos["real-secreto"] = "";
+      pintar();
+      host.enviar("realConectar", { llave, secreto });
+    } else if (b.id === "real-revisar") {
+      E.realOcupado = true;
+      pintar();
+      host.enviar("realRevisar", {});
+    } else if (b.id === "real-desconectar") {
+      const si = await ui.confirmar({ titulo: "¿Desconectar la llave?", texto: "Borro la llave del llavero de este equipo. Para volver a operar en real tendrás que conectarla de nuevo.", si: "Desconectar", peligro: true });
+      if (!si) return;
+      host.enviar("realDesconectar", {});
+    } else if (b.id === "real-activar") {
+      const presupuesto = Math.round(Number(E.campos["real-presupuesto"] ?? document.getElementById("real-presupuesto")?.value));
+      const fraseEscrita = String(E.campos["real-frase"] ?? "");
+      const si = await ui.confirmar({ titulo: "¿Encender el dinero real?",
+        texto: "Desde ahora Pilota opera con {monto} de tu cuenta de Binance, con las mismas reglas y frenos de la prueba. Puedes volver a prueba cuando quieras.",
+        valores: { monto: usdt(presupuesto) }, si: "Encender", peligro: true });
+      if (!si) return;
+      E.realOcupado = true;
+      pintar();
+      host.enviar("realActivar", { presupuesto, frase: fraseEscrita });
+    } else if (b.id === "real-desactivar") {
+      E.realOcupado = true;
+      pintar();
+      host.enviar("realDesactivar", {});
+    } else if (b.id === "real-emergencia") {
+      const si = await ui.confirmar({ titulo: "¿Cerrar todo y volver a prueba?",
+        texto: "Cancelo las órdenes de Pilota, vendo a mercado lo que compró y apago el dinero real. Lo tuyo que no es de Pilota no se toca.",
+        si: "Cerrar todo", peligro: true });
+      if (!si) return;
+      E.realOcupado = true;
+      pintar();
+      host.enviar("realEmergencia", {});
+    } else if (b.id === "abrir-ajustes") abrirAjustes();
     else if (b.id === "local-guardar") {
       // Lo que escribe la persona va en el archivo de entrada de la acción (nunca como argumento de un proceso).
       const moneda = (document.getElementById("local-moneda") || {}).value || "";
@@ -1646,7 +1739,35 @@
       host.enviar("modosAjustar", { monto: Number(b.dataset.monto) });
     }
   });
-  document.addEventListener("keydown", (ev) => { if (ui.manejarTecla(ev)) return; bv.manejarTecla(ev); });
+  // ── Las pestañas: un clic o las flechas (←/→, Inicio y Fin), como cualquier lista de pestañas ──
+  function irA(id, enfocar = true) {
+    if (!centroUI.PESTANAS.includes(id)) return;
+    E.pestana = id;
+    if (id === "simular" && !E.sim.ultima) host.enviar("simularEstado", {});
+    if (id === "operar") host.enviar("realEstado", {});
+    pintar();
+    if (enfocar) document.getElementById(`tab-${id}`)?.focus();
+    window.scrollTo?.(0, 0);
+  }
+  document.addEventListener("input", (ev) => {
+    const el = ev.target;
+    if (!el || !el.id) return;
+    if (el.id in secretos) secretos[el.id] = el.value;
+    else if (["sim-monto", "real-presupuesto", "real-frase"].includes(el.id)) E.campos[el.id] = el.value;
+  });
+  document.addEventListener("keydown", (ev) => {
+    const tab = ev.target && ev.target.closest && ev.target.closest('[role="tab"]');
+    if (tab && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(ev.key)) {
+      const ids = centroUI.PESTANAS, i = ids.indexOf(tab.dataset.pestana);
+      const j = ev.key === "Home" ? 0 : ev.key === "End" ? ids.length - 1
+        : (i + (ev.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length;
+      ev.preventDefault();
+      irA(ids[j]);
+      return;
+    }
+    if (ui.manejarTecla(ev)) return;
+    bv.manejarTecla(ev);
+  });
   // La cuenta atrás de las propuestas, una vez por segundo: solo cambia ese texto (no se vuelve a pintar la pantalla).
   // Cuando se le acaba el tiempo a la última, se le pregunta a la app: la propuesta vence allá, no acá.
   setInterval(() => {
@@ -1684,6 +1805,45 @@
         host.enviar("motorEstado", {});      // y hace cuánto fue la última revisión del motor, sin reconciliar nada
         host.enviar("modosEstado", {});      // y en qué modo quedó la cuenta y qué propuestas esperan un «Sí»
         host.enviar("panelEstado", {});      // y todo eso junto, como se ve en la pantalla principal
+        host.enviar("simularEstado", {});    // la última simulación con monto, si hay
+        host.enviar("realEstado", {});       // y si hay llave de Binance, los requisitos y si el dinero real está encendido
+        const q = new URLSearchParams(location.search).get("pestana");
+        if (q && centroUI.PESTANAS.includes(q)) E.pestana = q;
+      }
+      pintar();
+    },
+    // ── El centro de operaciones: la simulación con monto y el paso a real ──
+    simularEstadoListo(r) {
+      if (r && r.ok && r.datos && r.datos.ultima && r.datos.ultima.formato) {
+        E.sim = { ...E.sim, ultima: r.datos.ultima, monto: r.datos.ultima.monto || E.sim.monto,
+          dias: r.datos.ultima.dias || E.sim.dias };
+      }
+      pintar();
+    },
+    simularListo(r) {
+      E.sim = { ...E.sim, corriendo: false, ultima: (r && r.datos && r.datos.ultima) || E.sim.ultima };
+      if (!(r && r.ok)) toast(Tp("No pude simular."), { error: true });
+      host.enviar("realEstado", {});        // simular es uno de los requisitos para pasar a real
+      pintar();
+    },
+    realEstadoListo(r) {
+      if (r && r.ok && r.datos) E.real = r.datos;
+      pintar();
+    },
+    realListo(r) {
+      E.realOcupado = false;
+      const antes = !!(E.real && E.real.activo);
+      if (r && r.datos) E.real = r.datos;
+      if (r && r.ok) {
+        delete E.campos["real-frase"];
+        const ahora = !!(E.real && E.real.activo);
+        if (ahora && !antes) toast(Tp("Listo: Pilota opera con dinero real. Lo ves en «Ahora»."));
+        else if (!ahora && antes) toast(Tp("Listo: volviste a prueba."));
+        else toast(Tp("Listo."));
+        host.enviar("estadoArrancar", {});
+        host.enviar("panelEstado", {});
+      } else {
+        toast(Tp(centroUI.ERRORES_REAL[r && r.error] || "No se pudo."), { error: true });
       }
       pintar();
     },
@@ -2002,7 +2162,15 @@
         host.enviar("panelEstado", {});
         const esta = ((r.datos || {}).cuentas || []).find((c) => c.ambiente === (r.datos || {}).activo) || {};
         toast(Tp("Listo: el saldo de prueba quedó en {monto}, y el reinicio quedó en el registro.", { monto: usdt(esta.saldo) }));
+        if (E.simVivo) {                     // «Empezar la prueba en vivo»: con el saldo nuevo, el motor empieza a mirar
+          E.simVivo = false;
+          E.encendiendoMotor = true;
+          host.enviar("motorEncender", {});
+          host.enviar("realEstado", {});
+          E.pestana = "ahora";
+        }
       } else {
+        E.simVivo = false;
         toast(Tp(ERRORES[r && r.error] || "No se pudo."), { error: true });
       }
       pintar();
@@ -2101,6 +2269,48 @@
       if (listo && i === pasos.length - 1) c.responder(listo, { ok: true, datos: paso, error: "" });
     }));
   }
+  // ── La vista previa del centro de operaciones: números inventados, siempre los mismos para el mismo monto ──
+  function simulacionDemo(monto, dias) {
+    const hasta = Date.parse("2026-02-10T00:00:00Z"), desde = hasta - dias * 86400000;
+    const pasos = Math.max(6, Math.round(dias / 6));
+    let saldo = monto, techo = monto, caida = 0, ganadas = 0, perdidas = 0;
+    const curva = [[desde, monto]], btc = [[desde, monto]];
+    for (let i = 1; i <= pasos; i++) {
+      const x = desde + (hasta - desde) * i / pasos;
+      const r = Math.sin(i * 1.7) * 0.009 + 0.0022;
+      saldo *= 1 + r;
+      r > 0 ? ganadas++ : perdidas++;
+      techo = Math.max(techo, saldo);
+      caida = Math.max(caida, (techo - saldo) / techo);
+      curva.push([x, saldo]);
+      btc.push([x, monto * (1 + Math.sin(i / 3) * 0.08 + i / pasos * 0.05)]);
+    }
+    const b = btc[btc.length - 1][1];
+    return { formato: 1, listo: true, motivo: "", monto, dias, dias_reales: dias,
+      desde: new Date(desde).toISOString(), hasta: new Date(hasta).toISOString(), desde_ms: desde, hasta_ms: hasta,
+      pilota: { saldo, ganancia: saldo - monto, rendimiento: (saldo - monto) / monto, caida_maxima: caida, curva,
+        operaciones: pasos, ganadas, perdidas, mejor: monto * 0.011, peor: -monto * 0.007,
+        saltadas: { diario: 0, racha: 1, piso: 0, posiciones: 2, tamano: 0 } },
+      usdt: { saldo: monto, rendimiento: 0 }, btc: { saldo: b, rendimiento: (b - monto) / monto, caida_maxima: 0.12, curva: btc },
+      sin_exigencia: true, topado: true, tope: 15 };
+  }
+  function realDemo() {
+    DEMO.real = DEMO.real || { conectado: false, pista: "", conexion: { ok: false }, activo: false, cuenta: { existe: false } };
+    const c = DEMO.real.conexion || {}, libres = c.libres || {};
+    const fondos = (libres.USDT || 0) + (libres.FDUSD || 0);
+    const requisitos = [
+      { id: "simulacion", cumple: !!(DEMO.simulacion && DEMO.simulacion.listo), n: DEMO.simulacion && DEMO.simulacion.monto },
+      { id: "prueba", cumple: false, dias: 3, operaciones: 2, dias_pedidos: 7, operaciones_pedidas: 5 },
+      { id: "llave", cumple: !!(c.ok && c.lectura && c.spot && !c.retiro && c.ip), ok: !!c.ok, lectura: !!c.lectura,
+        spot: !!c.spot, retiro: !!c.retiro, ip: !!c.ip, motivo: "" },
+      { id: "minimos", cumple: true, minimo: 40 },
+      { id: "fondos", cumple: !!c.ok && fondos >= 40, fondos, minimo: 40 },
+    ];
+    if (new URLSearchParams(location.search).has("listo")) requisitos.forEach((q) => { q.cumple = true; });
+    return { formato: 1, llavero: true, conectado: DEMO.real.conectado, pista: DEMO.real.pista, conexion: c, requisitos,
+      listo: requisitos.every((q) => q.cumple), activo: DEMO.real.activo, frase: "OPERAR CON DINERO REAL",
+      cuenta: DEMO.real.cuenta, ejecutor: {} };
+  }
   function simular(accion, d, c) {
     if (!DEMO) return;
     switch (accion) {
@@ -2111,6 +2321,33 @@
         const cliente = mcpDemo().clientes.find((x) => x.id === d.cliente);
         if (cliente) Object.assign(cliente, { conectado: d.orden === "conectar", al_dia: true });
         c.responder("mcpListo", { ok: true, ...mcpDemo(), orden: d.orden, cliente: d.cliente });
+      });
+      case "simularEstado": return c.responder("simularEstadoListo", { ok: true, datos: { ultima: DEMO.simulacion || {} } });
+      case "simularCorrer": return c.luego(700, () => {
+        DEMO.simulacion = simulacionDemo(Number(d.monto), Number(d.dias));
+        c.responder("simularListo", { ok: true, datos: { ultima: DEMO.simulacion } });
+      });
+      case "realEstado": return c.responder("realEstadoListo", { ok: true, datos: realDemo() });
+      case "realConectar": case "realRevisar": return c.luego(500, () => {
+        DEMO.real.conectado = true;
+        DEMO.real.pista = "dEmO…a1b2";
+        DEMO.real.conexion = { ok: true, lectura: true, spot: true, retiro: false, ip: true, libres: { USDT: 260, FDUSD: 0 } };
+        c.responder("realListo", { ok: true, datos: realDemo() });
+      });
+      case "realDesconectar": return c.luego(300, () => {
+        Object.assign(DEMO.real, { conectado: false, pista: "", conexion: { ok: false } });
+        c.responder("realListo", { ok: true, datos: realDemo() });
+      });
+      case "realActivar": return c.luego(500, () => {
+        const r = realDemo();
+        if (!r.listo) return c.responder("realListo", { ok: false, datos: r, error: "requisitos" });
+        if (String(d.frase || "").trim().toUpperCase() !== r.frase) return c.responder("realListo", { ok: false, datos: r, error: "frase" });
+        Object.assign(DEMO.real, { activo: true, cuenta: { existe: true, saldo: d.presupuesto, aportado: d.presupuesto, operaciones: 0, posiciones: 0 } });
+        c.responder("realListo", { ok: true, datos: realDemo() });
+      });
+      case "realDesactivar": case "realEmergencia": return c.luego(500, () => {
+        DEMO.real.activo = false;
+        c.responder("realListo", { ok: true, datos: realDemo() });
       });
       case "velasEstado": return c.responder("velasEstadoListo", { ok: true, datos: DEMO.velas });
       case "velasDescargar": return c.luego(400, () => {

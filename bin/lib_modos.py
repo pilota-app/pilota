@@ -42,6 +42,7 @@ import os
 import lib_calibracion
 import lib_datos
 import lib_ejecutor_prueba
+import lib_ejecutor_real
 import lib_estado
 import lib_frenos
 import lib_puntaje
@@ -51,6 +52,11 @@ import nucleo
 
 #: El ambiente que se decide hoy: el otro es el conector real, en su paso.
 AMBIENTE = lib_ejecutor_prueba.AMBIENTE
+
+
+def ejecutor_de(amb):
+    """El ejecutor del dinero con que se juega: el de prueba o el conector real. Los dos tienen el mismo contrato."""
+    return lib_ejecutor_real if amb == lib_estado.REAL else lib_ejecutor_prueba
 #: Los tres modos (los del estado firmado: son los mismos en todas partes) y el de partida.
 MODOS = lib_estado.MODOS
 MANUAL, SEMI, AUTO = MODOS
@@ -159,7 +165,7 @@ def guardar(d):
 def id_de(o):
     """El id de una propuesta: **determinista** (el par, la vela y la estrategia), con el prefijo propio delante. De la
     misma señal sale el mismo id, así una revisión más no propone dos veces lo mismo."""
-    return (f"{lib_ejecutor_prueba.PREFIJO}-{AMBIENTE[0]}-prop-{o.get('par') or ''}-{_entero(o.get('vela'))}"
+    return (f"{lib_ejecutor_prueba.PREFIJO}-{lib_estado.activo()[0]}-prop-{o.get('par') or ''}-{_entero(o.get('vela'))}"
             f"-{o.get('estrategia') or ''}")
 
 
@@ -182,7 +188,7 @@ def propuesta_de(o, ahora_ms, vencimiento_min=VENCIMIENTO, exigencia=None, motiv
     suya = _entero(o.get("vence"))
     if suya > 0:
         vence = min(vence, suya)
-    p = {"id": id_de(o), "ambiente": AMBIENTE, "par": o.get("par") or "", "estrategia": o.get("estrategia") or "",
+    p = {"id": id_de(o), "ambiente": lib_estado.activo(), "par": o.get("par") or "", "estrategia": o.get("estrategia") or "",
          "temporalidad": o.get("temporalidad") or "", "razon": o.get("razon") or "", "vela_ms": _entero(o.get("vela")),
          "puntaje": o.get("puntaje"), "exigencia": exigencia, "permitida": bool(o.get("permitida")),
          "entrada": _numero(t.get("precio")) or _numero(o.get("entrada")),
@@ -221,7 +227,7 @@ def caducar(d, ahora_ms, anotar=True):
         propuestas.append(p)
     if anotar:
         for p in vencidas:
-            lib_registro.anotar(AMBIENTE, RAZON_VENCIDA, par=p.get("par") or "", puntaje=p.get("puntaje"),
+            lib_registro.anotar(p.get("ambiente") or AMBIENTE, RAZON_VENCIDA, par=p.get("par") or "", puntaje=p.get("puntaje"),
                                 ms=ahora_ms, orden=_orden(p, VENCIDA), resultado={"motivo": VENCIDA})
     return {**(d if isinstance(d, dict) else {}), "propuestas": propuestas}, vencidas
 
@@ -238,7 +244,7 @@ def proponer(o, ahora_ms, d=None, vencimiento_min=VENCIMIENTO, exigencia=None, m
     archivo = d if isinstance(d, dict) else guardado()
     p = propuesta_de(o, ahora_ms, vencimiento_min, exigencia, motivo)
     archivo = con_propuesta(archivo, p)
-    lib_registro.anotar(AMBIENTE, RAZON_PROPUESTA, par=p["par"], puntaje=p["puntaje"], ms=ahora_ms,
+    lib_registro.anotar(p["ambiente"], RAZON_PROPUESTA, par=p["par"], puntaje=p["puntaje"], ms=ahora_ms,
                         orden=_orden(p, PROPUESTA), resultado={"motivo": motivo} if motivo else None)
     return archivo, p
 
@@ -322,7 +328,8 @@ def decidir(ctx=None, ahora_ms=None, tamano=None, puntaje=None, calibracion=None
     motivo_modo = "" if permiso["puede"] else permiso["motivo"]
     # El ejecutor como lo dejó el motor; si esto lo pide la acción suelta, el último que quedó escrito. Lo que vuelve es
     # lo que el motor va a mostrar, así que nunca es un diccionario vacío con ceros que no son.
-    ej = c.get("ejecutor") if isinstance(c.get("ejecutor"), dict) else lib_ejecutor_prueba.guardado()
+    ex = ejecutor_de(amb)
+    ej = c.get("ejecutor") if isinstance(c.get("ejecutor"), dict) else ex.guardado()
     vuelta = {"modo": modo, "efectivo": efectivo, "motivo_modo": motivo_modo, "decision": "", "motivo": "",
               "par": "", "puntaje": None, "exigencia": _numero(modelo.get("exigencia")), "monto": None,
               "id": "", "propuestas": 0, "entradas": 0, "vencidas": len(vencidas), "vigentes": 0}
@@ -335,8 +342,7 @@ def decidir(ctx=None, ahora_ms=None, tamano=None, puntaje=None, calibracion=None
                            "monto": propuesta["monto"]})
         return {"ejecutor": ejecutor if isinstance(ejecutor, dict) else ej, "modos": vuelta}
 
-    if amb != AMBIENTE:
-        # Decidir sobre dinero de verdad es cosa del conector real, en su paso: acá no se toca nada real.
+    if amb not in (AMBIENTE, lib_estado.REAL):
         return fin(SIN_AMBIENTE, SIN_AMBIENTE)
     p = puntaje if isinstance(puntaje, dict) else lib_puntaje.escribir_estado(lib_puntaje.estado(ms, calibracion=cal))
     t = tamano if isinstance(tamano, dict) else lib_tamano.escribir(
@@ -362,7 +368,7 @@ def decidir(ctx=None, ahora_ms=None, tamano=None, puntaje=None, calibracion=None
         return fin(BAJO_EXIGENCIA)
     if any(x["id"] == id_de(mejor) for x in vigentes(d, ms)):
         return fin(ESPERANDO)        # esa misma señal ya está propuesta y esperando: no se propone dos veces
-    if lib_ejecutor_prueba.repetida(lib_estado.cuerpo_de(cuenta), mejor):
+    if ex.repetida(lib_estado.cuerpo_de(cuenta), mejor):
         return fin(REPETIDA, REPETIDA)
 
     solo, motivo = True, ""
@@ -377,8 +383,8 @@ def decidir(ctx=None, ahora_ms=None, tamano=None, puntaje=None, calibracion=None
         d, propuesta = proponer(mejor, ms, d, aj["vencimiento_min"], exigencia, motivo)
         vuelta["propuestas"] = 1
         return fin(PROPUESTA, motivo, propuesta=propuesta)
-    r = lib_ejecutor_prueba.entrar(mejor, ahora_ms=ms, tamano_=mejor.get("tamano"), frenos=f, calibracion=cal)
-    nuevo = lib_ejecutor_prueba.escribir(lib_ejecutor_prueba.estado(ms))
+    r = ex.entrar(mejor, ahora_ms=ms, tamano_=mejor.get("tamano"), frenos=f, calibracion=cal)
+    nuevo = ex.escribir(ex.estado(ms))
     if not r["puesta"]:
         return fin(RECHAZO, r["motivo"], ejecutor=nuevo)
     vuelta["entradas"] = 1
@@ -406,13 +412,14 @@ def responder(identificador=None, si=True, ahora_ms=None, calibracion=None):
         p = {**elegida, "estado": RECHAZADA, "respondida_ms": ms}
         d = con_propuesta(d, p)
         guardar(d)
-        lib_registro.anotar(AMBIENTE, RAZON_NO, par=p["par"], puntaje=p.get("puntaje"), ms=ms,
+        lib_registro.anotar(p.get("ambiente") or AMBIENTE, RAZON_NO, par=p["par"], puntaje=p.get("puntaje"), ms=ms,
                             orden=_orden(p, RECHAZADA), resultado={"motivo": RECHAZADA})
         return {"hecho": True, "motivo": "", "propuesta": p, "datos": estado(ms, archivo=d)}
     f = lib_frenos.escribir(lib_frenos.revisar(ms))
     cal = lib_calibracion.guardada() if calibracion is None else calibracion
-    r = lib_ejecutor_prueba.entrar(opcion_de(elegida), ahora_ms=ms, frenos=f, calibracion=cal)
-    ej = lib_ejecutor_prueba.escribir(lib_ejecutor_prueba.estado(ms))
+    ex = ejecutor_de(lib_estado.activo())
+    r = ex.entrar(opcion_de(elegida), ahora_ms=ms, frenos=f, calibracion=cal)
+    ej = ex.escribir(ex.estado(ms))
     # Si no se pudo poner (un freno que apareció, un monto que ya no alcanza), la propuesta sigue esperando mientras le
     # quede hora: el motivo se muestra y la persona puede volver a decir «Sí».
     p = {**elegida, "estado": ACEPTADA, "respondida_ms": ms} if r["puesta"] else elegida
@@ -503,7 +510,7 @@ def estado(ahora_ms=None, archivo=None, tamano=None, frenos=None, ejecutor=None,
     amb = lib_estado.activo()
     cuenta = lib_estado.cargar(amb, ahora_ms=ms)
     f = frenos if isinstance(frenos, dict) else lib_frenos.guardado()
-    ej = ejecutor if isinstance(ejecutor, dict) else lib_ejecutor_prueba.guardado()
+    ej = ejecutor if isinstance(ejecutor, dict) else ejecutor_de(amb).guardado()
     t = tamano if isinstance(tamano, dict) else lib_tamano.guardado()
     modelo = lib_calibracion.modelo(calibracion)
     aj = ajustes(d)
@@ -514,7 +521,7 @@ def estado(ahora_ms=None, archivo=None, tamano=None, frenos=None, ejecutor=None,
     esperando = [p for p in propuestas if p["espera"]]
     mejor = t.get("mejor") if isinstance(t.get("mejor"), dict) else None
     motivos = []
-    if amb != AMBIENTE:
+    if amb not in (AMBIENTE, lib_estado.REAL):
         motivos.append({"codigo": SIN_AMBIENTE, "par": "", "n": 0})
     if f and not puerta["puede"]:
         motivos.append({"codigo": puerta["motivo"] or FRENADO, "par": "", "n": 0})

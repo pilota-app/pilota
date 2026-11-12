@@ -31,6 +31,7 @@ import math
 
 import lib_datos
 import lib_ejecutor_prueba
+import lib_ejecutor_real
 import lib_estado
 import lib_frenos
 import lib_registro
@@ -246,7 +247,8 @@ def reconciliar(ahora_ms=None, plan=None, mercado=None, decidir=None):
         huerfano = cerrar_huerfano(lib_ejecutor_prueba.revisar(ms), ms)
         ej = lib_ejecutor_prueba.escribir(huerfano["ejecutor"])
     else:
-        ej = {}          # reconciliar contra Binance es cosa del conector real, en su paso: acá no se toca nada real
+        # En real se reconcilia contra Binance, nunca contra lo guardado: el conector mira cada orden propia.
+        ej = lib_ejecutor_real.escribir(lib_ejecutor_real.revisar(ms))
     lineas, topado = lineas_de(amb, v["desde_ms"], ms)
     cobertura = ej.get("cobertura") or {}
     resumen = {**v, **cuentas_de(lineas), "ambiente": amb, "topado": topado,
@@ -282,8 +284,9 @@ def vista(plan, ahora_ms=None, frenos=None, ejecutor=None):
     eso es `reconciliar`."""
     ms = _ms(ahora_ms)
     f = frenos if isinstance(frenos, dict) else lib_frenos.guardado()
-    ej = ejecutor if isinstance(ejecutor, dict) else lib_ejecutor_prueba.guardado()
     amb = lib_estado.activo()
+    ej = ejecutor if isinstance(ejecutor, dict) else (
+        lib_ejecutor_prueba.guardado() if amb == lib_ejecutor_prueba.AMBIENTE else lib_ejecutor_real.guardado())
     ultima = _entero(plan.get("ultima_ms"))
     hace = max(0, ms - ultima) if ultima else None
     corriendo = bool(plan.get("corriendo"))
@@ -296,7 +299,10 @@ def vista(plan, ahora_ms=None, frenos=None, ejecutor=None):
     elif not activo:
         motivos.append({"codigo": DORMIDO, "par": "", "n": _min(hace or 0)})
     if amb != lib_ejecutor_prueba.AMBIENTE:
-        motivos.append({"codigo": SIN_CONECTOR, "par": "", "n": 0})
+        for m in (ej.get("motivos") or []):
+            if m.get("codigo") in ("sin_llave", "sin_conexion"):
+                motivos.append({"codigo": SIN_CONECTOR, "par": "", "n": 0})
+                break
     if ej and not cobertura.get("cubierto"):
         motivos.append({"codigo": SIN_1M, "par": "", "n": _entero(cobertura.get("sin_cobertura_min"))})
     if f.get("frenado"):

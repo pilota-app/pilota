@@ -158,10 +158,10 @@ window.PilotaPanel = (() => {
     // El motivo con nombre y número, en su propia frase entera: por qué no sale monto, o por qué te pregunto.
     function porque(m, d) {
       if (m.cuento === "rechazada" && d.motivo) {
-        return `<p class="mascota-porque">${Tp(E.motivosTamano[d.motivo] || "Con esta oportunidad no me sale ningún monto.", { par: d.par || "", n: numero(d.n, 0) })}</p>`;
+        return `<p class="mascota-porque">${frase(E.motivosTamano[d.motivo] || "Con esta oportunidad no me sale ningún monto.", { par: d.par || "", n: numero(d.n, 0) })}</p>`;
       }
       if (m.cuento === "esperando" && d.motivo) {
-        return `<p class="mascota-porque">${Tp((E.pregunta || {})[d.motivo] || "Te pregunto antes de abrir esto.")}</p>`;
+        return `<p class="mascota-porque">${frase((E.pregunta || {})[d.motivo] || "Te pregunto antes de abrir esto.")}</p>`;
       }
       return "";
     }
@@ -243,7 +243,7 @@ window.PilotaPanel = (() => {
           <span class="serie-estado" data-estado="${m.pasa ? "listo" : "vacio"}">${corte}</span>
           <span class="serie-detalle">${detalle}</span>
           ${(tiene && !m.puede && m.motivo)
-            ? `<span class="serie-detalle freno">${Tp(E.motivosTamano[m.motivo] || "Con esta oportunidad no me sale ningún monto.", { par: m.par, n: 0 })}</span>`
+            ? `<span class="serie-detalle freno">${frase(E.motivosTamano[m.motivo] || "Con esta oportunidad no me sale ningún monto.", { par: m.par, n: 0 })}</span>`
             : ""}
           ${(tiene && m.puede && !m.pasa)
             ? `<span class="serie-detalle">${frase("No llega a la exigencia ({exigencia}): me quedo en USDT.", { exigencia: numero(m.exigencia, 0) })}</span>`
@@ -263,7 +263,7 @@ window.PilotaPanel = (() => {
         ${escalera(o.stop, o.precio, o.objetivo, o.precio_ahora)}
         ${typeof o.puntaje === "number"
           ? `<span class="serie-estado">${frase("Puntaje {n}", { n: numero(o.puntaje, 0) })}</span>` : ""}
-        <span class="serie-detalle">${Tp(E.estrategia[o.estrategia] || o.estrategia || "")}</span>
+        <span class="serie-detalle">${frase(E.estrategia[o.estrategia] || o.estrategia || "")}</span>
         <span class="serie-detalle">${abierta
           ? frase("Compré {cantidad} a {entrada}: ahora vale {valor}.", {
             cantidad: numero(o.cantidad, 8), entrada: numero(o.precio), valor: usdt(o.valor) })
@@ -301,11 +301,11 @@ window.PilotaPanel = (() => {
         <span class="serie-par" data-sin-traducir>${esc(donde)}</span>
         <span class="serie-estado" data-estado="listo">${frase("Puntaje {n}", { n: numero(o.puntaje, 0) })}</span>
         ${escalera(o.stop, o.entrada, o.objetivo, null)}
-        <span class="serie-detalle">${Tp(E.estrategia[o.estrategia] || o.estrategia || "")}</span>
+        <span class="serie-detalle">${frase(E.estrategia[o.estrategia] || o.estrategia || "")}</span>
         <span class="serie-detalle">${frase("Compro {monto} a {precio}, con stop en {stop} y objetivo en {objetivo}: arriesgo {arriesgado}.", {
           monto: usdt(o.monto), precio: numero(o.entrada), stop: numero(o.stop), objetivo: numero(o.objetivo),
           arriesgado: usdt(o.arriesgado) })}</span>
-        ${o.motivo ? `<span class="serie-detalle">${Tp((E.pregunta || {})[o.motivo] || "Te pregunto antes de abrir esto.")}</span>` : ""}
+        ${o.motivo ? `<span class="serie-detalle">${frase((E.pregunta || {})[o.motivo] || "Te pregunto antes de abrir esto.")}</span>` : ""}
         <span class="serie-detalle cuenta" data-vence="${Math.max(0, Number(o.queda_ms) || 0)}" data-desde="${Date.now()}">${textoVence(Number(o.queda_ms) || 0)}</span>
         <span class="serie-detalle">
           <button type="button" class="pz-boton pz-principal" data-propuesta="${esc(o.id)}" data-si="1"${esperando ? " disabled" : ""}>${esperando ? "Un momento…" : "Sí, ábrela"}</button>
@@ -358,7 +358,7 @@ window.PilotaPanel = (() => {
       if (typeof r.neto === "number") partes.push(frase("dejó {n}", { n: usdt(r.neto) }));
       if (typeof r.saldo === "number") partes.push(frase("saldo {n}", { n: usdt(r.saldo) }));
       if (typeof r.minutos === "number") partes.push(frase("esperó {n} min", { n: numero(r.minutos, 0) }));
-      if (r.motivo) partes.push(frase("motivo: {que}", { que: Tp(E.motivoCorto[r.motivo] || r.motivo) }));
+      if (r.motivo) partes.push(frase("motivo: {que}", { que: Tp(E.motivoCorto[r.motivo] || "otro motivo") }));
       return partes.join(" · ");
     }
     function historial(p) {
@@ -424,7 +424,7 @@ window.PilotaPanel = (() => {
         <p class="ayuda">${frase(AMBIENTES[p.ambiente === "real" ? "real" : "prueba"])}</p>
         ${mascota(p)}
         ${cadena(p)}
-        ${motivos.map((m) => `<p class="indicadores-linea freno">${Tp(MOTIVOS[m.codigo] || E.motivosFrenos[m.codigo] || "Ahora no abro ninguna entrada nueva.", { n: numero(m.n, 0), par: m.par || "" })}</p>`).join("")}
+        ${motivos.map((m) => `<p class="indicadores-linea freno">${frase(MOTIVOS[m.codigo] || E.motivosFrenos[m.codigo] || "Ahora no abro ninguna entrada nueva.", { n: numero(m.n, 0), par: m.par || "" })}</p>`).join("")}
         <div class="cabina-grilla">
           ${saldo(p)}
           <div class="cabina-monedas">
@@ -444,9 +444,12 @@ window.PilotaPanel = (() => {
           ? `<p class="indicadores-linea">${cuentasPosiciones(p, posiciones)}</p>
             <ul class="series tarjetas" aria-label="Mis posiciones">${posiciones.map(posicion).join("")}</ul>`
           : `<p class="suave">${frase("No tengo nada abierto: todo el saldo está en USDT. Caben {n} posiciones a la vez.", { n: numero((p.parametros || {}).posiciones, 0) })}</p>`}
-        ${motor(p)}
-        <h3>Lo último que hice</h3>
-        ${historial(p)}</section>`;
+        ${motor(p)}</section>`;
+    }
+    // ── La pestaña «Historial»: lo último que hice, con los campos de siempre ──
+    function registro(p) {
+      if (!p) return `<p class="suave">Abriendo Pilota…</p>`;
+      return `<section class="panel panel-registro"><h2>Lo último que hice</h2>${historial(p)}</section>`;
     }
 
     // La cuenta atrás de cada propuesta, una vez por segundo: solo cambia ese texto, sin volver a pintar la pantalla.
@@ -461,7 +464,7 @@ window.PilotaPanel = (() => {
       return vivas;
     }
 
-    return { html, latir };
+    return { html, registro, latir };
   }
 
   return { crear };

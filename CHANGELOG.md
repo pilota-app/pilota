@@ -7,6 +7,18 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- Pilota ahora se ordena en cinco pestañas: Ahora, Simular, Operar, Historial y Cómo pienso. *Pilota is now organized in five
+  tabs: Now, Simulate, Trade, History and How I think.*
+- Nuevo: «Simular». Eliges un monto y un período y ves qué habría hecho Pilota con él, con las reglas de hoy, al lado de quedarte
+  en USDT y de comprar BTC y esperar. Después lo pruebas en vivo con ese monto ficticio. *New: "Simulate". Choose an amount and a
+  period and see what Pilota would have done with it, with today's rules, next to staying in USDT and buying BTC and holding.
+  Then try it live with that play money.*
+- Nuevo: «Operar». Conectas tu llave de Binance (se guarda en el llavero del Mac, nunca en un archivo) y, cuando cumples los cinco
+  requisitos, enciendes el dinero real. Una llave que puede retirar no se acepta nunca. *New: "Trade". Connect your Binance key
+  (stored in the Mac keychain, never in a file) and, once you meet the five requirements, turn on real money. A key that can
+  withdraw is never accepted.*
+- Arreglado: los avisos y algunos textos se traducían dos veces, y el registro podía mostrar un código en vez de un motivo.
+  *Fixed: notices and some texts were translated twice, and the log could show a code instead of a reason.*
 - La pantalla principal ahora es una cabina: el robot te cuenta qué hizo, una cadena de seis luces muestra cómo va cada parte
   de Pilota (mercado, puntaje, tamaño, frenos, tu sí y motor), el saldo se ve como un medidor entre el piso y tu capital, cada
   moneda tiene su dial de puntaje y cada propuesta muestra su stop, su entrada y su objetivo en una línea de colores. El detalle

@@ -498,6 +498,104 @@
    "limite": 900,
    "pieza": "app"
   },
+  "realActivar": {
+   "script": "real.py",
+   "args": [
+    "activar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "presupuesto": {
+     "tipo": "entero",
+     "min": 1,
+     "max": 1000000
+    },
+    "frase": {
+     "tipo": "texto",
+     "max": 40
+    }
+   },
+   "responde": "realListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "realConectar": {
+   "script": "real.py",
+   "args": [
+    "conectar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "llave": {
+     "tipo": "texto",
+     "max": 128,
+     "patron": "^[A-Za-z0-9]{32,128}$"
+    },
+    "secreto": {
+     "tipo": "texto",
+     "max": 128,
+     "patron": "^[A-Za-z0-9]{32,128}$"
+    }
+   },
+   "responde": "realListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "realDesactivar": {
+   "script": "real.py",
+   "args": [
+    "desactivar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "realListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "realDesconectar": {
+   "script": "real.py",
+   "args": [
+    "desconectar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "realListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "realEmergencia": {
+   "script": "real.py",
+   "args": [
+    "emergencia"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "realListo",
+   "limite": 120,
+   "pieza": "app"
+  },
+  "realEstado": {
+   "script": "real.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "realEstadoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "realRevisar": {
+   "script": "real.py",
+   "args": [
+    "revisar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "realListo",
+   "limite": 60,
+   "pieza": "app"
+  },
   "senalesEstado": {
    "script": "senales.py",
    "args": [
@@ -507,6 +605,39 @@
    "datos": {},
    "responde": "senalesEstadoListo",
    "limite": 60,
+   "pieza": "app"
+  },
+  "simularCorrer": {
+   "script": "simular.py",
+   "args": [
+    "correr"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "monto": {
+     "tipo": "entero",
+     "min": 10,
+     "max": 1000000
+    },
+    "dias": {
+     "tipo": "entero",
+     "min": 30,
+     "max": 1095
+    }
+   },
+   "responde": "simularListo",
+   "limite": 600,
+   "pieza": "app"
+  },
+  "simularEstado": {
+   "script": "simular.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "simularEstadoListo",
+   "limite": 30,
    "pieza": "app"
   },
   "tamanoEstado": {

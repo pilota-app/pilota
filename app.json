@@ -483,6 +483,128 @@
    "datos": {},
    "responde": "motorEstadoListo",
    "limite": 30
+  },
+  "simularEstado": {
+   "script": "simular.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "simularEstadoListo",
+   "limite": 30
+  },
+  "simularCorrer": {
+   "script": "simular.py",
+   "args": [
+    "correr"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "monto": {
+     "tipo": "entero",
+     "min": 10,
+     "max": 1000000
+    },
+    "dias": {
+     "tipo": "entero",
+     "min": 30,
+     "max": 1095
+    }
+   },
+   "responde": "simularListo",
+   "limite": 600
+  },
+  "realEstado": {
+   "script": "real.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "realEstadoListo",
+   "limite": 30
+  },
+  "realConectar": {
+   "script": "real.py",
+   "args": [
+    "conectar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "llave": {
+     "tipo": "texto",
+     "max": 128,
+     "patron": "^[A-Za-z0-9]{32,128}$"
+    },
+    "secreto": {
+     "tipo": "texto",
+     "max": 128,
+     "patron": "^[A-Za-z0-9]{32,128}$"
+    }
+   },
+   "responde": "realListo",
+   "limite": 60
+  },
+  "realRevisar": {
+   "script": "real.py",
+   "args": [
+    "revisar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "realListo",
+   "limite": 60
+  },
+  "realDesconectar": {
+   "script": "real.py",
+   "args": [
+    "desconectar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "realListo",
+   "limite": 30
+  },
+  "realActivar": {
+   "script": "real.py",
+   "args": [
+    "activar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "presupuesto": {
+     "tipo": "entero",
+     "min": 1,
+     "max": 1000000
+    },
+    "frase": {
+     "tipo": "texto",
+     "max": 40
+    }
+   },
+   "responde": "realListo",
+   "limite": 60
+  },
+  "realDesactivar": {
+   "script": "real.py",
+   "args": [
+    "desactivar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "realListo",
+   "limite": 30
+  },
+  "realEmergencia": {
+   "script": "real.py",
+   "args": [
+    "emergencia"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "realListo",
+   "limite": 120
   }
  }
 }

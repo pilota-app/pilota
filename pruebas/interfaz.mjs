@@ -45,12 +45,12 @@ async function abrir(consulta, ancho = 1280, { plegado = false } = {}) {
   page.on("pageerror", (e) => errores.push(`${consulta}: ${e.message}`));
   page.on("console", (m) => { if (m.type() === "error") errores.push(`${consulta}: ${m.text()}`); });
   await page.addInitScript(() => document.addEventListener("securitypolicyviolation", (e) => console.error(`CSP: ${e.violatedDirective}`)));
-  // Las pruebas de cada pieza miran lo que está plegado en «Ver cómo lo pensé»: se abre apenas aparece (y la app lo deja
-  // abierto al volver a pintar). La cabina plegada se revisa aparte, con `abrir(consulta, ancho, { plegado: true })`.
+  // Las pruebas de cada pieza miran la pestaña «Cómo pienso»: se elige apenas aparece (y la app se queda en ella al volver
+  // a pintar). Las demás pestañas se revisan aparte, con `abrir(consulta, ancho, { plegado: true })`.
   if (!plegado) {
     await page.addInitScript(() => new MutationObserver(() => {
-      const d = document.getElementById("por-dentro");
-      if (d && !d.open) d.open = true;
+      const t = document.getElementById("tab-como");
+      if (t && t.getAttribute("aria-selected") !== "true" && !window.__comoElegida) { window.__comoElegida = true; t.click(); }
     }).observe(document, { childList: true, subtree: true }));
   }
   await page.goto(BASE + consulta);
@@ -83,19 +83,47 @@ for (let i = 0; i < 10 && await page.locator(".pieza-bv [data-bv-ir].pz-principa
 await page.click(".pieza-bv [data-bv-fin]:not([data-bv-fin=despues])");
 await page.waitForSelector("#descargar");
 
-// 1b. La cabina: lo importante a la vista (el robot, la cadena de seis agentes, el saldo y un dial por moneda) y el detalle
-// técnico plegado. Los dibujos son SVG con atributos: ninguno usa style="" (la CSP lo bloquearía y se verían vacíos).
+// 1b. El centro de operaciones: cinco pestañas, la cabina con dibujos (sin style="" en línea: la CSP lo bloquearía), la
+// simulación con monto y el paso a real con sus requisitos.
 {
-  const cab = await abrir("?demo", 1280, { plegado: true });
+  const cab = await abrir("?demo&idioma=es", 1280, { plegado: true });
   await cab.waitForSelector(".cabina .cadena");
+  assert.equal(await cab.locator('[role="tab"]').count(), 5, "cinco pestañas");
+  assert.equal(await cab.locator('[role="tab"][aria-selected="true"]').getAttribute("id"), "tab-ahora", "parte en «Ahora»");
   assert.equal(await cab.locator(".cadena .estacion").count(), 6, "la cadena muestra los seis agentes");
   assert.equal(await cab.locator(".cabina .robot").count(), 1, "el robot está dibujado");
-  assert.ok(await cab.locator(".cabina .media-luna").count() === 1, "el saldo se ve como medidor");
+  assert.equal(await cab.locator(".cabina .media-luna").count(), 1, "el saldo se ve como medidor");
   assert.ok(await cab.locator(".cabina .dial").count() >= 1, "cada moneda tiene su dial");
-  assert.equal(await cab.locator("#panel [style]").count(), 0, "la cabina no usa style en línea");
-  assert.equal(await cab.evaluate(() => document.getElementById("por-dentro").open), false, "el detalle técnico parte plegado");
-  await cab.click("#por-dentro > summary");
-  await cab.waitForSelector("#descargar");
+  assert.equal(await cab.locator("#app [style]").count(), 0, "nada usa style en línea");
+  assert.ok(await cab.locator("#pestana-como").isHidden(), "lo técnico vive en su pestaña");
+  // Las flechas mueven entre pestañas, como en cualquier lista de pestañas.
+  await cab.focus("#tab-ahora");
+  await cab.keyboard.press("ArrowRight");
+  assert.equal(await cab.evaluate(() => document.activeElement.id), "tab-simular");
+  assert.ok(await cab.locator("#pestana-simular").isVisible());
+  // Simular: el monto, el período y el resultado al lado de quedarse en USDT y de comprar BTC y esperar.
+  await cab.fill("#sim-monto", "250");
+  await cab.click('[data-sim-dias="365"]');
+  assert.equal(await cab.inputValue("#sim-monto"), "250", "lo escrito sigue ahí al volver a pintar");
+  await cab.click("#sim-correr");
+  await cab.waitForSelector(".sim-tarjetas");
+  assert.match(await cab.textContent(".sim-resultado"), /Con Pilota[\s\S]*Quedarte en USDT[\s\S]*250 USDT[\s\S]*Comprar BTC y esperar/);
+  assert.match(await cab.textContent(".sim-resultado"), /365 días/);
+  assert.equal(await cab.locator(".sim-grafico svg polyline").count(), 2, "las dos curvas");
+  // Operar: los cinco requisitos y la llave; sin cumplirlos, no hay cómo encender.
+  await cab.click("#tab-operar");
+  await cab.waitForSelector(".requisitos");
+  assert.equal(await cab.locator(".requisito").count(), 5);
+  assert.equal(await cab.locator('.requisito[data-cumple="1"] >> text=Simulaste el pasado').count(), 1,
+    "simular cuenta como requisito cumplido");
+  assert.equal(await cab.locator("#real-activar").count(), 0, "sin los cinco pasos no aparece el botón de encender");
+  assert.equal(await cab.getAttribute("#real-secreto", "type"), "password", "el secreto no se ve al escribirlo");
+  await cab.fill("#real-llave", "corta");
+  await cab.click("#real-conectar");
+  await cab.waitForSelector(".pz-toast");
+  assert.match(await cab.textContent(".pz-toast"), /solo letras y números/, "una llave mal copiada se dice antes de mandarla");
+  assert.equal(await cab.evaluate(() => JSON.stringify(window.Pilota._pruebas.E).includes("corta")), false,
+    "la llave no se guarda en el estado de la pantalla");
   await cab.close();
 }
 
@@ -642,7 +670,7 @@ assert.match(await page.textContent("#senales"), /BTC viene bien/, "el filtro de
 assert.match(await page.textContent("#senales"),
   /compra con límite al volver a 94\.830, stop en 93\.869,7 y objetivo en 96\.252,45/, "la ruptura entra en el nivel roto");
 assert.match(await page.textContent("#senales"), /arriesga 1,01 % para ganar 1,5 %/);
-assert.match(await page.textContent("#senales"), /objetivo en la media, 3\.198,4/, "el rebote sale en la media");
+assert.match(await page.textContent("#senales"), /objetivo en la media, 3\.?198,4/, "el rebote sale en la media");
 assert.match(await page.textContent("#senales"), /ETHUSDT 1 d: falta historial para saber si el día viene al alza/);
 assert.match(await page.textContent("#backtest"), /Todavía no he recorrido el historial/, "el backtest parte sin correr");
 await page.click("#backtest-correr");

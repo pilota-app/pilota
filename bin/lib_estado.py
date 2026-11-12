@@ -271,10 +271,30 @@ def cargar(ambiente, ahora_ms=None):
 
 # ── Lo que hace la app ───────────────────────────────────────────────────────────────────────────────────────────────
 
+def ruta_interruptor():
+    return os.path.join(carpeta(), "interruptor.json")
+
+
 def activo():
-    """Con qué dinero se está jugando. Hoy siempre prueba: pasar a real es su propio paso y hasta que esté cerrado el
-    interruptor no existe (la banda de la pantalla sale de acá)."""
-    return PRUEBA
+    """Con qué dinero se está jugando. Real solo si el interruptor está escrito, firmado y dice real; cualquier otra cosa
+    (no está, no cuadra la huella, no se entiende) es prueba. Lo enciende y lo apaga `lib_real` (la banda de la pantalla
+    sale de acá)."""
+    d = nucleo.leer_json(ruta_interruptor(), {}, maximo=64 * 1024)
+    cuerpo = d.get("interruptor") if isinstance(d, dict) else None
+    if not isinstance(cuerpo, dict) or cuerpo.get("real") is not True:
+        return PRUEBA
+    if not hmac.compare_digest(str(d.get("huella") or ""), huella(cuerpo, "interruptor")):
+        return PRUEBA
+    return REAL
+
+
+def poner_interruptor(real, ahora_ms=None, presupuesto=None):
+    """Enciende o apaga el dinero de verdad. Solo lo llama `lib_real`, después de revisar todos los requisitos."""
+    ms = int(ahora_ms if ahora_ms is not None else lib_datos.ahora_local_ms())
+    cuerpo = {"real": bool(real), "cuando": lib_datos.iso(ms), "cuando_ms": ms, "presupuesto": presupuesto}
+    nucleo.escribir_json(ruta_interruptor(), {"formato": FORMATO, "huella": huella(cuerpo, "interruptor"),
+                                             "interruptor": cuerpo})
+    return activo()
 
 
 def arrancar(ahora_ms=None):
