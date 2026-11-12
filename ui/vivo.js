@@ -190,6 +190,10 @@ window.PilotaVivo = (() => {
     function gatillo(e, fila) {
       const m = moneda(fila.par), falta = porcentaje(Math.max(0, e.distancia || 0), 2);
       if (e.motivo === "listo") return frase("¡Se cumple! {moneda} cerró donde quería: pongo la compra ahora.", { moneda: m });
+      if (fila.condicion === "con_rumbo") {
+        return frase("Cuando el precio se calme (fuerza {adx} ahora; pido {max} o menos), compro {moneda} si una vela cierra en {precio} o menos.",
+          { adx: numero(fila.adx || 0, 0), max: numero(e.adx_maximo || 20, 0), moneda: m, precio: usdt(e.gatillo) });
+      }
       return e.estrategia === "rebote"
         ? frase("Compro {moneda} por rebote si una vela cierra en {precio} o menos (falta {falta}).", { moneda: m, precio: usdt(e.gatillo), falta })
         : frase("Compro {moneda} por ruptura si una vela cierra sobre {precio} con volumen (falta {falta}).", { moneda: m, precio: usdt(e.gatillo), falta });
@@ -210,7 +214,9 @@ window.PilotaVivo = (() => {
         ${frena ? `<p class="freno-texto">${frase("BTC viene cayendo: no compro nada hasta que se calme.", {})}</p>` : ""}
         <ul class="radar-filas">${filas.map((f) => {
           const espera = (f.estrategias || []).find((e) => e.estrategia === f.espera);
-          const otras = (f.estrategias || []).filter((e) => e !== espera).map((e) => porQueNo(e, f)).filter(Boolean);
+          const otras = (f.estrategias || []).filter((e) => e !== espera || f.condicion).map((e) => porQueNo(e, f))
+            .filter((t, i, todos) => t && todos.indexOf(t) === i)
+            .filter((t) => !(f.condicion && /^Rebote|^Bounce/.test(t.replace(/<[^>]+>/g, ""))));
           return `<li class="radar-fila" data-cerca="${f.cerca ? 1 : 0}">
             <div class="radar-cabeza"><strong data-sin-traducir>${esc(moneda(f.par))}</strong>
               <span class="suave">${frase("velas de {t}", { t: Tp(TIEMPO[f.temporalidad] || f.temporalidad) })}</span>

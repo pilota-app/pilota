@@ -162,6 +162,10 @@ def mirar_serie(par, temporalidad, velas, al_alza, filtro, perfil, historia):
     mejor = min(posibles, key=lambda e: max(0.0, e["distancia"]), default=None)
     item["espera"] = mejor["estrategia"] if mejor else ""
     item["cerca"] = bool(mejor and 0 <= mejor["distancia"] <= CERCA)
+    item["condicion"] = ""
+    if not mejor and r.get("motivo") == "con_rumbo" and r.get("sirve"):
+        # Ninguna aplica, pero el rebote solo espera que el precio se calme: eso también es «estar esperando».
+        item.update(espera="rebote", condicion="con_rumbo")
     return item
 
 
