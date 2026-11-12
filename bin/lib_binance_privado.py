@@ -33,6 +33,7 @@ RUTAS = {
     ("GET", "/api/v3/order"): True,                      # una orden por su id propio
     ("GET", "/api/v3/openOrders"): True,                 # las órdenes abiertas de un par
     ("GET", "/api/v3/orderList"): True,                  # una protección (OCO) por su id propio
+    ("GET", "/api/v3/myTrades"): True,                   # los llenados de una orden, con su comisión
     ("POST", "/api/v3/order"): True,                     # una compra límite, una venta a mercado o una conversión
     ("POST", "/api/v3/orderList/oco"): True,             # la protección: objetivo + stop
     ("DELETE", "/api/v3/order"): True,                   # cancelar una orden propia
@@ -95,6 +96,16 @@ class Privada:
         return f"{texto}&signature={firma}"
 
     def llamar(self, metodo, ruta, parametros=None):
+        """Un pedido. Si Binance dice que la hora no cuadra (-1021), se corrige la hora y se intenta una vez más."""
+        try:
+            return self._llamar(metodo, ruta, parametros)
+        except ErrorBinance as e:
+            if e.codigo != HORA or ruta == "/api/v3/time":
+                raise
+            self.sincronizar()
+            return self._llamar(metodo, ruta, parametros)
+
+    def _llamar(self, metodo, ruta, parametros=None):
         if (metodo, ruta) not in RUTAS:
             raise ValueError(f"ruta no permitida: {metodo} {ruta}")
         firmada = RUTAS[(metodo, ruta)]
@@ -130,7 +141,7 @@ class Privada:
 
     def sincronizar(self):
         """Corrige la hora local con la del servidor de Binance."""
-        d = self.llamar("GET", "/api/v3/time")
+        d = self._llamar("GET", "/api/v3/time")
         servidor = int(d.get("serverTime") or 0)
         if servidor > 0:
             self.desfase = servidor - self.reloj()
@@ -148,6 +159,10 @@ class Privada:
 
     def orden(self, par, id_propio):
         return self.llamar("GET", "/api/v3/order", {"symbol": par, "origClientOrderId": id_propio})
+
+    def llenados(self, par, orden_id):
+        """Los llenados de una orden (por el orderId de Binance), con la comisión de cada uno y en qué moneda."""
+        return self.llamar("GET", "/api/v3/myTrades", {"symbol": par, "orderId": orden_id})
 
     def abiertas(self, par):
         return self.llamar("GET", "/api/v3/openOrders", {"symbol": par})

@@ -45,6 +45,9 @@ window.PilotaCentro = (() => {
     frenado: "La cuenta real está frenada: revísala antes de encender nada.",
     activo: "Primero vuelve a prueba: no puedo desconectar la llave con el dinero real encendido.",
     con_posiciones: "Hay posiciones reales abiertas: ciérralas primero o usa «Cerrar todo y volver a prueba».",
+    llave_insegura: "Tu llave de Binance ahora puede retirar o transferir: no abro nada nuevo. Quítale ese permiso en Binance.",
+    ocupado: "Estoy terminando otra revisión. Vuelve a intentar en un momento.",
+    sin_llave: "No encuentro la llave de Binance en este equipo. Conéctala de nuevo.",
   };
 
   function crear({ i18n, esc, numero, usdt, porcentaje, fechaHora }) {

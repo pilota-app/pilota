@@ -794,6 +794,7 @@
     bajo_minimo: "bajo el mínimo de Binance", sin_proteccion: "Binance no aceptó la protección", cruzaria: "el precio ya pasó",
     sin_saldo: "sin saldo en Binance", sin_llave: "sin llave de Binance", sin_conexion: "sin conexión con Binance",
     binance: "Binance dijo que no", rechazada: "dijiste que no", vencida: "nadie respondió",
+    llave_insegura: "la llave ya no es segura", ocupado: "otra revisión en curso", cambio_ambiente: "era de la otra cuenta",
   };
   // Por qué quedó anotada una línea (bin/lib_registro.py: RAZONES). Cada paso usa las suyas; el registro acepta solo
   // estos códigos, así que nunca hay una línea sin palabras.
@@ -1298,6 +1299,7 @@
   };
   // Por qué un modo está apagado. Los códigos los pone el Python (lib_modos, lib_frenos).
   const MOTIVOS_MODO = {
+    cambio_ambiente: "Esa propuesta era de la otra cuenta (prueba o real): la dejo vencer.",
     sin_calibracion: "Hasta que el modelo esté calibrado, cada entrada la decides tú.",
     faltan_confirmaciones: "El automático se activa confirmando dos veces.",
     modo: "Ese modo no existe.",

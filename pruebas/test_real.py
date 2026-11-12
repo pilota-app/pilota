@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -35,14 +36,42 @@ OPCION = {"estrategia": "rebote", "par": "BTCFDUSD", "temporalidad": "1h", "vela
           "stop": 99_000.0, "objetivo": 101_500.0, "puntaje": 90, "permitida": True, "vence": AHORA + 3 * HORA}
 
 
-class BinanceFalso:
-    """Lo mínimo de Binance para el conector: saldos, órdenes por id propio y protecciones."""
+ID_BINANCE = re.compile(r"^[\.A-Z\:/a-z0-9_-]{1,36}$")
 
-    def __init__(self, usdt=500.0, fdusd=0.0, btc=0.0):
+
+class BinanceFalso:
+    """Lo mínimo de Binance para el conector: saldos, órdenes por id propio, protecciones y llenados con comisión.
+
+    Revisa los ids como Binance (`ID_BINANCE`), rechaza un id repetido entre las órdenes abiertas y puede «cortar la red»
+    justo **después** de ejecutar un pedido (`cortar_despues`), que es el caso difícil: Binance lo hizo y nadie se enteró."""
+
+    def __init__(self, usdt=500.0, fdusd=0.0, btc=0.0, comision_base=0.0):
         self.saldos = {"USDT": usdt, "FDUSD": fdusd, "BTC": btc, "ETH": 0.0}
-        self.ordenes, self.listas, self.llamadas = {}, {}, []
+        self.ordenes, self.listas, self.llamadas, self.ajenas = {}, {}, [], []
         self.rechazar_oco = False
-        self.ajenas = []
+        self.comision_base = comision_base          # la comisión de la compra, cobrada en BTC (sin BNB)
+        self.cortar_despues = set()                 # nombres de pedidos que «se cortan» después de hacerse
+        self.permisos_extra = {}
+        self.siguiente = 1
+
+    def _id(self, cid):
+        assert ID_BINANCE.match(cid), f"Binance no acepta este id: {cid!r} ({len(cid)} caracteres)"
+        viva = self.ordenes.get(cid)
+        if viva and viva["status"] in ("NEW", "PARTIALLY_FILLED"):
+            raise bp.ErrorBinance(-2010, 400, "/api/v3/order")      # id repetido entre las abiertas
+        return cid
+
+    def _corte(self, que):
+        if que in self.cortar_despues:
+            self.cortar_despues.discard(que)
+            raise bp.SinRed("timeout")
+
+    def _orden(self, cid, par, precio, cantidad, lista=-1):
+        self.siguiente += 1
+        self.ordenes[cid] = {"clientOrderId": cid, "orderId": self.siguiente, "symbol": par, "status": "NEW",
+                             "executedQty": "0", "cummulativeQuoteQty": "0", "price": precio, "origQty": cantidad,
+                             "orderListId": lista, "llenos": []}
+        return self.ordenes[cid]
 
     def sincronizar(self):
         return 0
@@ -53,28 +82,36 @@ class BinanceFalso:
 
     def permisos(self):
         return {"enableReading": True, "enableSpotAndMarginTrading": True, "enableWithdrawals": False,
-                "ipRestrict": True}
+                "ipRestrict": True, **self.permisos_extra}
 
     def comprar_con(self, par, monto, cid):
-        self.llamadas.append(("convertir", par, monto))
+        self._id(cid)
+        self.llamadas.append(("convertir", par, monto, cid))
         m = float(monto)
         self.saldos["USDT"] -= m
         self.saldos["FDUSD"] += m * 0.9995
         return {"status": "FILLED"}
 
     def comprar_limite(self, par, cantidad, precio, cid):
+        self._id(cid)
         self.llamadas.append(("comprar", par, cantidad, precio, cid))
-        self.ordenes[cid] = {"clientOrderId": cid, "symbol": par, "status": "NEW", "executedQty": "0",
-                             "cummulativeQuoteQty": "0", "price": precio, "origQty": cantidad, "orderListId": -1}
-        return self.ordenes[cid]
+        o = self._orden(cid, par, precio, cantidad)
+        self._corte("comprar")
+        return o
 
     def llenar(self, cid, fraccion=1.0):
         o = self.ordenes[cid]
         q = float(o["origQty"]) * fraccion
+        comision = q * self.comision_base
         o.update(status="FILLED" if fraccion >= 1 else "PARTIALLY_FILLED", executedQty=str(q),
                  cummulativeQuoteQty=str(q * float(o["price"])))
-        self.saldos["BTC"] += q
+        o["llenos"] = [{"qty": str(q), "quoteQty": str(q * float(o["price"])), "commission": str(comision),
+                        "commissionAsset": "BTC"}]
+        self.saldos["BTC"] += q - comision
         self.saldos["FDUSD"] -= q * float(o["price"])
+
+    def llenados(self, par, orden_id):
+        return next((o["llenos"] for o in self.ordenes.values() if o["orderId"] == orden_id), [])
 
     def orden(self, par, cid):
         if cid not in self.ordenes:
@@ -94,27 +131,35 @@ class BinanceFalso:
         return o
 
     def proteger(self, par, cantidad, objetivo, stop, lista):
+        self._id(lista)
+        for suf in ("o", "s"):
+            self._id(f"{lista}{suf}")
         self.llamadas.append(("proteger", par, cantidad, objetivo, stop, lista))
         if self.rechazar_oco:
             raise bp.ErrorBinance(-1013, 400, "/api/v3/orderList/oco")
+        if float(cantidad) > self.saldos["BTC"] + 1e-12:
+            raise bp.ErrorBinance(-2010, 400, "/api/v3/orderList/oco")
         for suf, precio in (("o", objetivo), ("s", stop)):
-            self.ordenes[f"{lista}-{suf}"] = {"clientOrderId": f"{lista}-{suf}", "symbol": par, "status": "NEW",
-                                              "executedQty": "0", "cummulativeQuoteQty": "0", "price": precio,
-                                              "origQty": cantidad, "orderListId": 1}
+            self._orden(f"{lista}{suf}", par, precio, cantidad, lista=1)
         self.listas[lista] = {"listClientOrderId": lista, "listOrderStatus": "EXECUTING"}
         self.saldos["BTC"] -= float(cantidad)
+        self._corte("proteger")
         return self.listas[lista]
 
     def proteccion(self, lista):
+        if lista not in self.listas:
+            raise bp.ErrorBinance(bp.NO_EXISTE, 400, "/api/v3/orderList")
         return self.listas[lista]
 
     def cerrar_lista(self, lista, pata):
         """Una pata de la OCO se llenó; la otra se cancela."""
         for suf in ("o", "s"):
-            o = self.ordenes[f"{lista}-{suf}"]
+            o = self.ordenes[f"{lista}{suf}"]
             if suf == pata:
                 q = float(o["origQty"])
                 o.update(status="FILLED", executedQty=str(q), cummulativeQuoteQty=str(q * float(o["price"])))
+                o["llenos"] = [{"qty": str(q), "quoteQty": str(q * float(o["price"])), "commission": "0",
+                                "commissionAsset": "FDUSD"}]
                 self.saldos["FDUSD"] += q * float(o["price"])
             else:
                 o["status"] = "CANCELED"
@@ -123,19 +168,24 @@ class BinanceFalso:
     def cancelar_proteccion(self, par, lista):
         self.llamadas.append(("cancelar_proteccion", lista))
         for suf in ("o", "s"):
-            o = self.ordenes[f"{lista}-{suf}"]
+            o = self.ordenes[f"{lista}{suf}"]
             if o["status"] == "NEW":
                 o["status"] = "CANCELED"
                 self.saldos["BTC"] += float(o["origQty"]) if suf == "s" else 0.0
         self.listas[lista]["listOrderStatus"] = "ALL_DONE"
 
     def vender_mercado(self, par, cantidad, cid):
+        self._id(cid)
         self.llamadas.append(("vender", par, cantidad, cid))
         q = float(cantidad)
+        assert q <= self.saldos["BTC"] + 1e-12, "no se puede vender lo que no hay"
         self.saldos["BTC"] -= q
         self.saldos["FDUSD"] += q * 99_500.0
-        return {"clientOrderId": cid, "status": "FILLED", "executedQty": str(q),
-                "cummulativeQuoteQty": str(q * 99_500.0)}
+        o = self._orden(cid, par, "99500", cantidad)
+        o.update(status="FILLED", executedQty=str(q), cummulativeQuoteQty=str(q * 99_500.0),
+                 llenos=[{"qty": str(q), "quoteQty": str(q * 99_500.0), "commission": "0", "commissionAsset": "FDUSD"}])
+        self._corte("vender")
+        return o
 
 
 class Base(unittest.TestCase):
@@ -270,7 +320,7 @@ class Conector(Base):
         self.assertTrue(r["puesta"], r)
         tipos = [x[0] for x in b.llamadas]
         self.assertEqual(tipos, ["convertir", "comprar"])
-        self.assertTrue(b.llamadas[1][4].startswith("pil-r-BTCFDUSD-"), "el id lleva el prefijo y la r de real")
+        self.assertTrue(b.llamadas[1][4].startswith("pil-r-B"), "el id lleva el prefijo y la r de real")
         self.assertLessEqual(float(b.llamadas[0][2]), r["posicion"]["monto"] * 1.01)
         self.assertEqual(self.cuerpo()["posiciones"][0]["estado"], "puesta")
 
@@ -427,6 +477,160 @@ class PasoAReal(Base):
         self.assertEqual(lib_real.desactivar(AHORA)["motivo"], "con_posiciones")
         self.assertTrue(lib_real.emergencia(AHORA + HORA, cliente=b)["hecho"])
         self.assertEqual(lib_estado.activo(), lib_estado.PRUEBA)
+
+
+class Cortes(Base):
+    """Lo que pasa cuando la red se corta justo después de que Binance hizo algo: nunca se repite una compra o una venta."""
+
+    def test_todos_los_ids_caben_en_binance(self):
+        for par in real.LETRA_PAR:
+            for estrategia in real.LETRA_ESTRATEGIA:
+                base = real.base_de({"par": par, "estrategia": estrategia, "vela": 9_999_999_999_999})
+                for cid in real.ids(base).values():
+                    self.assertRegex(cid, ID_BINANCE)
+                    self.assertLessEqual(len(cid), real.LARGO_MAXIMO_ID)
+                    self.assertTrue(cid.startswith("pil-"))
+
+    def test_la_misma_oportunidad_da_los_mismos_ids(self):
+        self.assertEqual(real.base_de(OPCION), real.base_de({**OPCION}))
+        self.assertNotEqual(real.base_de(OPCION), real.base_de({**OPCION, "vela": OPCION["vela"] + HORA}))
+
+    def test_corte_al_comprar_no_compra_dos_veces(self):
+        self.en_real()
+        b = BinanceFalso()
+        b.cortar_despues.add("comprar")
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        self.assertEqual(r["motivo"], "sin_confirmar")
+        self.assertEqual(self.cuerpo()["posiciones"][0]["fase"], "enviando", "quedó guardada antes de mandarla")
+        r2 = real.entrar(OPCION, AHORA + 1000, frenos=PUEDE, calibracion={}, cliente=b)
+        self.assertEqual(r2["motivo"], "repetida")
+        self.assertEqual([x[0] for x in b.llamadas].count("comprar"), 1)
+        real.revisar(AHORA + 60_000, cliente=b)
+        self.assertEqual(self.cuerpo()["posiciones"][0]["fase"], "", "la revisión la encontró por su id")
+
+    def test_corte_al_comprar_y_no_llego_se_olvida(self):
+        self.en_real()
+        b = BinanceFalso()
+        b.cortar_despues.add("comprar")
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        del b.ordenes[r["posicion"]["id"]]              # Binance nunca la recibió
+        real.revisar(AHORA + 60_000, cliente=b)
+        self.assertEqual(self.cuerpo()["posiciones"], [])
+
+    def test_corte_al_proteger_no_vende_ni_protege_dos_veces(self):
+        self.en_real()
+        b = BinanceFalso()
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"])
+        b.cortar_despues.add("proteger")
+        real.revisar(AHORA + 60_000, cliente=b)
+        self.assertEqual(self.cuerpo()["posiciones"][0]["fase"], "protegiendo")
+        e = real.revisar(AHORA + 120_000, cliente=b)
+        tipos = [x[0] for x in b.llamadas]
+        self.assertEqual(tipos.count("proteger"), 1)
+        self.assertNotIn("vender", tipos)
+        self.assertEqual(e["protegidas"], 1)
+
+    def test_corte_al_vender_no_vende_dos_veces(self):
+        self.en_real()
+        b = BinanceFalso(btc=1.0)
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"])
+        real.revisar(AHORA + 60_000, cliente=b)
+        b.cortar_despues.add("vender")
+        real.cerrar(None, AHORA + HORA, cliente=b)
+        self.assertEqual(self.cuerpo()["posiciones"][0]["fase"], "vendiendo")
+        real.revisar(AHORA + 2 * HORA, cliente=b)
+        self.assertEqual([x[0] for x in b.llamadas].count("vender"), 1)
+        self.assertEqual(self.cuerpo()["posiciones"], [])
+        self.assertAlmostEqual(b.saldos["BTC"], 1.0, places=8, msg="el BTC de la persona sigue ahí")
+
+
+class Casos(Base):
+    def test_llenada_en_parte_se_protege_en_la_misma_vuelta(self):
+        self.en_real()
+        b = BinanceFalso()
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"], 0.5)
+        e = real.revisar(AHORA + 60_000, cliente=b)          # todavía no vence
+        tipos = [x[0] for x in b.llamadas]
+        self.assertIn("cancelar", tipos)
+        self.assertIn("proteger", tipos)
+        self.assertEqual(e["protegidas"], 1)
+
+    def test_la_comision_en_btc_no_se_toma_de_lo_ajeno(self):
+        self.en_real()
+        b = BinanceFalso(btc=1.0, comision_base=0.001)
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"])
+        real.revisar(AHORA + 60_000, cliente=b)
+        protegido = float([x for x in b.llamadas if x[0] == "proteger"][0][2])
+        self.assertLessEqual(protegido, r["posicion"]["cantidad"] * (1 - 0.001) + 1e-12)
+        real.cerrar(None, AHORA + HORA, cliente=b)
+        self.assertGreaterEqual(b.saldos["BTC"], 1.0 - 1e-9, "el BTC de la persona sigue ahí")
+
+    def test_una_llave_que_ahora_puede_retirar_no_opera(self):
+        self.en_real()
+        b = BinanceFalso()
+        b.permisos_extra = {"enableWithdrawals": True}
+        nucleo.escribir_json(real.ruta_conexion(), {"ok": True, "cuando_ms": AHORA - 2 * real.REVISAR_LLAVE_MS})
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        self.assertEqual(r["motivo"], "llave_insegura")
+        self.assertNotIn("comprar", [x[0] for x in b.llamadas])
+
+    def test_una_llave_que_puede_transferir_tampoco(self):
+        class Transfiere(BinanceFalso):
+            def permisos(self):
+                return {**super().permisos(), "permitsUniversalTransfer": True}
+        r = lib_real.conectar(LLAVE, SECRETO, AHORA, cliente=Transfiere())
+        self.assertEqual(r["motivo"], "puede_retirar")
+
+    def test_con_real_encendido_no_se_cambia_la_llave(self):
+        self.en_real()
+        self.assertEqual(lib_real.conectar(LLAVE, SECRETO, AHORA, cliente=BinanceFalso())["motivo"], "activo")
+
+    def test_sin_conexion_al_conectar_no_se_guarda_nada(self):
+        class Caido(BinanceFalso):
+            def sincronizar(self):
+                raise bp.SinRed("red")
+        r = lib_real.conectar(LLAVE, SECRETO, AHORA, cliente=Caido())
+        self.assertFalse(r["hecho"])
+        self.assertEqual(r["motivo"], "sin_conexion")
+
+    def test_rechazada_la_proteccion_despues_se_vende(self):
+        self.en_real()
+        b = BinanceFalso()
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"])
+        real.revisar(AHORA + 60_000, cliente=b)
+        lista = self.cuerpo()["posiciones"][0]["proteccion_id"]
+        b.cancelar_proteccion("BTCFDUSD", lista)          # alguien la canceló desde Binance
+        real.revisar(AHORA + HORA, cliente=b)
+        self.assertIn("vender", [x[0] for x in b.llamadas])
+        self.assertEqual(self.cuerpo()["posiciones"], [])
+
+    def test_el_candado_no_deja_tocar_la_cuenta_a_dos_a_la_vez(self):
+        self.en_real()
+        antes, real.ESPERA_CANDADO = real.ESPERA_CANDADO, 0.3
+        try:
+            with real.candado():
+                r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=BinanceFalso())
+                e = real.revisar(AHORA, cliente=BinanceFalso())
+        finally:
+            real.ESPERA_CANDADO = antes
+        self.assertEqual(r["motivo"], "ocupado")
+        self.assertIn("ocupado", [m["codigo"] for m in e["motivos"]])
+
+    def test_una_propuesta_de_prueba_no_se_ejecuta_en_real(self):
+        import lib_modos
+        o = {**OPCION, "vela": OPCION["vela"], "tamano": {"precio": 100_000.0, "stop": 99_000.0, "monto": 14.0}}
+        d, prop = lib_modos.proponer(o, AHORA)
+        lib_modos.guardar(d)
+        self.assertEqual(prop["ambiente"], lib_estado.PRUEBA)
+        self.en_real()
+        r = lib_modos.responder(prop["id"], True, AHORA + 1000)
+        self.assertFalse(r["hecho"])
+        self.assertEqual(r["motivo"], lib_modos.CAMBIO_AMBIENTE)
 
 
 if __name__ == "__main__":

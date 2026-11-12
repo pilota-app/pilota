@@ -52,6 +52,8 @@ import nucleo
 
 #: El ambiente que se decide hoy: el otro es el conector real, en su paso.
 AMBIENTE = lib_ejecutor_prueba.AMBIENTE
+#: Por qué una propuesta no se ejecuta: nació en prueba y ahora se juega con dinero real (o al revés).
+CAMBIO_AMBIENTE = "cambio_ambiente"
 
 
 def ejecutor_de(amb):
@@ -97,7 +99,8 @@ SIN_CALIBRACION, SIN_PROPUESTA, FALTAN_CONFIRMACIONES = "sin_calibracion", "sin_
 #: Por qué el semiautomático preguntó en vez de operar solo.
 NO_CLARO, MONTO_MAYOR = "no_claro", "monto_mayor"
 RECHAZOS = tuple(dict.fromkeys((SIN_PROPUESTA, VENCIDA, SIN_CALIBRACION, FALTAN_CONFIRMACIONES, NO_CLARO, MONTO_MAYOR,
-                                "modo", "vencimiento", "monto", "frenado", *lib_ejecutor_prueba.RECHAZOS)))
+                                "modo", "vencimiento", "monto", "frenado", CAMBIO_AMBIENTE,
+                                *lib_ejecutor_prueba.RECHAZOS, *lib_ejecutor_real.RECHAZOS)))
 #: Ruido de coma flotante, no un monto distinto.
 TOLERANCIA = 1e-9
 
@@ -415,6 +418,9 @@ def responder(identificador=None, si=True, ahora_ms=None, calibracion=None):
         lib_registro.anotar(p.get("ambiente") or AMBIENTE, RAZON_NO, par=p["par"], puntaje=p.get("puntaje"), ms=ms,
                             orden=_orden(p, RECHAZADA), resultado={"motivo": RECHAZADA})
         return {"hecho": True, "motivo": "", "propuesta": p, "datos": estado(ms, archivo=d)}
+    if (elegida.get("ambiente") or AMBIENTE) != lib_estado.activo():
+        # Una propuesta que nació con el otro dinero no se ejecuta con este: se deja vencer.
+        return {"hecho": False, "motivo": CAMBIO_AMBIENTE, "propuesta": elegida, "datos": estado(ms, archivo=d)}
     f = lib_frenos.escribir(lib_frenos.revisar(ms))
     cal = lib_calibracion.guardada() if calibracion is None else calibracion
     ex = ejecutor_de(lib_estado.activo())

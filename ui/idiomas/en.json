@@ -1095,6 +1095,13 @@
   "Binance dijo que no": "Binance said no",
   "dijiste que no": "you said no",
   "nadie respondió": "nobody answered",
-  "otro motivo": "another reason"
+  "otro motivo": "another reason",
+  "Esa propuesta era de la otra cuenta (prueba o real): la dejo vencer.": "That proposal belonged to the other account (test or real): I'll let it expire.",
+  "la llave ya no es segura": "the key is no longer safe",
+  "otra revisión en curso": "another check in progress",
+  "era de la otra cuenta": "it belonged to the other account",
+  "Tu llave de Binance ahora puede retirar o transferir: no abro nada nuevo. Quítale ese permiso en Binance.": "Your Binance key can now withdraw or transfer: I'm not opening anything new. Remove that permission on Binance.",
+  "Estoy terminando otra revisión. Vuelve a intentar en un momento.": "I'm finishing another check. Try again in a moment.",
+  "No encuentro la llave de Binance en este equipo. Conéctala de nuevo.": "I can't find the Binance key on this computer. Connect it again."
  }
 }

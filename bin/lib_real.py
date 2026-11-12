@@ -69,9 +69,11 @@ def revisar(ahora_ms=None, cliente=None):
             cta = cli.cuenta()
             libres = {b.get("asset"): _num(b.get("free")) for b in (cta.get("balances") or [])
                       if isinstance(b, dict) and b.get("asset") in MONEDAS}
+            malos = lib_ejecutor_real.permisos_inseguros(per)
             d = {**base, "ok": True, "lectura": bool(per.get("enableReading")),
                  "spot": bool(per.get("enableSpotAndMarginTrading")) and bool(cta.get("canTrade")),
                  "retiro": bool(per.get("enableWithdrawals")), "ip": bool(per.get("ipRestrict")),
+                 "transferencias": any(m != "enableWithdrawals" for m in malos),
                  "futuros": bool(per.get("enableFutures")), "margen": bool(per.get("enableMargin")),
                  "libres": {m: libres.get(m, 0.0) for m in MONEDAS}}
         except bp.ErrorBinance as e:
@@ -85,7 +87,8 @@ def revisar(ahora_ms=None, cliente=None):
 
 def llave_segura(c):
     """Si la llave cumple: lee, opera spot, NO retira y está limitada a una IP."""
-    return bool(c.get("ok") and c.get("lectura") and c.get("spot") and not c.get("retiro") and c.get("ip"))
+    return bool(c.get("ok") and c.get("lectura") and c.get("spot") and not c.get("retiro")
+                and not c.get("transferencias") and c.get("ip"))
 
 
 def requisitos(ahora_ms=None, simulacion=None):
@@ -106,7 +109,8 @@ def requisitos(ahora_ms=None, simulacion=None):
         {"id": "prueba", "cumple": dias >= PRUEBA_DIAS and operaciones >= PRUEBA_OPERACIONES,
          "dias": dias, "operaciones": operaciones, "dias_pedidos": PRUEBA_DIAS,
          "operaciones_pedidas": PRUEBA_OPERACIONES},
-        {"id": "llave", "cumple": llave_segura(c), "ok": bool(c.get("ok")), "retiro": bool(c.get("retiro")),
+        {"id": "llave", "cumple": llave_segura(c), "ok": bool(c.get("ok")),
+         "retiro": bool(c.get("retiro")) or bool(c.get("transferencias")),
          "ip": bool(c.get("ip")), "spot": bool(c.get("spot")), "lectura": bool(c.get("lectura")),
          "motivo": c.get("motivo") or ""},
         {"id": "minimos", "cumple": bool(md.get("calculado")), "minimo": minimo},
@@ -133,22 +137,25 @@ def estado(ahora_ms=None):
 
 
 def conectar(llave, secreto, ahora_ms=None, cliente=None):
-    """Guarda la llave en el llavero y la revisa al tiro. Una llave que puede retirar se borra de inmediato."""
+    """Revisa la llave con Binance **antes** de guardarla: solo una llave que no puede retirar ni transferir llega al
+    llavero. Con el dinero real encendido no se cambia la llave (las posiciones abiertas son de la cuenta de esa llave)."""
+    if lib_estado.activo() == lib_estado.REAL:
+        return {"hecho": False, "motivo": "activo"}
     if not (lib_llavero.valida(llave) and lib_llavero.valida(secreto)):
         return {"hecho": False, "motivo": "formato"}
-    if not lib_llavero.disponible() and cliente is None:
+    if cliente is None and not lib_llavero.disponible():
         return {"hecho": False, "motivo": "sin_llavero"}
+    c = revisar(ahora_ms, cliente or bp.Privada(llave, secreto))
+    if not c.get("ok"):
+        return {"hecho": False, "motivo": c.get("motivo") or "binance", "conexion": c}
+    if c.get("retiro") or c.get("transferencias"):
+        return {"hecho": False, "motivo": "puede_retirar", "conexion": c}
     if cliente is None:
         try:
             lib_llavero.guardar(llave, secreto)
         except lib_llavero.Llavero as e:
-            return {"hecho": False, "motivo": str(e)}
-    c = revisar(ahora_ms, cliente or bp.Privada(llave, secreto))
-    if c.get("ok") and c.get("retiro"):
-        if cliente is None:
-            lib_llavero.borrar()
-        return {"hecho": False, "motivo": "puede_retirar", "conexion": c}
-    return {"hecho": bool(c.get("ok")), "motivo": c.get("motivo") or "", "conexion": c}
+            return {"hecho": False, "motivo": str(e), "conexion": c}
+    return {"hecho": True, "motivo": "", "conexion": c}
 
 
 def desconectar(ahora_ms=None):
