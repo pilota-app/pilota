@@ -266,7 +266,7 @@ def _encender(d=None, cliente=None, ahora_ms=None, dias=lib_datos.DIAS_MINUTOS, 
                 break
         if ciclos and vuelta >= ciclos:
             break
-        lib_trabajo.esperar(CICLO_SEGUNDOS, dormir=dormir, detenido=t.detenido)
+        lib_trabajo.esperar(CICLO_SEGUNDOS, dormir=dormir, detenido=lambda: t.detenido() or lib_candado.huerfano())
     detenido = t.detenido()
     plan.update({"error": error, "corriendo": False, "deteniendo": False,
                  "estado": lib_trabajo.terminar(t, error, detenido)})
