@@ -1865,9 +1865,10 @@
   function prepararSola() {
     const enDemo = host.plataforma === "web" && !new URLSearchParams(location.search).has("auto");
     if (!E.iniciada) return;
+    // Una vez, y otra más si a los 3 minutos sigue sin correr (pudo haber quedado uno a medio cerrar al abrir).
     const una = (clave, accion, datos = {}) => {
-      if (E.auto[clave]) return;
-      E.auto[clave] = true;
+      if (E.auto[clave] && Date.now() - E.auto[clave] < 180000) return;
+      E.auto[clave] = Date.now();
       host.enviar(accion, datos);
     };
     // El flujo de Binance en vivo: el gráfico y el robot reaccionan al segundo. Es de solo lectura y va siempre.
@@ -1913,6 +1914,12 @@
     if (P.i >= (P.total || 0)) P.jugando = false;
     pintarPeli();
   }, 450);
+  // Cada minuto se revisa que lo que corre solo siga corriendo (el muestreo y el flujo); si no, `prepararSola` lo vuelve a pedir.
+  setInterval(() => {
+    if (bv.activa || !E.iniciada || host.plataforma === "web") return;
+    host.enviar("muestreoEstado", {});
+    if (!(E.flujo && E.flujo.corriendo)) host.enviar("vivoEstado", {});
+  }, 60000);
   // El robot en vivo se mira de nuevo cada 30 segundos mientras su pestaña está a la vista (el motor decide cada 5 min).
   setInterval(() => {
     if (bv.activa || !E.vivo || !E.vivo.activo || !["vivo", "movimientos"].includes(E.pestana)) return;
