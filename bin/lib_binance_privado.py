@@ -44,6 +44,8 @@ TIEMPO_LIMITE = 20
 MAXIMO_RESPUESTA = 2 * 1024 * 1024
 #: Códigos de Binance que Pilota entiende (el resto se trata como «Binance dijo que no»).
 NO_EXISTE = -2013            # la orden no existe
+NO_EXISTE_LISTA = -2011      # la protección (orderList) no existe o no se pudo cancelar (a verificar: Binance usa los dos)
+FILTRO = -1013               # la orden no pasa un filtro del par (precio, cantidad o nocional mínimo)
 SIN_SALDO = -2010            # rechazada: saldo insuficiente, o una LIMIT_MAKER que se habría llenado al tiro
 CANCELAR_FALLO = -2011       # no se pudo cancelar (ya no estaba)
 HORA = -1021                 # timestamp fuera de la ventana
@@ -187,13 +189,13 @@ class Privada:
                                                      "quoteOrderQty": monto_cotizado, "newClientOrderId": id_propio,
                                                      "newOrderRespType": "FULL"})
 
-    def proteger(self, par, cantidad, objetivo, stop, id_lista):
+    def proteger(self, par, cantidad, objetivo, stop, id_lista, id_objetivo, id_stop):
         """La protección: una OCO de venta con el objetivo (límite, maker) y el stop (a mercado al tocarlo, para que salga
-        aunque el precio salte)."""
+        aunque el precio salte). Los tres ids los decide quien llama (`lib_ejecutor_real.ids`): se arman en un solo lugar."""
         return self.llamar("POST", "/api/v3/orderList/oco", {
             "symbol": par, "side": "SELL", "quantity": cantidad,
-            "aboveType": "LIMIT_MAKER", "abovePrice": objetivo, "aboveClientOrderId": f"{id_lista}-o",
-            "belowType": "STOP_LOSS", "belowStopPrice": stop, "belowClientOrderId": f"{id_lista}-s",
+            "aboveType": "LIMIT_MAKER", "abovePrice": objetivo, "aboveClientOrderId": id_objetivo,
+            "belowType": "STOP_LOSS", "belowStopPrice": stop, "belowClientOrderId": id_stop,
             "listClientOrderId": id_lista, "newOrderRespType": "FULL"})
 
     def cancelar(self, par, id_propio):

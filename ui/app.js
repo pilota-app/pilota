@@ -795,6 +795,7 @@
     sin_saldo: "sin saldo en Binance", sin_llave: "sin llave de Binance", sin_conexion: "sin conexión con Binance",
     binance: "Binance dijo que no", rechazada: "dijiste que no", vencida: "nadie respondió",
     llave_insegura: "la llave ya no es segura", ocupado: "otra revisión en curso", cambio_ambiente: "era de la otra cuenta",
+    polvo: "bajo el mínimo de Binance, quedó en tu cuenta",
   };
   // Por qué quedó anotada una línea (bin/lib_registro.py: RAZONES). Cada paso usa las suyas; el registro acepta solo
   // estos códigos, así que nunca hay una línea sin palabras.

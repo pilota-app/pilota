@@ -1102,6 +1102,8 @@
   "era de la otra cuenta": "it belonged to the other account",
   "Tu llave de Binance ahora puede retirar o transferir: no abro nada nuevo. Quítale ese permiso en Binance.": "Your Binance key can now withdraw or transfer: I'm not opening anything new. Remove that permission on Binance.",
   "Estoy terminando otra revisión. Vuelve a intentar en un momento.": "I'm finishing another check. Try again in a moment.",
-  "No encuentro la llave de Binance en este equipo. Conéctala de nuevo.": "I can't find the Binance key on this computer. Connect it again."
+  "No encuentro la llave de Binance en este equipo. Conéctala de nuevo.": "I can't find the Binance key on this computer. Connect it again.",
+  "bajo el mínimo de Binance, quedó en tu cuenta": "below Binance's minimum, it stayed in your account",
+  "Todavía hay órdenes de Pilota abiertas en Binance: usa «Cerrar todo y volver a prueba».": "There are still Pilota orders open on Binance: use \"Close everything and go back to test mode\"."
  }
 }

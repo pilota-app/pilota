@@ -28,6 +28,13 @@ Lo que no se negocia aquí:
   Binance aunque el equipo se apague.
 - **En real la posición sale entera.** La salida en dos mitades y el stop móvil son de prueba por ahora.
 - `cliente` se puede pasar (las pruebas pasan un Binance falso); si no, se arma con la llave del llavero.
+
+Lo que todavía no hace (pendiente, a la vista):
+- Las comisiones pagadas en BNB no se descuentan del saldo de Pilota: conviene operar con el descuento BNB apagado.
+- La llave se lee con el comando `security` del sistema: cualquier programa del usuario que use ese comando puede leerla.
+  La restricción por IP limita el daño; lo correcto es que la app firmada la lea con la API del llavero.
+- Que BTCFDUSD y ETHFDUSD acepten OCO con STOP_LOSS y que Binance responda -2011 o -2013 a una protección que no existe
+  se revisa contra Binance de verdad, con montos chicos, antes de abrirlo a nadie más.
 """
 import contextlib
 import fcntl
@@ -63,6 +70,10 @@ REVISAR_LLAVE_MS = 24 * 60 * 60 * 1000
 #: Cuántas oportunidades ya usadas se recuerdan para no repetir un id.
 USADAS = 400
 LARGO_MAXIMO_ID = 36
+#: Cuánto se espera a que Binance muestre una orden que se mandó con la red cortada, antes de darla por no recibida.
+ESPERA_ENVIO_MS = 10 * 60 * 1000
+#: La comisión más alta que se supone mientras Binance no muestra los llenados: así nunca se protege de más.
+COMISION_SUPUESTA = 0.001
 ESPERA_CANDADO = 60
 TOLERANCIA = 1e-9
 #: Una letra por par y por estrategia, para que los ids sean cortos.
@@ -124,8 +135,18 @@ def ids(base):
 
 # ── El candado: una sola cosa a la vez sobre la cuenta real ──────────────────────────────────────────────────────────
 
+_tomado = [0]          # cuántas veces este proceso ya tiene el candado (es reentrante dentro del mismo proceso)
+
+
 @contextlib.contextmanager
 def candado(espera=None):
+    if _tomado[0]:
+        _tomado[0] += 1
+        try:
+            yield
+        finally:
+            _tomado[0] -= 1
+        return
     espera = ESPERA_CANDADO if espera is None else espera
     ruta = os.path.join(lib_estado.carpeta(), "real.candado")
     fd = os.open(ruta, os.O_RDWR | os.O_CREAT, 0o600)
@@ -139,7 +160,11 @@ def candado(espera=None):
                 if time.monotonic() >= limite:
                     raise Ocupado() from None
                 time.sleep(0.2)
-        yield
+        _tomado[0] = 1
+        try:
+            yield
+        finally:
+            _tomado[0] = 0
     finally:
         try:
             fcntl.flock(fd, fcntl.LOCK_UN)
@@ -231,7 +256,7 @@ def llave_al_dia(cli, ms):
     c = nucleo.leer_json(ruta_conexion(), {}, maximo=256 * 1024)
     c = c if isinstance(c, dict) else {}
     if c.get("ok") and ms - _entero(c.get("cuando_ms")) < REVISAR_LLAVE_MS:
-        return not (c.get("retiro") or c.get("transferencias"))
+        return bool(c.get("ip") and c.get("spot") and not (c.get("retiro") or c.get("transferencias")))
     per = cli.permisos()
     malos = permisos_inseguros(per)
     nucleo.escribir_json(ruta_conexion(), {**c, "ok": True, "cuando": lib_datos.iso(ms), "cuando_ms": ms,
@@ -239,7 +264,7 @@ def llave_al_dia(cli, ms):
                                            "transferencias": any(m != "enableWithdrawals" for m in malos),
                                            "ip": bool(per.get("ipRestrict")), "lectura": bool(per.get("enableReading")),
                                            "spot": bool(per.get("enableSpotAndMarginTrading"))})
-    return not malos
+    return bool(per.get("ipRestrict") and per.get("enableSpotAndMarginTrading") and not malos)
 
 
 # ── Entrar ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -362,6 +387,20 @@ def _orden_o_nada(cli, par, cid):
         raise
 
 
+def _lista_o_nada(cli, id_lista):
+    try:
+        return cli.proteccion(id_lista)
+    except bp.ErrorBinance as e:
+        if e.codigo in (bp.NO_EXISTE, bp.NO_EXISTE_LISTA):
+            return None
+        raise
+
+
+def _bajo_minimo(filtros, cantidad, precio):
+    return (cantidad < _numero(filtros.get("cantidad_minima")) - TOLERANCIA
+            or cantidad * precio < _numero(filtros.get("nocional_minimo")) - TOLERANCIA)
+
+
 def llenado(cli, par, orden, moneda):
     """Lo que de verdad dejó una orden, con sus llenados: la cantidad bruta, la neta (menos la comisión cobrada en la
     moneda), lo cotizado y la comisión cobrada en FDUSD."""
@@ -372,8 +411,13 @@ def llenado(cli, par, orden, moneda):
     cotizado = sum(_numero(x.get("quoteQty")) for x in llenos)
     en_moneda = sum(_numero(x.get("commission")) for x in llenos if x.get("commissionAsset") == moneda)
     en_par = sum(_numero(x.get("commission")) for x in llenos if x.get("commissionAsset") == MONEDA_PAR)
-    if bruta <= 0:                       # sin llenados todavía visibles: lo que dice la orden
-        bruta, cotizado = _numero(orden.get("executedQty")), _numero(orden.get("cummulativeQuoteQty"))
+    hecha = _numero(orden.get("executedQty"))
+    if bruta < hecha - TOLERANCIA:
+        # Binance todavía no muestra todos los llenados: se cuenta lo que dice la orden y se supone la comisión más alta
+        # en la moneda, para nunca proteger ni vender más de lo propio.
+        bruta, cotizado = hecha, _numero(orden.get("cummulativeQuoteQty"))
+        return {"bruta": bruta, "neta": bruta * (1 - COMISION_SUPUESTA), "cotizado": cotizado,
+                "comision_cotizada": 0.0, "estimada": True}
     return {"bruta": bruta, "neta": max(0.0, bruta - en_moneda), "cotizado": cotizado, "comision_cotizada": en_par}
 
 
@@ -397,21 +441,35 @@ def _cerrar(cuerpo, p, por, ms, motivo=""):
 
 
 def _vender(cli, cuerpo, p, filtros, ms, por, motivo=""):
-    """Vende a mercado lo propio que quede y cierra. Idempotente: si la venta ya existe, se usa esa."""
+    """Vende a mercado lo propio que quede y cierra. Idempotente y sin tocar lo ajeno:
+    1. cancela primero la protección propia (sus monedas quedan libres: si no, lo libre sería de la persona);
+    2. cuenta de nuevo lo que vendieron sus patas y la venta propia, si ya existe (nunca se suma dos veces);
+    3. vende solo lo comprado que falte, y si queda bajo los mínimos de Binance, lo deja como «polvo» sin venderlo."""
     i, moneda = ids(p["base"]), moneda_de(p["par"], filtros)
+    paso = _numero(filtros.get("paso"))
     p = {**p, "fase": "vendiendo", "por": por, "motivo_cierre": motivo}
     cuerpo = _con(cuerpo, p, ms)
+    if p.get("estado") == ABIERTA or p.get("proteccion_id"):
+        try:
+            cli.cancelar_proteccion(p["par"], i["proteccion"])
+        except bp.ErrorBinance as e:
+            if e.codigo not in (bp.CANCELAR_FALLO, bp.NO_EXISTE, bp.NO_EXISTE_LISTA):
+                raise
+    vendido, recibido, por_patas = _patas(cli, p, moneda)
+    por = por if por != "manual" or not por_patas else por_patas
     o = _orden_o_nada(cli, p["par"], i["salida"])
     if o is None:
-        falta = _numero(p.get("comprada")) - _numero(p.get("vendido"))
-        cantidad = bajar(min(falta, libres(cli).get(moneda, 0.0)), _numero(filtros.get("paso")))
-        if cantidad > 0:
-            o = cli.vender_mercado(p["par"], bp.texto(cantidad, _numero(filtros.get("paso"))), i["salida"])
+        falta = _numero(p.get("comprada")) - vendido
+        cantidad = bajar(min(falta, libres(cli).get(moneda, 0.0)), paso)
+        if cantidad > 0 and _bajo_minimo(filtros, cantidad, _numero(p.get("precio"))):
+            motivo = motivo or "polvo"           # bajo los mínimos: Binance no lo vende; queda en la cuenta, anotado
+        elif cantidad > 0:
+            o = cli.vender_mercado(p["par"], bp.texto(cantidad, paso), i["salida"])
     if o is not None:
         v = llenado(cli, p["par"], o, moneda)
-        p = {**p, "vendido": _numero(p.get("vendido")) + v["bruta"],
-             "recibido": _numero(p.get("recibido")) + v["cotizado"] - v["comision_cotizada"]}
-    return _cerrar(cuerpo, p, por, ms, motivo)
+        vendido += v["bruta"]
+        recibido += v["cotizado"] - v["comision_cotizada"]
+    return _cerrar(cuerpo, {**p, "vendido": vendido, "recibido": recibido}, por, ms, motivo)
 
 
 def _patas(cli, p, moneda):
@@ -434,12 +492,7 @@ def _proteger(cli, cuerpo, p, filtros, ms):
     paso, tick = _numero(filtros.get("paso")), _numero(filtros.get("tick"))
     p = {**p, "fase": "protegiendo"}
     cuerpo = _con(cuerpo, p, ms)
-    try:
-        lista = cli.proteccion(i["proteccion"])
-    except bp.ErrorBinance as e:
-        if e.codigo != bp.NO_EXISTE:
-            raise
-        lista = None
+    lista = _lista_o_nada(cli, i["proteccion"])
     if lista and lista.get("listOrderStatus") != "REJECT":
         # Ya estaba puesta (se cortó la red justo después): su cantidad quedó guardada antes de mandarla.
         return _con(cuerpo, {**p, "fase": "", "estado": ABIERTA, "protegida": True}, ms)
@@ -449,10 +502,14 @@ def _proteger(cli, cuerpo, p, filtros, ms):
         cuerpo = _con(cuerpo, p, ms)              # escritura adelantada: la cantidad protegida, antes de mandarla
         try:
             cli.proteger(p["par"], bp.texto(cantidad, paso), bp.texto(p["objetivo"], tick), bp.texto(p["stop"], tick),
-                         i["proteccion"])
+                         i["proteccion"], i["objetivo"], i["stop"])
             return _con(cuerpo, {**p, "fase": "", "estado": ABIERTA, "cantidad": cantidad, "protegida": True}, ms)
-        except bp.ErrorBinance:
-            pass
+        except bp.ErrorBinance as e:
+            # ¿La tomó igual (llegó tarde, id repetido)? Se pregunta por su id antes de decidir nada.
+            if _lista_o_nada(cli, i["proteccion"]):
+                return _con(cuerpo, {**p, "fase": "", "estado": ABIERTA, "cantidad": cantidad, "protegida": True}, ms)
+            if e.codigo != bp.FILTRO:
+                raise                     # no se vende por un error que no se entiende: se reintenta en la próxima vuelta
     # Sin protección no se queda: se vende a mercado lo que se compró.
     return _vender(cli, cuerpo, p, filtros, ms, "manual", "sin_proteccion")
 
@@ -467,7 +524,10 @@ def _seguir(cli, cuerpo, p, filtros, ms):
     if p["estado"] == PUESTA:
         o = _orden_o_nada(cli, p["par"], p["id"])
         if o is None:
-            # Nunca llegó a Binance (se cortó al mandarla), o Binance ya archivó una orden cancelada sin llenar.
+            # Nunca llegó a Binance (se cortó al mandarla), o Binance ya archivó una orden cancelada sin llenar. Una
+            # recién mandada se espera un rato: Binance puede mostrarla tarde.
+            if p.get("fase") == "enviando" and ms - _entero(p.get("puesta_ms")) < ESPERA_ENVIO_MS:
+                return _con(cuerpo, {**p, "revisado_ms": ms}, ms)
             if p.get("fase") != "enviando":
                 lib_registro.anotar(AMBIENTE, RAZON_VENCIDA, par=p["par"], puntaje=p.get("puntaje"), ms=ms,
                                     orden=_registro_orden(p, VENCIDA))
@@ -499,12 +559,7 @@ def _seguir(cli, cuerpo, p, filtros, ms):
                             orden=_registro_orden(p, LLENADA))
         return _proteger(cli, cuerpo, p, filtros, ms)
     # ABIERTA: cómo está su protección
-    try:
-        lista = cli.proteccion(p["proteccion_id"])
-    except bp.ErrorBinance as e:
-        if e.codigo != bp.NO_EXISTE:
-            raise
-        lista = {"listOrderStatus": "REJECT"}
+    lista = _lista_o_nada(cli, p["proteccion_id"]) or {"listOrderStatus": "REJECT"}
     if lista.get("listOrderStatus") == "EXECUTING":
         return _con(cuerpo, {**p, "revisado_ms": ms, "protegida": True}, ms)
     vendido, recibido, por = _patas(cli, p, moneda)
@@ -531,6 +586,12 @@ def huerfanas_reales(cli, par, conocidas):
     return canceladas
 
 
+def propias_abiertas(cli):
+    """Cuántas órdenes propias (entradas o patas de una protección) siguen abiertas en Binance."""
+    return sum(1 for par in lib_datos.PARES_OPERADOS for o in (cli.abiertas(par) or [])
+               if es_nuestro(o.get("clientOrderId") or ""))
+
+
 def revisar(ahora_ms=None, cliente=None, com=None):
     """Mira cada posición propia en Binance y deja aplicado lo que pasó. Sin conexión no toca nada y lo dice."""
     ms = _ms(ahora_ms)
@@ -544,6 +605,15 @@ def revisar(ahora_ms=None, cliente=None, com=None):
 def _revisar(ms, cliente):
     cuenta, cuerpo = _cargar(ms)
     if not _editable(cuenta):
+        # El estado no es de fiar: igual se hace una pasada de seguridad contra Binance. No se compra nada nuevo y se
+        # cancelan las entradas propias que sigan abiertas (las protecciones ya puestas siguen en Binance).
+        cli = conectar(cliente)
+        if cli is not None:
+            try:
+                for par in lib_datos.PARES_OPERADOS:
+                    huerfanas_reales(cli, par, set())
+            except (bp.SinRed, bp.ErrorBinance):
+                pass
         return estado(ms, cuenta=cuenta)
     cli = conectar(cliente)
     if cli is None:
@@ -613,14 +683,7 @@ def _cerrar_todo(identificador, ms, cliente):
                     p = {**p, "comprada": v["neta"], "pagado": v["cotizado"] + v["comision_cotizada"], "llenada_ms": ms}
                     cuerpo = _vender(cli, cuerpo, p, filtros, ms, "manual")
             else:
-                if p.get("fase") == "protegiendo" or p["estado"] == ABIERTA:
-                    try:
-                        cli.cancelar_proteccion(p["par"], p["proteccion_id"])
-                    except bp.ErrorBinance as e:
-                        if e.codigo not in (bp.CANCELAR_FALLO, bp.NO_EXISTE):
-                            raise
-                vendido, recibido, _ = _patas(cli, p, moneda)
-                cuerpo = _vender(cli, cuerpo, {**p, "vendido": vendido, "recibido": recibido}, filtros, ms, "manual")
+                cuerpo = _vender(cli, cuerpo, p, filtros, ms, "manual")      # cancela la protección y vende el resto
             cerradas += 1
         except (bp.SinRed, bp.ErrorBinance) as e:
             motivo = "sin_conexion" if isinstance(e, bp.SinRed) else "binance"

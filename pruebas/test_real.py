@@ -99,14 +99,14 @@ class BinanceFalso:
         self._corte("comprar")
         return o
 
-    def llenar(self, cid, fraccion=1.0):
+    def llenar(self, cid, fraccion=1.0, sin_llenados=False):
         o = self.ordenes[cid]
         q = float(o["origQty"]) * fraccion
         comision = q * self.comision_base
         o.update(status="FILLED" if fraccion >= 1 else "PARTIALLY_FILLED", executedQty=str(q),
                  cummulativeQuoteQty=str(q * float(o["price"])))
-        o["llenos"] = [{"qty": str(q), "quoteQty": str(q * float(o["price"])), "commission": str(comision),
-                        "commissionAsset": "BTC"}]
+        o["llenos"] = [] if sin_llenados else [{"qty": str(q), "quoteQty": str(q * float(o["price"])),
+                                                "commission": str(comision), "commissionAsset": "BTC"}]
         self.saldos["BTC"] += q - comision
         self.saldos["FDUSD"] -= q * float(o["price"])
 
@@ -130,31 +130,32 @@ class BinanceFalso:
         o["status"] = "CANCELED"
         return o
 
-    def proteger(self, par, cantidad, objetivo, stop, lista):
-        self._id(lista)
-        for suf in ("o", "s"):
-            self._id(f"{lista}{suf}")
-        self.llamadas.append(("proteger", par, cantidad, objetivo, stop, lista))
+    def proteger(self, par, cantidad, objetivo, stop, lista, id_objetivo, id_stop):
+        for cid in (lista, id_objetivo, id_stop):
+            self._id(cid)
+        self.llamadas.append(("proteger", par, cantidad, objetivo, stop, lista, id_objetivo, id_stop))
         if self.rechazar_oco:
-            raise bp.ErrorBinance(-1013, 400, "/api/v3/orderList/oco")
+            raise bp.ErrorBinance(self.rechazar_oco if type(self.rechazar_oco) is int else bp.FILTRO, 400,
+                                  "/api/v3/orderList/oco")
         if float(cantidad) > self.saldos["BTC"] + 1e-12:
             raise bp.ErrorBinance(-2010, 400, "/api/v3/orderList/oco")
-        for suf, precio in (("o", objetivo), ("s", stop)):
-            self._orden(f"{lista}{suf}", par, precio, cantidad, lista=1)
-        self.listas[lista] = {"listClientOrderId": lista, "listOrderStatus": "EXECUTING"}
+        for cid, precio in ((id_objetivo, objetivo), (id_stop, stop)):
+            self._orden(cid, par, precio, cantidad, lista=1)
+        self.listas[lista] = {"listClientOrderId": lista, "listOrderStatus": "EXECUTING",
+                              "patas": {"o": id_objetivo, "s": id_stop}}
         self.saldos["BTC"] -= float(cantidad)
         self._corte("proteger")
         return self.listas[lista]
 
     def proteccion(self, lista):
         if lista not in self.listas:
-            raise bp.ErrorBinance(bp.NO_EXISTE, 400, "/api/v3/orderList")
+            raise bp.ErrorBinance(bp.NO_EXISTE_LISTA, 400, "/api/v3/orderList")
         return self.listas[lista]
 
     def cerrar_lista(self, lista, pata):
         """Una pata de la OCO se llenó; la otra se cancela."""
         for suf in ("o", "s"):
-            o = self.ordenes[f"{lista}{suf}"]
+            o = self.ordenes[self.listas[lista]["patas"][suf]]
             if suf == pata:
                 q = float(o["origQty"])
                 o.update(status="FILLED", executedQty=str(q), cummulativeQuoteQty=str(q * float(o["price"])))
@@ -167,8 +168,10 @@ class BinanceFalso:
 
     def cancelar_proteccion(self, par, lista):
         self.llamadas.append(("cancelar_proteccion", lista))
+        if lista not in self.listas or self.listas[lista]["listOrderStatus"] != "EXECUTING":
+            raise bp.ErrorBinance(bp.NO_EXISTE_LISTA, 400, "/api/v3/orderList")
         for suf in ("o", "s"):
-            o = self.ordenes[f"{lista}{suf}"]
+            o = self.ordenes[self.listas[lista]["patas"][suf]]
             if o["status"] == "NEW":
                 o["status"] = "CANCELED"
                 self.saldos["BTC"] += float(o["origQty"]) if suf == "s" else 0.0
@@ -514,7 +517,7 @@ class Cortes(Base):
         b.cortar_despues.add("comprar")
         r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
         del b.ordenes[r["posicion"]["id"]]              # Binance nunca la recibió
-        real.revisar(AHORA + 60_000, cliente=b)
+        real.revisar(AHORA + real.ESPERA_ENVIO_MS + 60_000, cliente=b)
         self.assertEqual(self.cuerpo()["posiciones"], [])
 
     def test_corte_al_proteger_no_vende_ni_protege_dos_veces(self):
@@ -611,12 +614,16 @@ class Casos(Base):
 
     def test_el_candado_no_deja_tocar_la_cuenta_a_dos_a_la_vez(self):
         self.en_real()
+        import fcntl
         antes, real.ESPERA_CANDADO = real.ESPERA_CANDADO, 0.3
+        otro = os.open(os.path.join(lib_estado.carpeta(), "real.candado"), os.O_RDWR | os.O_CREAT, 0o600)
         try:
-            with real.candado():
-                r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=BinanceFalso())
-                e = real.revisar(AHORA, cliente=BinanceFalso())
+            fcntl.flock(otro, fcntl.LOCK_EX)                 # «otro proceso» (el motor) tiene la cuenta
+            r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=BinanceFalso())
+            e = real.revisar(AHORA, cliente=BinanceFalso())
         finally:
+            fcntl.flock(otro, fcntl.LOCK_UN)
+            os.close(otro)
             real.ESPERA_CANDADO = antes
         self.assertEqual(r["motivo"], "ocupado")
         self.assertIn("ocupado", [m["codigo"] for m in e["motivos"]])
@@ -631,6 +638,93 @@ class Casos(Base):
         r = lib_modos.responder(prop["id"], True, AHORA + 1000)
         self.assertFalse(r["hecho"])
         self.assertEqual(r["motivo"], lib_modos.CAMBIO_AMBIENTE)
+
+
+class SegundaRonda(Base):
+    def test_las_patas_se_buscan_con_los_mismos_ids_que_se_mandan(self):
+        self.en_real()
+        b = BinanceFalso(btc=1.0)
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"])
+        real.revisar(AHORA + 60_000, cliente=b)
+        i = real.ids(self.cuerpo()["posiciones"][0]["base"])
+        llamada = [x for x in b.llamadas if x[0] == "proteger"][0]
+        self.assertEqual(llamada[5:], (i["proteccion"], i["objetivo"], i["stop"]))
+        b.cerrar_lista(i["proteccion"], "o")
+        saldo = self.cuerpo()["saldo"]
+        real.revisar(AHORA + HORA, cliente=b)
+        self.assertNotIn("vender", [x[0] for x in b.llamadas], "si la protección vendió, no se vende de nuevo")
+        self.assertGreater(self.cuerpo()["saldo"], saldo, "y se anota la ganancia de verdad")
+        self.assertAlmostEqual(b.saldos["BTC"], 1.0, places=8, msg="el BTC de la persona sigue ahí")
+        self.assertEqual(self.razones()[-1], "objetivo")
+
+    def test_un_error_que_no_se_entiende_no_vende(self):
+        self.en_real()
+        b = BinanceFalso(btc=1.0)
+        b.rechazar_oco = -1003                       # un error cualquiera, que no es de filtros
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"])
+        e = real.revisar(AHORA + 60_000, cliente=b)
+        self.assertNotIn("vender", [x[0] for x in b.llamadas])
+        self.assertEqual(self.cuerpo()["posiciones"][0]["fase"], "protegiendo", "se reintenta en la próxima vuelta")
+        self.assertIn("binance", [m["codigo"] for m in e["motivos"]])
+        b.rechazar_oco = False
+        e = real.revisar(AHORA + 120_000, cliente=b)
+        self.assertEqual(e["protegidas"], 1)
+
+    def test_un_llenado_bajo_los_minimos_queda_como_polvo_y_no_se_atasca(self):
+        self.en_real()
+        b = BinanceFalso()
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"], 0.0001 / r["posicion"]["cantidad"] * 0.00001 / 0.0001)   # 0,00001 BTC: ~1 USDT
+        real.revisar(AHORA + 60_000, cliente=b)
+        self.assertNotIn("vender", [x[0] for x in b.llamadas])
+        self.assertEqual(self.cuerpo()["posiciones"], [], "no queda atascada")
+
+    def test_sin_los_llenados_a_la_vista_protege_de_menos_nunca_de_mas(self):
+        self.en_real()
+        b = BinanceFalso(btc=1.0)
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"], sin_llenados=True)
+        real.revisar(AHORA + 60_000, cliente=b)
+        protegido = float([x for x in b.llamadas if x[0] == "proteger"][0][2])
+        self.assertLessEqual(protegido, r["posicion"]["cantidad"] * (1 - real.COMISION_SUPUESTA) + 1e-12)
+
+    def test_no_se_apaga_con_ordenes_propias_abiertas_en_binance(self):
+        self.en_real()
+        b = BinanceFalso()
+        b.comprar_limite("BTCFDUSD", "0.0001", "90000", "pil-r-BV1-e")       # una orden propia que el estado no conoce
+        self.assertEqual(lib_real.desactivar(AHORA, cliente=b)["motivo"], "con_ordenes")
+        self.assertEqual(lib_estado.activo(), lib_estado.REAL)
+
+    def test_la_emergencia_cancela_lo_propio_aunque_el_estado_no_lo_conozca(self):
+        self.en_real()
+        b = BinanceFalso()
+        b.comprar_limite("BTCFDUSD", "0.0001", "90000", "pil-r-BV1-e")
+        self.assertTrue(lib_real.emergencia(AHORA, cliente=b)["hecho"])
+        self.assertEqual(b.ordenes["pil-r-BV1-e"]["status"], "CANCELED")
+        self.assertEqual(lib_estado.activo(), lib_estado.PRUEBA)
+
+    def test_con_el_estado_frenado_igual_cancela_las_entradas_propias(self):
+        self.en_real()
+        b = BinanceFalso()
+        b.comprar_limite("BTCFDUSD", "0.0001", "90000", "pil-r-BV1-e")
+        os.remove(lib_estado.ruta(lib_estado.REAL))                         # el estado se perdió
+        real.revisar(AHORA, cliente=b)
+        self.assertEqual(b.ordenes["pil-r-BV1-e"]["status"], "CANCELED")
+
+    def test_una_orden_mandada_con_corte_se_espera_antes_de_olvidarla(self):
+        self.en_real()
+        b = BinanceFalso()
+        b.cortar_despues.add("comprar")
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        orden = b.ordenes.pop(r["posicion"]["id"])                           # Binance todavía no la muestra
+        real.revisar(AHORA + 60_000, cliente=b)
+        self.assertEqual(len(self.cuerpo()["posiciones"]), 1, "todavía se espera")
+        b.ordenes[orden["clientOrderId"]] = orden                            # aparece tarde
+        b.llenar(orden["clientOrderId"])
+        e = real.revisar(AHORA + 120_000, cliente=b)
+        self.assertEqual(e["protegidas"], 1)
 
 
 if __name__ == "__main__":

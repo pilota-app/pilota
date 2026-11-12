@@ -190,23 +190,55 @@ def activar(presupuesto, frase, ahora_ms=None):
     return {"hecho": True, "motivo": ""}
 
 
-def desactivar(ahora_ms=None):
-    """Vuelve a prueba. Con posiciones reales abiertas no: el motor dejaría de mirarlas."""
+def _sin_ordenes_propias(cliente=None):
+    """Si en Binance no queda ninguna orden propia abierta. Sin llave o sin conexión no se puede saber: se dice que no."""
+    cli = lib_ejecutor_real.conectar(cliente)
+    if cli is None:
+        return False, "sin_llave"
+    try:
+        return lib_ejecutor_real.propias_abiertas(cli) == 0, "con_ordenes"
+    except (bp.SinRed, bp.ErrorBinance):
+        return False, "sin_conexion"
+
+
+def desactivar(ahora_ms=None, cliente=None):
+    """Vuelve a prueba. Con posiciones reales u órdenes propias abiertas en Binance no: el motor dejaría de mirarlas."""
     ms = _ms(ahora_ms)
-    cuerpo = lib_estado.cuerpo_de(lib_estado.cargar(lib_estado.REAL, ahora_ms=ms))
-    if lib_ejecutor_real.nuestras(cuerpo):
-        return {"hecho": False, "motivo": "con_posiciones"}
-    lib_estado.poner_interruptor(False, ms)
-    return {"hecho": True, "motivo": ""}
+    try:
+        with lib_ejecutor_real.candado():
+            cuerpo = lib_estado.cuerpo_de(lib_estado.cargar(lib_estado.REAL, ahora_ms=ms))
+            if lib_ejecutor_real.nuestras(cuerpo):
+                return {"hecho": False, "motivo": "con_posiciones"}
+            libre, motivo = _sin_ordenes_propias(cliente)
+            if not libre:
+                return {"hecho": False, "motivo": motivo}
+            lib_estado.poner_interruptor(False, ms)
+            return {"hecho": True, "motivo": ""}
+    except lib_ejecutor_real.Ocupado:
+        return {"hecho": False, "motivo": "ocupado"}
 
 
 def emergencia(ahora_ms=None, cliente=None):
     """Cerrar todo y volver a prueba: cancela lo propio, vende a mercado lo comprado y apaga el dinero real. Si algo no
     se pudo cerrar (sin conexión), no apaga: lo dice, y las protecciones siguen en Binance."""
     ms = _ms(ahora_ms)
-    r = lib_ejecutor_real.cerrar(None, ahora_ms=ms, cliente=cliente)
-    cuerpo = lib_estado.cuerpo_de(lib_estado.cargar(lib_estado.REAL, ahora_ms=ms))
-    if lib_ejecutor_real.nuestras(cuerpo):
-        return {"hecho": False, "motivo": r.get("motivo") or "sin_conexion", "cerradas": r.get("cerradas", 0)}
-    lib_estado.poner_interruptor(False, ms)
-    return {"hecho": True, "motivo": "", "cerradas": r.get("cerradas", 0)}
+    try:
+        with lib_ejecutor_real.candado():
+            r = lib_ejecutor_real.cerrar(None, ahora_ms=ms, cliente=cliente)
+            cuerpo = lib_estado.cuerpo_de(lib_estado.cargar(lib_estado.REAL, ahora_ms=ms))
+            if lib_ejecutor_real.nuestras(cuerpo):
+                return {"hecho": False, "motivo": r.get("motivo") or "sin_conexion", "cerradas": r.get("cerradas", 0)}
+            cli = lib_ejecutor_real.conectar(cliente)
+            if cli is not None:
+                try:
+                    for par in lib_datos.PARES_OPERADOS:
+                        lib_ejecutor_real.huerfanas_reales(cli, par, set())
+                except (bp.SinRed, bp.ErrorBinance):
+                    pass
+            libre, motivo = _sin_ordenes_propias(cliente)
+            if not libre:
+                return {"hecho": False, "motivo": motivo, "cerradas": r.get("cerradas", 0)}
+            lib_estado.poner_interruptor(False, ms)
+            return {"hecho": True, "motivo": "", "cerradas": r.get("cerradas", 0)}
+    except lib_ejecutor_real.Ocupado:
+        return {"hecho": False, "motivo": "ocupado"}

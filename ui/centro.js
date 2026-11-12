@@ -47,6 +47,7 @@ window.PilotaCentro = (() => {
     con_posiciones: "Hay posiciones reales abiertas: ciérralas primero o usa «Cerrar todo y volver a prueba».",
     llave_insegura: "Tu llave de Binance ahora puede retirar o transferir: no abro nada nuevo. Quítale ese permiso en Binance.",
     ocupado: "Estoy terminando otra revisión. Vuelve a intentar en un momento.",
+    con_ordenes: "Todavía hay órdenes de Pilota abiertas en Binance: usa «Cerrar todo y volver a prueba».",
     sin_llave: "No encuentro la llave de Binance en este equipo. Conéctala de nuevo.",
   };
 
