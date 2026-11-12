@@ -31,6 +31,7 @@ import lib_estado
 import lib_flujo
 import lib_perfiles
 import lib_piloto
+import lib_radar
 import lib_reconciliar
 import lib_registro
 import lib_trabajo
@@ -66,7 +67,19 @@ def flujo_estado():
 
 
 def estado(d=None, ahora_ms=None):
-    return {"ok": True, "datos": {**lib_piloto.estado(ahora_ms), "flujo": flujo_estado()}}
+    return {"ok": True, "datos": {**lib_piloto.estado(ahora_ms), "flujo": flujo_estado(),
+                                  "radar": lib_radar.guardado().get("radar") or {}}}
+
+
+def radar_de(ms):
+    """Qué está esperando el robot (`lib_radar`), para el perfil puesto o, sin perfil, para el sugerido. La historia de cada
+    jugada se mide de nuevo cada tanto (es una pasada por el historial: la hace este trabajo, que no tiene apuro)."""
+    try:
+        historia = lib_radar.al_dia(ms).get("jugadas") or {}
+    except (OSError, ValueError, KeyError):
+        historia = (lib_radar.guardado().get("historia") or {}).get("jugadas") or {}
+    perfil = lib_piloto.guardado().get("perfil") or lib_perfiles.SUGERIDO
+    return lib_radar.escribir(lib_radar.radar(perfil, ms, historia=historia))
 
 
 def empezar(d=None, ahora_ms=None):
@@ -183,7 +196,12 @@ def _encender(flujo, cliente, ciclos, latir, reloj, dormir):
             visto = max(int(x.get("ms") or 0) for x in r["eventos"])
         plan["revision_ms"] = ms
         lib_trabajo.guardar_plan(TIPO, plan)
-        publicar(r["eventos"], r["piloto"], vivo={**lib_piloto.estado(ms), "flujo": flujo_estado()}, forzar=True)
+        try:
+            radar = radar_de(ms)
+        except (OSError, ValueError):
+            radar = {}
+        publicar(r["eventos"], r["piloto"], vivo={**lib_piloto.estado(ms), "flujo": flujo_estado(), "radar": radar},
+                 forzar=True)
 
     while not t.detenido() and not lib_candado.huerfano() and not (ciclos and conexiones >= ciclos):
         conexiones += 1

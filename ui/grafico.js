@@ -50,32 +50,48 @@ window.PilotaGrafico = (() => {
 
   function crear({ i18n, esc, numero, usdt }) {
     const { Tp } = i18n;
-    let lienzo = null, sobre = null, pedido = false;
-    let Eref = null;
+    const TIEMPO_CORTO = Object.fromEntries(TEMPORALIDADES);
+    let Eref = null, pedido = false;
+    const sobre = {};                // dónde está el mouse en cada lienzo
 
-    function estadoInicial() {
-      return { par: "BTCFDUSD", temporalidad: "1m", datos: null, cargando: false, ancho: 9,
-        ind: Object.fromEntries(INDICADORES.map(([id, , si]) => [id, si])), minutos: {}, precios: {}, cambio: {} };
+    function panel(par, temporalidad) {
+      return { par, temporalidad, datos: null, cargando: false, minutos: {} };
     }
+    function estadoInicial() {
+      return { layout: 1, ancho: 9, precios: {}, cambio: {},
+        ind: Object.fromEntries(INDICADORES.map(([id, , si]) => [id, si])),
+        paneles: [panel("BTCFDUSD", "1m"), panel("ETHFDUSD", "1m"), panel("BTCFDUSD", "5m"), panel("ETHFDUSD", "5m")] };
+    }
+    const visibles = (G) => G.paneles.slice(0, G.layout);
 
-    // ── El HTML alrededor del lienzo (los botones y los precios, traducibles) ──
+    // ── El HTML alrededor de los lienzos (los botones y los precios, traducibles) ──
+    function cabezaPanel(G, P, i) {
+      return `<div class="graf-panel-cabeza">
+        <div class="chips chips-chicos" role="group" aria-label="Par">${PARES.map(([par, n]) => `
+          <button type="button" class="chip" data-graf-panel="${i}" data-graf-par="${par}" aria-pressed="${P.par === par}" data-sin-traducir>${n}</button>`).join("")}</div>
+        <div class="chips chips-chicos grafico-tiempos" role="group" aria-label="Velas de">${TEMPORALIDADES.map(([t, n]) => `
+          <button type="button" class="chip" data-graf-panel="${i}" data-graf-t="${t}" aria-pressed="${P.temporalidad === t}">${n}</button>`).join("")}</div></div>`;
+    }
     function html(E) {
       const G = E.graf;
       return `<div class="tarjeta grafico">
         <div class="grafico-cabeza">
-          <div class="grafico-pares" role="tablist" aria-label="Par">${PARES.map(([par, nombre]) => `
-            <button type="button" class="graf-par" role="tab" data-graf-par="${par}" aria-selected="${G.par === par}">
-              <span class="graf-par-nombre" data-sin-traducir>${nombre}</span>
-              <span class="graf-par-precio" id="precio-${par}" data-tic="${G.cambio[par] || ""}" data-sin-traducir>${esc(G.precios[par] ? numero(G.precios[par], 2) : "–")}</span></button>`).join("")}</div>
-          <div class="chips grafico-tiempos" role="group" aria-label="Velas de">${TEMPORALIDADES.map(([t, n]) => `
-            <button type="button" class="chip" data-graf-t="${t}" aria-pressed="${G.temporalidad === t}">${n}</button>`).join("")}</div>
+          <div class="grafico-pares">${PARES.map(([par, nombre]) => `
+            <div class="graf-par"><span class="graf-par-nombre" data-sin-traducir>${nombre}</span>
+              <span class="graf-par-precio" id="precio-${par}" data-tic="${G.cambio[par] || ""}" data-sin-traducir>${esc(G.precios[par] ? numero(G.precios[par], 2) : "–")}</span></div>`).join("")}</div>
+          <div class="chips grafico-layout" role="group" aria-label="Gráficos a la vez">${[1, 2, 4].map((n) => `
+            <button type="button" class="chip" data-graf-layout="${n}" aria-pressed="${G.layout === n}">${n === 1 ? "1 gráfico" : (n === 2 ? "2 gráficos" : "4 gráficos")}</button>`).join("")}</div>
         </div>
         <div class="chips grafico-indicadores" role="group" aria-label="Indicadores">${INDICADORES.map(([id, n]) => `
           <button type="button" class="chip chip-ind" data-graf-ind="${id}" aria-pressed="${!!G.ind[id]}">${n}</button>`).join("")}</div>
-        <div class="grafico-caja${G.ind.rsi ? " con-rsi" : ""}">
-          <canvas id="grafico-lienzo" role="img" aria-label="Gráfico de velas en vivo"></canvas>
+        <div class="grafico-grilla n-${G.layout}">
+          ${visibles(G).map((P, i) => `<div class="graf-panel">
+            ${cabezaPanel(G, P, i)}
+            <div class="grafico-caja${G.ind.rsi ? " con-rsi" : ""}">
+              <canvas id="grafico-lienzo-${i}" class="grafico-lienzo" data-panel="${i}" role="img" aria-label="Gráfico de velas en vivo"></canvas>
+              ${!P.datos ? `<p class="grafico-vacio suave">${P.cargando ? "Cargando velas…" : "Todavía no hay velas para mostrar."}</p>` : ""}
+            </div></div>`).join("")}
           <div class="grafico-destello" id="grafico-destello" hidden></div>
-          ${!G.datos ? `<p class="grafico-vacio suave">${G.cargando ? "Cargando velas…" : "Todavía no hay velas para mostrar."}</p>` : ""}
         </div>
         <p class="grafico-dato suave" id="grafico-dato" data-sin-traducir> </p></div>`;
     }
@@ -106,7 +122,7 @@ window.PilotaGrafico = (() => {
       return `rgba(${r},${g},${b},${a})`;
     };
 
-    // ── La vela en curso: lo que empuja Binance cada segundo, sumado a las velas cerradas ──
+    // ── La vela en curso: lo que empuja Binance cada segundo, sumado a las velas cerradas de cada gráfico de ese par ──
     function vela(E, par, v) {
       const G = E.graf;
       if (!Array.isArray(v) || v.length < 6) return;
@@ -120,30 +136,30 @@ window.PilotaGrafico = (() => {
         void el.offsetWidth;            // reinicia la animación del destello del precio
         el.dataset.tic = G.cambio[par] || "";
       }
-      if (!G.datos || G.datos.par !== par) return;
-      const paso = G.datos.paso_ms, velas = G.datos.velas;
+      for (const P of visibles(G)) if (P.datos && P.datos.par === par) sumar(P, v);
+      dibujar();
+    }
+    function sumar(P, v) {
+      const paso = P.datos.paso_ms, velas = P.datos.velas;
       const inicio = Math.floor(v[0] / paso) * paso;
       let nueva;
       if (paso === 60000) nueva = [...v];
       else {
-        G.minutos[v[0]] = v;
-        const mins = Object.values(G.minutos).filter((m) => m[0] >= inicio && m[0] < inicio + paso).sort((a, b) => a[0] - b[0]);
-        for (const k of Object.keys(G.minutos)) if (Number(k) < inicio) delete G.minutos[k];
+        P.minutos[v[0]] = v;
+        for (const k of Object.keys(P.minutos)) if (Number(k) < inicio) delete P.minutos[k];
+        const mins = Object.values(P.minutos).sort((a, b) => a[0] - b[0]);
         const ultima = velas.length && velas[velas.length - 1][0] === inicio ? velas[velas.length - 1] : null;
-        const abre = ultima ? ultima[1] : mins[0][1];
-        nueva = [inicio, abre, Math.max(...mins.map((m) => m[2]), ultima ? ultima[2] : -Infinity),
-          Math.min(...mins.map((m) => m[3]), ultima ? ultima[3] : Infinity), v[4],
-          mins.reduce((a, m) => a + m[5], 0)];
+        nueva = [inicio, ultima ? ultima[1] : mins[0][1], Math.max(...mins.map((m) => m[2]), ultima ? ultima[2] : -Infinity),
+          Math.min(...mins.map((m) => m[3]), ultima ? ultima[3] : Infinity), v[4], mins.reduce((a, m) => a + m[5], 0)];
       }
       nueva.enCurso = true;
       const ult = velas[velas.length - 1];
       if (ult && ult[0] === inicio) velas[velas.length - 1] = nueva;
       else if (!ult || ult[0] < inicio) velas.push(nueva);
       if (velas.length > 400) velas.shift();
-      dibujar();
     }
 
-    // ── Una compra o una venta que acaba de pasar: el destello de color y la flecha en el gráfico ──
+    // ── Una compra o una venta que acaba de pasar: el destello de color y la flecha en los gráficos de ese par ──
     function destello(texto, tipo) {
       const el = document.getElementById("grafico-destello");
       if (!el) return;
@@ -157,39 +173,81 @@ window.PilotaGrafico = (() => {
       destello.t = setTimeout(() => { el.hidden = true; }, 6000);
     }
     function marca(E, m) {
-      const G = E.graf;
-      if (G.datos && G.datos.par === m.par) { G.datos.marcas.push(m); dibujar(); }
+      for (const P of visibles(E.graf)) if (P.datos && P.datos.par === m.par) P.datos.marcas.push({ ...m });
+      dibujar();
+    }
+    // Las velas que llegaron del Python: van a todos los gráficos de ese par y esa temporalidad.
+    function datos(E, d) {
+      let alguno = false;
+      for (const P of visibles(E.graf)) {
+        if (P.par !== d.par || P.temporalidad !== d.temporalidad) continue;
+        const enCurso = P.datos && P.datos.velas.length && P.datos.velas[P.datos.velas.length - 1];
+        P.datos = { ...d, velas: d.velas.map((v) => [...v]), marcas: (d.marcas || []).map((m) => ({ ...m, par: d.par })),
+          niveles: d.niveles || [] };
+        const vel = P.datos.velas;
+        if (enCurso && enCurso.enCurso && (!vel.length || vel[vel.length - 1][0] < enCurso[0])) vel.push(enCurso);
+        alguno = alguno || P.cargando;
+        P.cargando = false;
+      }
+      return alguno;
+    }
+    // Qué pedir: un pedido por cada par y temporalidad que se ve.
+    function pedidos(E) {
+      const vistos = new Set();
+      return visibles(E.graf).filter((P) => {
+        const k = `${P.par}|${P.temporalidad}`;
+        if (vistos.has(k)) return false;
+        vistos.add(k);
+        return true;
+      }).map((P) => ({ par: P.par, temporalidad: P.temporalidad }));
     }
 
     // ── Dibujar ──
     function dibujar() {
       if (pedido) return;
       pedido = true;
-      (window.requestAnimationFrame || ((f) => setTimeout(f, 16)))(() => { pedido = false; pintarLienzo(); });
+      (window.requestAnimationFrame || ((f) => setTimeout(f, 16)))(() => { pedido = false; pintarTodo(); });
     }
     function montar(raiz, E) {
       Eref = E;
-      lienzo = raiz.querySelector("#grafico-lienzo");
-      if (!lienzo) return;
-      if (!lienzo.dataset.listo) {
+      for (const lienzo of raiz.querySelectorAll(".grafico-lienzo")) {
+        if (lienzo.dataset.listo) continue;
         lienzo.dataset.listo = "1";
-        lienzo.addEventListener("mousemove", (ev) => { const r = lienzo.getBoundingClientRect(); sobre = [ev.clientX - r.left, ev.clientY - r.top]; dibujar(); });
-        lienzo.addEventListener("mouseleave", () => { sobre = null; dibujar(); });
+        const i = Number(lienzo.dataset.panel);
+        lienzo.addEventListener("mousemove", (ev) => { const r = lienzo.getBoundingClientRect(); sobre[i] = [ev.clientX - r.left, ev.clientY - r.top]; dibujar(); });
+        lienzo.addEventListener("mouseleave", () => { delete sobre[i]; dibujar(); });
         lienzo.addEventListener("wheel", (ev) => {
           ev.preventDefault();
           E.graf.ancho = Math.max(3, Math.min(24, E.graf.ancho * (ev.deltaY > 0 ? 0.9 : 1.1)));
           dibujar();
         }, { passive: false });
       }
-      pintarLienzo();
+      pintarTodo();
+    }
+    function pintarTodo() {
+      if (!Eref) return;
+      const dato = document.getElementById("grafico-dato");
+      let texto = null;
+      visibles(Eref.graf).forEach((P, i) => {
+        const lienzo = document.getElementById(`grafico-lienzo-${i}`);
+        if (lienzo) { const t = pintarLienzo(lienzo, P, sobre[i]); if (t) texto = t; }
+      });
+      if (dato) dato.textContent = texto || Tp("Pasa el mouse sobre una vela para ver sus precios. Con la rueda acercas o alejas.");
+    }
+    // Los gatillos del radar (bin/lib_radar.py) de ese par: «compro aquí».
+    function gatillos(P) {
+      const filas = ((((Eref || {}).vivo || {}).radar || {}).filas || []).filter((f) => f.par === P.par && f.espera);
+      return filas.map((f) => {
+        const e = f.estrategias.find((x) => x.estrategia === f.espera);
+        return e && e.gatillo > 0 ? { tipo: "gatillo", precio: e.gatillo, estrategia: e.estrategia, temporalidad: f.temporalidad } : null;
+      }).filter(Boolean);
     }
 
-    function pintarLienzo() {
-      if (!lienzo || !lienzo.isConnected || !Eref) return;
-      const G = Eref.graf, d = G.datos;
+    function pintarLienzo(lienzo, P, sobre) {
+      const G = Eref.graf, d = P.datos;
       const dpr = window.devicePixelRatio || 1;
       const W = lienzo.clientWidth, H = lienzo.clientHeight;
-      if (!W || !H) return;
+      if (!W || !H) return null;
       if (lienzo.width !== Math.round(W * dpr) || lienzo.height !== Math.round(H * dpr)) {
         lienzo.width = Math.round(W * dpr);
         lienzo.height = Math.round(H * dpr);
@@ -197,7 +255,8 @@ window.PilotaGrafico = (() => {
       const c = lienzo.getContext("2d");
       c.setTransform(dpr, 0, 0, dpr, 0, 0);
       c.clearRect(0, 0, W, H);
-      if (!d || !d.velas || !d.velas.length) return;
+      if (!d || !d.velas || !d.velas.length) return null;
+      const niveles = [...(d.niveles || []), ...gatillos(P)];
       const col = colores();
       const fuente = "11px system-ui, -apple-system, sans-serif";
       c.font = fuente;
@@ -217,7 +276,7 @@ window.PilotaGrafico = (() => {
       // El rango de precios: las velas a la vista, las bandas y las líneas de lo abierto.
       let lo = Math.min(...vis.map((v) => v[3])), hi = Math.max(...vis.map((v) => v[2]));
       if (bb) for (let i = desde; i < todas.length; i++) if (bb[i]) { lo = Math.min(lo, bb[i][2]); hi = Math.max(hi, bb[i][0]); }
-      for (const nv of d.niveles || []) { lo = Math.min(lo, nv.precio); hi = Math.max(hi, nv.precio); }
+      for (const nv of niveles) { lo = Math.min(lo, nv.precio); hi = Math.max(hi, nv.precio); }
       const margen = (hi - lo) * 0.08 || hi * 0.001 || 1;
       lo -= margen; hi += margen;
       const volH = G.ind.vol ? plotH * 0.18 : 0;
@@ -285,13 +344,18 @@ window.PilotaGrafico = (() => {
       // Las líneas de lo abierto: compra esperando, entrada, stop y objetivo, con su nombre en el eje.
       const NIVEL = { espera: [col.acento, "Compra esperando"], entrada: [col.suave, "Entrada"], stop: [col.pierde, "Stop"],
         objetivo: [col.gana, "Objetivo"] };
-      for (const nv of d.niveles || []) {
-        const [color, nombre] = NIVEL[nv.tipo] || [col.suave, ""];
+      for (const nv of niveles) {
+        const [color, nombre] = nv.tipo === "gatillo"
+          ? [col.acento, Tp(nv.estrategia === "rebote" ? "Compro aquí por rebote ({t})" : "Compro aquí por ruptura ({t})",
+            { t: Tp(TIEMPO_CORTO[nv.temporalidad] || nv.temporalidad) })]
+          : (NIVEL[nv.tipo] || [col.suave, ""]);
         const y = Math.round(Y(nv.precio)) + 0.5;
         c.setLineDash([6, 4]); c.strokeStyle = color; c.lineWidth = 1.2;
         c.beginPath(); c.moveTo(0, y); c.lineTo(plotW, y); c.stroke(); c.setLineDash([]);
-        c.fillStyle = color; c.textAlign = "left"; c.textBaseline = "bottom";
-        c.fillText(`${Tp(nombre)} ${numero(nv.precio, 2)}`, 6, y - 2);
+        // El gatillo se escribe a la derecha y debajo de su línea: así no se pisa con la entrada ni con el stop.
+        const gat = nv.tipo === "gatillo";
+        c.fillStyle = color; c.textAlign = gat ? "right" : "left"; c.textBaseline = gat ? "top" : "bottom";
+        c.fillText(`${gat ? nombre : Tp(nombre)} ${numero(nv.precio, 2)}`, gat ? plotW - 6 : 6, gat ? y + 2 : y - 2);
       }
       // Las compras (flecha verde hacia arriba, bajo la vela) y las ventas (flecha hacia abajo, sobre la vela; verde si ganó).
       for (const m of d.marcas || []) {
@@ -335,30 +399,24 @@ window.PilotaGrafico = (() => {
         if (ultR != null) { c.fillStyle = col.acento; c.fillText(`RSI ${numero(ultR, 0)}`, 6, top + 8); }
       }
 
-      // La cruz del mouse, con la vela que está debajo.
-      const dato = document.getElementById("grafico-dato");
-      if (sobre && sobre[0] < plotW) {
-        const i = Math.max(desde, Math.min(todas.length - 1, desde + Math.floor(sobre[0] / ancho)));
-        const v = todas[i];
-        c.strokeStyle = alfa(col.suave, 0.6); c.setLineDash([3, 3]);
-        c.beginPath(); c.moveTo(X(i), 0); c.lineTo(X(i), plotH + altoRsi); c.moveTo(0, sobre[1]); c.lineTo(plotW, sobre[1]); c.stroke();
-        c.setLineDash([]);
-        if (sobre[1] < plotH) {
-          const p = lo + (hi - lo) * (1 - (sobre[1] - 6) / (plotH - 12 - volH));
-          c.fillStyle = col.texto; c.fillRect(plotW, sobre[1] - 9, EJE, 18);
-          c.fillStyle = col.panel; c.fillText(numero(p, 2), plotW + 6, sobre[1]);
-        }
-        if (dato) {
-          dato.textContent = Tp("{fecha} · abre {o} · alto {h} · bajo {l} · cierra {c}", {
-            fecha: new Date(v[0]).toLocaleString(i18n.idioma, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
-            o: numero(v[1], 2), h: numero(v[2], 2), l: numero(v[3], 2), c: numero(v[4], 2) });
-        }
-      } else if (dato) {
-        dato.textContent = Tp("Pasa el mouse sobre una vela para ver sus precios. Con la rueda acercas o alejas.");
+      // La cruz del mouse, con la vela que está debajo: su texto va abajo de los gráficos.
+      if (!sobre || sobre[0] >= plotW) return null;
+      const i = Math.max(desde, Math.min(todas.length - 1, desde + Math.floor(sobre[0] / ancho)));
+      const v = todas[i];
+      c.strokeStyle = alfa(col.suave, 0.6); c.setLineDash([3, 3]);
+      c.beginPath(); c.moveTo(X(i), 0); c.lineTo(X(i), plotH + altoRsi); c.moveTo(0, sobre[1]); c.lineTo(plotW, sobre[1]); c.stroke();
+      c.setLineDash([]);
+      if (sobre[1] < plotH) {
+        const p = lo + (hi - lo) * (1 - (sobre[1] - 6) / (plotH - 12 - volH));
+        c.fillStyle = col.texto; c.fillRect(plotW, sobre[1] - 9, EJE, 18);
+        c.fillStyle = col.panel; c.textAlign = "left"; c.textBaseline = "middle"; c.fillText(numero(p, 2), plotW + 6, sobre[1]);
       }
+      return Tp("{fecha} · abre {o} · alto {h} · bajo {l} · cierra {c}", {
+        fecha: new Date(v[0]).toLocaleString(i18n.idioma, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
+        o: numero(v[1], 2), h: numero(v[2], 2), l: numero(v[3], 2), c: numero(v[4], 2) });
     }
 
-    return { html, montar, dibujar, vela, destello, marca, estadoInicial, PARES, TEMPORALIDADES, PASO, INDICADORES };
+    return { html, montar, dibujar, vela, destello, marca, datos, pedidos, estadoInicial, PARES, TEMPORALIDADES, PASO, INDICADORES };
   }
   return { crear };
 })();

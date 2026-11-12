@@ -1419,9 +1419,8 @@
     motivoCorto: (c) => MOTIVO_CORTO[c] || "otro motivo", grafico: () => graficoUI.html(E) });
   // Pide las velas del gráfico (las cerradas, las marcas y las líneas de lo abierto) del par y la temporalidad elegidos.
   function pedirGrafico() {
-    E.graf.cargando = !E.graf.datos;
-    E.graf.minutos = {};
-    host.enviar("vivoGrafico", { par: E.graf.par, temporalidad: E.graf.temporalidad });
+    for (const P of E.graf.paneles.slice(0, E.graf.layout)) { P.cargando = !P.datos; P.minutos = {}; }
+    for (const q of graficoUI.pedidos(E)) host.enviar("vivoGrafico", q);
   }
   function comoPienso() {
     const series = (E.datos && Array.isArray(E.datos.series)) ? E.datos.series : [];
@@ -1575,9 +1574,14 @@
     if (b.dataset.pestana) irA(b.dataset.pestana);
     else if (b.dataset.irPestana) irA(b.dataset.irPestana);
     else if (b.dataset.grafPar || b.dataset.grafT) {
-      if (b.dataset.grafPar) E.graf.par = b.dataset.grafPar;
-      if (b.dataset.grafT) E.graf.temporalidad = b.dataset.grafT;
-      E.graf.datos = null;
+      const P = E.graf.paneles[Number(b.dataset.grafPanel) || 0];
+      if (b.dataset.grafPar) P.par = b.dataset.grafPar;
+      if (b.dataset.grafT) P.temporalidad = b.dataset.grafT;
+      P.datos = null;
+      pedirGrafico();
+      pintar();
+    } else if (b.dataset.grafLayout) {
+      E.graf.layout = Number(b.dataset.grafLayout);
       pedirGrafico();
       pintar();
     } else if (b.dataset.grafInd) {
@@ -2013,14 +2017,8 @@
     },
     graficoListo(r) {
       if (!(r && r.ok && r.datos)) return;
-      if (r.datos.par !== E.graf.par || r.datos.temporalidad !== E.graf.temporalidad) return;   // llegó tarde: ya cambiaste
-      const enCurso = E.graf.datos && E.graf.datos.velas.length && E.graf.datos.velas[E.graf.datos.velas.length - 1];
-      E.graf.datos = { ...r.datos, velas: r.datos.velas.map((v) => [...v]), marcas: r.datos.marcas || [], niveles: r.datos.niveles || [] };
-      const vel = E.graf.datos.velas;
-      if (enCurso && enCurso.enCurso && (!vel.length || vel[vel.length - 1][0] < enCurso[0])) vel.push(enCurso);
-      const habia = E.graf.cargando;
-      E.graf.cargando = false;
-      if (habia) pintar(); else graficoUI.dibujar();
+      // Va a cada gráfico de ese par y esa temporalidad; si ya nadie lo mira (cambiaste), no va a ninguno.
+      if (graficoUI.datos(E, r.datos)) pintar(); else graficoUI.dibujar();
     },
     // ── El centro de operaciones: la simulación con monto y el paso a real ──
     simularEstadoListo(r) {
@@ -2595,7 +2593,18 @@
   function vivoDemo() {
     const v = DEMO.vivo;
     const flujo = { corriendo: !!DEMO.flujo, conectado: !!DEMO.flujo };
-    if (!v) return { formato: 1, activo: false, perfil: "", monto: 0, movimientos: [], posiciones: [], tenencias: [], flujo };
+    // Lo que espera el robot en la vista previa: BTC cerca de su gatillo de rebote, ETH lejos y la ruptura frenada por el día.
+    const pb = (DEMO.precio && DEMO.precio.BTCFDUSD) || PRECIO_DEMO.BTCFDUSD, pe = (DEMO.precio && DEMO.precio.ETHFDUSD) || PRECIO_DEMO.ETHFDUSD;
+    const fila = (par, t, precio, dist) => ({ par, temporalidad: t, precio, adx: 14, volumen_relativo: 0.8, espera: "rebote", cerca: dist < 0.0025,
+      estrategias: [
+        { estrategia: "rebote", motivo: "lejos", gatillo: precio * (1 - dist), distancia: dist, entrada: precio * (1 - dist),
+          stop: precio * (1 - dist) * 0.994, objetivo: precio * (1 - dist) * 1.0072, rr: 1.2, rr_pide: 1, sirve: true, adx_maximo: 20,
+          historia: { n: 214, ganadas: 92, gana: 0.43, neto_medio: 0.0004 } },
+        { estrategia: "ruptura", motivo: "dia_no_al_alza", gatillo: precio * 1.004, distancia: 0.004, rr: 1, rr_pide: 1, sirve: true } ] });
+    const t = (v && v.perfil === "scalper") ? "5m" : "1h";
+    const radar = { perfil: (v && v.perfil) || "equilibrado", filtro: { pasa: true, motivo: "" },
+      filas: [fila("BTCFDUSD", t, pb, 0.0018), fila("ETHFDUSD", t, pe, 0.0091)] };
+    if (!v) return { formato: 1, activo: false, perfil: "", monto: 0, movimientos: [], posiciones: [], tenencias: [], flujo, radar };
     const h = 3600000, t0 = v.desde_ms, m = v.monto;
     const linea = (ms, razon, par, orden, resultado) => ({ ms, fecha: new Date(ms).toISOString(), par, razon, orden, resultado });
     const movs = v.perfil === "holding"
@@ -2618,7 +2627,7 @@
     return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
       ganancia_relativa: valor / m - 1, efectivo: holding ? m * 11 / 12 : m * 1.0037 - m * 0.25, posiciones, tenencias,
       ultima: holding ? { decision: "esperando", proxima_ms: t0 + 7 * 24 * h } : { decision: "sin_senal" },
-      movimientos: movs, flujo };
+      movimientos: movs, flujo, radar, jugadas: {} };
   }
   function realDemo() {
     DEMO.real = DEMO.real || { conectado: false, pista: "", conexion: { ok: false }, activo: false, cuenta: { existe: false } };

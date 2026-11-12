@@ -171,10 +171,29 @@ def _vuelta_senales(d, ms, f, ex_estado):
                                 pares.get(s["par"]) or {}, com, abiertas=abiertas, comprometido=comprometido)
         r = lib_ejecutor_prueba.entrar(s, ahora_ms=ms, tamano_=t, frenos=f)
         if r["puesta"]:
+            anotar_jugada(d, r["posicion"], s)
             break
         cuenta = lib_estado.cargar(AMBIENTE, ahora_ms=ms)
     return {"decision": "entrada" if r["puesta"] else "rechazo", "motivo": r.get("motivo") or "",
             "par": s["par"], "temporalidad": s["temporalidad"], "estrategia": s["estrategia"]}
+
+
+#: Cuántas jugadas se recuerdan (las de las últimas entradas): con qué estrategia, en qué velas y qué decía la historia.
+JUGADAS = 200
+
+
+def anotar_jugada(d, posicion, s):
+    """Lo que el registro no guarda de una entrada: en qué velas se decidió, cuánto ganaba por cada 1 que arriesgaba y qué
+    decía la historia de esa misma jugada. Lo muestra la pantalla al lado de cada compra."""
+    import lib_radar           # aquí y no arriba: lib_radar usa este módulo
+    h = (lib_radar.guardado().get("historia") or {}).get("jugadas") or {}
+    clave = f"{s.get('estrategia')}|{s.get('par')}|{s.get('temporalidad')}"
+    jugadas = d.setdefault("jugadas", {})
+    jugadas[posicion["id"]] = {"estrategia": s.get("estrategia"), "temporalidad": s.get("temporalidad"),
+                               "rr": lib_perfiles.relacion(s), "historia": h.get(clave)}
+    if len(jugadas) > JUGADAS:
+        for k in list(jugadas)[:len(jugadas) - JUGADAS]:
+            del jugadas[k]
 
 
 def _vuelta_holding(d, ms, minutos=None):
@@ -278,5 +297,6 @@ def estado(ahora_ms=None, minutos=None):
             "posiciones": posiciones, "tenencias": tenencias, "precios": ahora,
             "holding": d.get("holding") if perfil and perfil["tipo"] == "acumular" else None,
             "ultima": d.get("ultima") or {}, "ultima_ms": int(d.get("ultima_ms") or 0),
+            "jugadas": d.get("jugadas") or {},
             "movimientos": movimientos(int(d.get("desde_ms") or 0)) if hay else [],
             "parametros": lib_perfiles.parametros()}

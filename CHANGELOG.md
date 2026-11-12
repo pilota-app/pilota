@@ -9,6 +9,13 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
 - Pilota ahora se ordena en seis pestañas: En vivo, Comparar, Movimientos, Cabina, Dinero real y Avanzado (lo técnico). *Pilota
   is now organized in six tabs: Live, Compare, Moves, Cockpit, Real money and Advanced (the technical part).*
+- Nuevo: «Qué estoy esperando». El robot dice a qué precio compraría cada moneda, cuánto falta («¡Casi casi!»), cómo sería la
+  operación (entrada, stop, objetivo y cuánto gana por cada 1 que arriesga) y cuántas veces ganó esa jugada en el pasado.
+  *New: "What I'm waiting for". The robot says at what price it would buy each coin, how far it is ("Almost there!"), what the
+  trade would look like (entry, stop, target and how much it wins for every 1 it risks) and how often that play won in the past.*
+- Nuevo: ver 1, 2 o 4 gráficos a la vez, cada uno con su moneda y sus velas, y la línea de «compro aquí» dibujada. *New: view 1,
+  2 or 4 charts at once, each with its own coin and candles, with the "I buy here" line drawn.*
+- Nuevo: «Cómo decide el perfil», con sus reglas en palabras. *New: "How the profile decides", with its rules in plain words.*
 - Nuevo: gráfico de velas en vivo, como el de un trader. El precio se mueve cada segundo, las compras y las ventas del robot
   aparecen como flechas de color con un aviso al instante, y puedes prender bandas de Bollinger, medias, volumen y RSI con un
   botón. *New: a live candlestick chart, like a trader's. The price moves every second, the robot's buys and sells show up as

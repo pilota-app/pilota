@@ -493,3 +493,35 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 @media (max-width: 520px) {
   .pestana span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; }
 }
+/* Varios gráficos a la vez */
+.grafico-grilla { position: relative; display: grid; gap: 12px; }
+.grafico-grilla.n-2, .grafico-grilla.n-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grafico-grilla.n-2 .grafico-caja canvas, .grafico-grilla.n-4 .grafico-caja canvas { height: 300px; }
+.grafico-grilla.n-4 .grafico-caja canvas { height: 240px; }
+.grafico-grilla .grafico-caja.con-rsi canvas { height: 360px; }
+.grafico-grilla.n-4 .grafico-caja.con-rsi canvas { height: 300px; }
+.graf-panel { min-width: 0; }
+.graf-panel-cabeza { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
+.chips-chicos .chip { min-height: 26px; padding: 2px 9px; font-size: 12px; }
+.grafico-layout .chip { font-size: 13px; }
+.graf-par { cursor: default; }
+/* Qué estoy esperando */
+.radar { padding: 20px; }
+.radar-filas { list-style: none; display: grid; gap: 0; margin: 0 0 8px; padding: 0; }
+.radar-fila { padding: 12px 0; border-top: 1px solid var(--linea); }
+.radar-fila:first-child { border-top: 0; padding-top: 0; }
+.radar-cabeza { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.radar-casi { padding: 2px 10px; border-radius: 999px; background: var(--prueba-fondo); color: var(--prueba-texto); font-size: 12px; font-weight: 700;
+  animation: latido 1.2s ease-in-out infinite; }
+.radar-barra { display: block; width: 100%; max-width: 360px; height: 6px; margin: 0 0 6px; }
+.radar-barra .pista { fill: var(--panel-2); }
+.radar-barra .valor { fill: var(--acento); }
+.radar-fila[data-cerca="1"] .radar-barra .valor { fill: var(--prueba-texto); }
+.radar-gatillo { margin: 0 0 4px; font-weight: 600; }
+.radar-plan { margin: 0 0 2px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.radar-historia, .radar-no { margin: 2px 0 0; font-size: 13px; }
+.mov-prob { display: block; margin-top: 2px; color: var(--texto-suave); font-size: 13px; }
+@media (max-width: 760px) {
+  .grafico-grilla.n-2, .grafico-grilla.n-4 { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .radar-casi { animation: none; } }

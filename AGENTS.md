@@ -63,6 +63,7 @@ cuentas ni publicidad; nada personal en el código (Ana Pérez, Matías Soto). B
 | `bin/lib_piloto.py` | El robot en vivo, solo en prueba: empezar con un perfil y un monto (`empezar`, `detener`), la vuelta que engancha el motor (`decidir`: con perfil opera el perfil, sin perfil o en real deciden los tres modos), las señales de la última vela cerrada (`senales_de_ahora`), el holding por partes y lo que lee la pantalla (`estado`, `movimientos`). No es una acción. |
 | `bin/vivo.py` | Las acciones del robot en vivo: `estado`, `empezar` (perfil y monto), `detener`, `grafico` (velas, marcas de compra y venta y líneas de lo abierto) y el trabajo `encender` (el flujo de Binance al segundo: guarda cada vela de 1 m al cerrar y revisa en ese mismo instante). |
 | `bin/lib_flujo.py` | El flujo de Binance en vivo por WebSocket, solo biblioteca estándar: un solo destino (`HOST`, `PUERTO`, `ruta_de`), el saludo revisado, marcos con tope, ping/pong, silencio que corta (`SILENCIO_MAXIMO`) y cada mensaje revisado (`vela_de`). Solo lectura. No es una acción. |
+| `bin/lib_radar.py` | Qué está esperando el robot: por par y temporalidad del perfil, el gatillo de cada estrategia (a qué precio tendría que cerrar la vela), cuánto falta (`distancia`, `cerca`), la operación posible (entrada, stop, objetivo y `rr`, y si el perfil la acepta) y la historia de esa misma jugada (`estadisticas`, `agrupar`, `al_dia`: ganadas de cuántas y lo que dejó en promedio). Lo escribe el flujo en vivo en `mercado/radar.json`. No decide nada. No es una acción. |
 | `bin/lib_candado.py` | Una sola cosa a la vez entre procesos: un solo trabajo de cada tipo (`unico`, `YaCorriendo`), una revisión a la vez (`candado`) y el trabajo que quedó sin app (`huerfano`). No es una acción. |
 | `ui/grafico.js` | El gráfico de velas en vivo en un `<canvas>` (`PilotaGrafico.crear`): 1 m, 5 m, 1 h y 4 h, Bollinger, medias, volumen y RSI con un botón, las flechas de compra y venta, las líneas de entrada, stop y objetivo, el precio que se mueve cada segundo y el destello de color de cada operación. |
 | `bin/lib_simulacion.py` | «Si hubiera puesto X»: el historial como una cartera con tamaño y frenos (`cartera`, con `perfil` y sus `movimientos`), comprar BTC y esperar, el holding por partes (`holding`), el scalper sobre 5 m (`ops_rapidas`) y los cinco perfiles lado a lado (`comparar`). No es una acción (la corre `bin/simular.py`). |
@@ -643,6 +644,10 @@ Reglas que no se cambian sin pensarlo dos veces:
 - **Reacciona al cerrar la vela, no antes.** El flujo (`vivo.py encender`) muestra la vela en curso cada segundo, pero se decide
   con velas cerradas, igual que en el pasado: la revisión corre en el segundo en que cierra cada minuto. En prueba, un stop o
   un objetivo se aplica al cerrar el minuto con el precio del nivel; en real la protección vive en Binance y salta al instante.
+- **El radar explica, no decide** (`lib_radar`): usa las mismas reglas y números de `lib_estrategias` para decir a qué precio
+  compraría, cuánto falta y por qué la otra jugada no aplica. La probabilidad que muestra es la **historia** de esa jugada
+  (las operaciones que de verdad habría hecho en el pasado), siempre con cuántas fueron y dicha como pasado, no como promesa.
+  Cada entrada guarda esa historia en `piloto.json` (`jugadas`) para mostrarla junto a la compra.
 - **El gráfico no decide nada**: muestra las velas guardadas más la que se está formando, las marcas del registro y las líneas
   de lo abierto. Sus indicadores se calculan en la pantalla con las mismas fórmulas de `lib_indicadores*`.
 

@@ -51,6 +51,15 @@ window.PilotaVivo = (() => {
       return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(i18n.idioma, { day: "numeric", month: "short", year: "numeric" });
     };
     const fechaMs = (ms) => fechaHora(new Date(Number(ms)).toISOString());
+    let J = {};            // las jugadas del robot (lib_piloto: estrategia, velas, rr e historia de cada entrada)
+    const TIEMPO = { "5m": "5 min", "1h": "1 hora", "4h": "4 horas" };
+    // Lo que dice la historia de una jugada, en una frase. Sin historia, se dice.
+    function historia(h) {
+      if (!h || !h.n) return frase("Todavía no tengo historia de esta jugada.", {});
+      return frase("En el pasado ganó {g} de {n} veces ({pct}) y dejó {neto} por operación en promedio.", {
+        g: numero(h.ganadas, 0), n: numero(h.n, 0), pct: porcentaje(h.gana, 0),
+        neto: `${h.neto_medio > 0 ? "+" : ""}${porcentaje(h.neto_medio, 2)}` });
+    }
     const signo = (x) => (typeof x !== "number" || Math.abs(x) < 1e-9 ? "igual" : (x > 0 ? "sube" : "baja"));
     const conSigno = (x, f) => `${x > 0 ? "+" : ""}${f(x)}`;
 
@@ -86,6 +95,10 @@ window.PilotaVivo = (() => {
         case "perfil_detenido": return frase("Me detuviste (perfil {perfil}). Lo abierto sigue protegido.", { perfil: Tp(nombre(r.perfil)) });
         case "compra_holding": return frase("Compré {cantidad} {moneda} a {precio} ({monto}).", { cantidad: numero(o.cantidad, 6), moneda: m, precio: usdt(o.precio), monto: usdt(o.monto) });
         case "entrada_ruptura": case "entrada_rebote":
+          if (J[o.id] && o.estado !== "llenada") {
+            return `${frase("Dejé una compra de {moneda} esperando en {precio} ({monto}), con stop en {stop} y objetivo en {objetivo}.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto), stop: usdt(o.stop), objetivo: usdt(o.objetivo) })}
+              <span class="mov-prob">${frase("Gano {rr} por cada 1 que arriesgo.", { rr: numero(J[o.id].rr, 1) })} ${historia(J[o.id].historia)}</span>`;
+          }
           return o.estado === "llenada"
             ? frase("Se llenó mi compra de {moneda} a {precio} ({monto}). Queda protegida: stop en {stop} y objetivo en {objetivo}.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto), stop: usdt(o.stop), objetivo: usdt(o.objetivo) })
             : frase("Dejé una compra de {moneda} esperando en {precio} ({monto}), con stop en {stop} y objetivo en {objetivo}.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto), stop: usdt(o.stop), objetivo: usdt(o.objetivo) });
@@ -150,6 +163,93 @@ window.PilotaVivo = (() => {
       if (!plantilla) return "Estoy mirando.";
       return frase(plantilla, { motivo: Tp(motivoCorto(u.motivo)), n: numero(u.parte || 0, 0), fecha: dia(u.proxima_ms) });
     }
+    // ── Qué estoy esperando (bin/lib_radar.py): el gatillo de cada estrategia, cuánto falta, la operación y su historia ──
+    const NOMBRE_ESTRATEGIA = { rebote: "rebote", ruptura: "ruptura" };
+    function porQueNo(e, fila) {
+      switch (e.motivo) {
+        case "btc_frena": case "btc": case "sin_contexto": return frase("BTC viene cayendo: no compro nada hasta que se calme.", {});
+        case "dia_no_al_alza": return frase("Ruptura: no, el día no viene al alza.", {});
+        case "con_rumbo": return frase("Rebote: no, el precio tiene rumbo (fuerza {adx}; pido {max} o menos para comprar en la banda de abajo).", { adx: numero(fila.adx || 0, 0), max: numero(e.adx_maximo || 20, 0) });
+        case "sin_volumen": return frase("Ruptura: rompió el techo, pero sin volumen ({rel} veces lo normal; pido {pide}).", { rel: numero(fila.volumen_relativo || 0, 1), pide: numero(e.volumen_pide || 1.5, 1) });
+        case "sin_datos": return frase("Me faltan velas para mirar esto.", {});
+        default:
+          if (e.sirve === false) {
+            return e.estrategia === "rebote"
+              ? frase("Rebote: aunque llegue, gana poco para lo que arriesga ({rr} por 1; este perfil pide {pide}).", { rr: numero(e.rr || 0, 1), pide: numero(e.rr_pide || 0, 1) })
+              : frase("Ruptura: aunque rompa, gana poco para lo que arriesga ({rr} por 1; este perfil pide {pide}).", { rr: numero(e.rr || 0, 1), pide: numero(e.rr_pide || 0, 1) });
+          }
+          return "";
+      }
+    }
+    function plan(e) {
+      if (!(e.entrada > 0)) return "";
+      return frase("Entraría en {entrada} · stop {stop} ({pierde}) · objetivo {objetivo} ({gana}) · gano {rr} por cada 1 que arriesgo.", {
+        entrada: usdt(e.entrada), stop: usdt(e.stop), pierde: porcentaje((e.stop - e.entrada) / e.entrada, 2),
+        objetivo: usdt(e.objetivo), gana: `+${porcentaje((e.objetivo - e.entrada) / e.entrada, 2)}`, rr: numero(e.rr || 0, 1) });
+    }
+    function gatillo(e, fila) {
+      const m = moneda(fila.par), falta = porcentaje(Math.max(0, e.distancia || 0), 2);
+      if (e.motivo === "listo") return frase("¡Se cumple! {moneda} cerró donde quería: pongo la compra ahora.", { moneda: m });
+      return e.estrategia === "rebote"
+        ? frase("Compro {moneda} por rebote si una vela cierra en {precio} o menos (falta {falta}).", { moneda: m, precio: usdt(e.gatillo), falta })
+        : frase("Compro {moneda} por ruptura si una vela cierra sobre {precio} con volumen (falta {falta}).", { moneda: m, precio: usdt(e.gatillo), falta });
+    }
+    // La cercanía como barra: llena cuando está en el gatillo, vacía a 2 % o más.
+    function cercania(e) {
+      const x = Math.max(0, Math.min(1, 1 - Math.max(0, e.distancia || 0) / 0.02));
+      return `<svg class="radar-barra" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true">
+        <rect class="pista" x="0" y="0" width="100" height="6" rx="3"/><rect class="valor" x="0" y="0" width="${(x * 100).toFixed(1)}" height="6" rx="3"/></svg>`;
+    }
+    function radar(E) {
+      const R = (E.vivo || {}).radar || {};
+      const filas = R.filas || [];
+      if (!filas.length) return "";
+      const frena = R.filtro && !R.filtro.pasa;
+      return `<div class="tarjeta radar">
+        <h3>Qué estoy esperando</h3>
+        ${frena ? `<p class="freno-texto">${frase("BTC viene cayendo: no compro nada hasta que se calme.", {})}</p>` : ""}
+        <ul class="radar-filas">${filas.map((f) => {
+          const espera = (f.estrategias || []).find((e) => e.estrategia === f.espera);
+          const otras = (f.estrategias || []).filter((e) => e !== espera).map((e) => porQueNo(e, f)).filter(Boolean);
+          return `<li class="radar-fila" data-cerca="${f.cerca ? 1 : 0}">
+            <div class="radar-cabeza"><strong data-sin-traducir>${esc(moneda(f.par))}</strong>
+              <span class="suave">${frase("velas de {t}", { t: Tp(TIEMPO[f.temporalidad] || f.temporalidad) })}</span>
+              <span class="suave" data-sin-traducir>${esc(f.precio ? usdt(f.precio) : "")}</span>
+              ${f.cerca ? `<span class="radar-casi">Casi casi</span>` : ""}</div>
+            ${espera ? `${cercania(espera)}<p class="radar-gatillo">${gatillo(espera, f)}</p>
+              <p class="radar-plan">${plan(espera)}</p><p class="radar-historia suave">${historia(espera.historia)}</p>`
+              : `<p class="radar-gatillo">${frase("Nada que esperar en {moneda} por ahora: ninguna de mis dos jugadas sirve aquí.", { moneda: moneda(f.par) })}</p>`}
+            ${otras.length ? `<p class="radar-no suave">${otras.join(" ")}</p>` : ""}</li>`;
+        }).join("")}</ul>
+        <p class="ayuda">Decido solo con velas cerradas: cuando una cierra donde dice arriba, compro en ese mismo segundo. La historia es el pasado, no una promesa.</p></div>`;
+    }
+    // La frase del robot: lo más cerca que está de comprar, o lo último que hizo.
+    function narra(v) {
+      const filas = ((v.radar || {}).filas || []).filter((f) => f.espera);
+      const cerca = filas.filter((f) => f.cerca);
+      const mejor = filas.map((f) => ({ f, e: f.estrategias.find((e) => e.estrategia === f.espera) }))
+        .sort((a, b) => (a.e.distancia || 0) - (b.e.distancia || 0))[0];
+      if (v.ultima && ["entrada", "compra", "frenado"].includes(v.ultima.decision)) return vuelta(v);
+      if (cerca.length && mejor) return `${frase("¡Casi casi!", {})} ${gatillo(mejor.e, mejor.f)}`;
+      if (mejor) return `${frase("Esperando:", {})} ${gatillo(mejor.e, mejor.f)}`;
+      return vuelta(v);
+    }
+    // Cómo decide cada perfil, en palabras y con sus números.
+    const REGLAS = {
+      holding: "Compra BTC (60 %) y ETH (40 %) en 12 partes iguales, una por semana, al precio de ese momento. No vende ni pone stop: apuesta a que suben en años. Puede caer mucho en el camino.",
+      conservador: "Mira velas de 4 horas de BTC y ETH. Compra solo si la operación puede ganar al menos 2 veces lo que arriesga, arriesga el 1 % del saldo y tiene como máximo 1 posición abierta.",
+      equilibrado: "Mira velas de 1 y 4 horas. Compra si la operación puede ganar al menos 1,5 veces lo que arriesga, arriesga el 1,5 % del saldo y tiene como máximo 2 posiciones.",
+      trader: "Mira velas de 1 hora. Compra si la operación gana al menos lo mismo que arriesga, arriesga el 2 % del saldo y tiene como máximo 2 posiciones.",
+      scalper: "Mira velas de 5 minutos, armadas con las de 1 minuto. Compra si gana al menos lo mismo que arriesga, arriesga el 1 % del saldo y tiene como máximo 2 posiciones. Opera mucho: las comisiones pesan.",
+    };
+    function reglas(perfil) {
+      if (!REGLAS[perfil]) return "";
+      return `<details class="que-es" id="como-decide"><summary>${frase("Cómo decide el perfil {perfil}", { perfil: Tp(nombre(perfil)) })}</summary>
+        <p class="ayuda">${REGLAS[perfil]}</p>
+        ${perfil !== "holding" ? `<p class="ayuda">Rebote: cuando el precio va y viene sin rumbo (fuerza de tendencia baja) y una vela cierra pegada a la banda de abajo de Bollinger, compro ahí. Salgo en la media de la banda (objetivo) o 1 ATR más abajo (stop).</p>
+        <p class="ayuda">Ruptura: cuando el día viene al alza y una vela cierra sobre el techo de las 20 anteriores con 1,5 veces el volumen normal, dejo una compra en ese techo: espero a que vuelva, no la persigo. Objetivo +1,5 %, stop 1,5 ATR más abajo; la mitad sale en el objetivo y la otra sigue con stop móvil.</p>
+        <p class="ayuda">Siempre: si BTC viene cayendo, no compro nada. Cada compra lleva su stop y su objetivo desde el principio, el 40 % queda en USDT y los frenos (5 % al día, 4 pérdidas seguidas, el piso) cortan todo.</p>` : ""}</details>`;
+    }
     function posiciones(v) {
       if ((v.tenencias || []).length) {
         return `<ul class="vivo-lista">${v.tenencias.map((t) => `<li class="vivo-fila">
@@ -163,11 +263,13 @@ window.PilotaVivo = (() => {
           <span class="vivo-moneda" data-sin-traducir>${esc(moneda(p.par))}</span>
           <span>${p.estado === "puesta"
             ? frase("Compra esperando en {precio} ({monto})", { precio: usdt(p.precio), monto: usdt(p.monto) })
-            : frase("Compré a {precio} · ahora {ahora} · stop {stop} · objetivo {objetivo}", { precio: usdt(p.precio), ahora: p.precio_ahora == null ? "–" : usdt(p.precio_ahora), stop: usdt(p.stop), objetivo: usdt(p.objetivo) })}</span>
+            : frase("Compré a {precio} · ahora {ahora} · stop {stop} · objetivo {objetivo}", { precio: usdt(p.precio), ahora: p.precio_ahora == null ? "–" : usdt(p.precio_ahora), stop: usdt(p.stop), objetivo: usdt(p.objetivo) })}
+            ${J[p.id] ? `<span class="mov-prob">${historia(J[p.id].historia)}</span>` : ""}</span>
           <span class="vivo-valor" data-signo="${signo(p.ganancia)}" data-sin-traducir>${esc(p.estado === "puesta" || p.ganancia == null ? "" : conSigno(p.ganancia, usdt))}</span></li>`).join("")}</ul>`;
     }
     function vivo(E) {
       const v = E.vivo || {};
+      J = v.jugadas || {};
       const hay = !!v.perfil && v.monto > 0;
       if (!hay || E.vivoElegir) {
         return `<div class="centro">
@@ -189,7 +291,7 @@ window.PilotaVivo = (() => {
           <div class="vivo-cabeza-texto">
             <p class="vivo-perfil">${activo ? frase("Perfil {perfil} · operando desde el {fecha}", { perfil: Tp(nombre(v.perfil)), fecha: dia(v.desde_ms) })
               : frase("Perfil {perfil} · detenido", { perfil: Tp(nombre(v.perfil)) })}</p>
-            <p class="vivo-piensa">${vuelta(v)}</p>
+            <p class="vivo-piensa">${narra(v)}</p>
             <p class="conexion" data-estado="${conexion}"><span class="conexion-punto" aria-hidden="true"></span>${{
               en_vivo: "En vivo: conectado a Binance. Reacciono en el segundo en que cierra cada vela.",
               conectando: "Conectando con Binance…",
@@ -197,6 +299,7 @@ window.PilotaVivo = (() => {
             }[conexion]}</p>
           </div></div>
         ${grafico ? grafico() : ""}
+        ${radar(E)}
         <div class="tarjeta vivo-saldo" data-signo="${signo(v.ganancia)}">
           <p class="vivo-saldo-titulo">Cuánto vale ahora</p>
           <p class="vivo-saldo-monto" data-sin-traducir>${esc(v.valor == null ? "–" : usdt(v.valor))}</p>
@@ -209,6 +312,7 @@ window.PilotaVivo = (() => {
         <div class="vivo-acciones">
           ${activo ? `<button type="button" class="pz-boton" id="vivo-detener"${E.vivoOcupado ? " disabled" : ""}>Detener el robot</button>` : ""}
           <button type="button" class="pz-boton${activo ? "" : " pz-principal"}" id="vivo-cambiar">${activo ? "Cambiar de perfil" : "Empezar de nuevo"}</button></div>
+        ${reglas(v.perfil)}
         <p class="ayuda">Es dinero ficticio con precios de verdad. Cuando te guste cómo opera, el paso a dinero real está en «Dinero real».</p></div>`;
     }
 
@@ -292,6 +396,7 @@ window.PilotaVivo = (() => {
     // ── Todos los movimientos del robot en vivo ──
     function movimientos(E, registro) {
       const v = E.vivo || {};
+      J = v.jugadas || {};
       const movs = v.movimientos || [];
       const grupos = [];
       for (const l of movs) {
@@ -307,7 +412,7 @@ window.PilotaVivo = (() => {
         <details class="que-es" id="registro-completo"><summary>El registro completo (técnico)</summary>${registro}</details></div>`;
     }
 
-    return { vivo, comparar, pelicula, movimientos, textoLinea, ERRORES_VIVO, ORDEN };
+    return { vivo, comparar, pelicula, movimientos, textoLinea, ERRORES_VIVO, ORDEN, narra };
   }
   return { crear };
 })();

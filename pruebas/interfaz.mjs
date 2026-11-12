@@ -101,7 +101,7 @@ await page.waitForSelector("#descargar");
   await cab.click("#vivo-empezar");
   await cab.waitForSelector(".vivo-saldo");
   // El gráfico en vivo: velas en un lienzo, el precio que se mueve solo y los indicadores que se prenden con un botón.
-  await cab.waitForSelector("#grafico-lienzo");
+  await cab.waitForSelector("#grafico-lienzo-0");
   await cab.waitForFunction(() => /\d/.test(document.getElementById("precio-BTCFDUSD").textContent), null, { timeout: 10000 });
   const precio1 = await cab.textContent("#precio-BTCFDUSD");
   await cab.waitForFunction((p) => document.getElementById("precio-BTCFDUSD").textContent !== p, precio1, { timeout: 10000 });
@@ -109,10 +109,17 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.getAttribute('[data-graf-ind="bb"]', "aria-pressed"), "true", "Bollinger viene prendido");
   await cab.click('[data-graf-ind="rsi"]');
   assert.equal(await cab.locator(".grafico-caja.con-rsi").count(), 1, "el RSI suma su panel");
-  await cab.click('[data-graf-t="1h"]');
-  assert.equal(await cab.getAttribute('[data-graf-t="1h"]', "aria-pressed"), "true");
+  await cab.click('[data-graf-layout="4"]');
+  assert.equal(await cab.locator(".grafico-lienzo").count(), 4, "cuatro gráficos a la vez");
+  await cab.click('[data-graf-layout="1"]');
+  // Qué está esperando: el gatillo, la operación posible y lo que dice la historia.
+  assert.ok(await cab.locator(".radar-fila").count() >= 1, "el radar dice qué espera");
+  assert.match(await cab.textContent(".radar"), /Compro (BTC|ETH) por (rebote|ruptura)/);
+  assert.match(await cab.textContent(".radar"), /En el pasado ganó \d+ de \d+ veces/);
+  await cab.click('[data-graf-panel="0"][data-graf-t="1h"]');
+  assert.equal(await cab.getAttribute('[data-graf-panel="0"][data-graf-t="1h"]', "aria-pressed"), "true");
   await cab.waitForFunction(() => {           // el gráfico de 1 h se dibujó (llega un momento después)
-    const c = document.getElementById("grafico-lienzo");
+    const c = document.getElementById("grafico-lienzo-0");
     if (!c || !c.width) return false;
     const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
     for (let i = 3; i < d.length; i += 4) if (d[i]) return true;
