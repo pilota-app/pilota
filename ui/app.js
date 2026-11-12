@@ -1062,7 +1062,7 @@
       ${d.pausado ? `<p class="indicadores-linea">${frase("Sigues con {n} posiciones protegidas: «Pausar» cancela las entradas y no toca ninguna protección automática.", { n: numero(d.protegidas, 0) })}</p>` : ""}
       <ul class="tramos" aria-label="Los frenos">${lista.map((f) => filaFreno(f, c)).join("")}</ul>
       <ul class="tramos" aria-label="Los frenos de siempre">
-        ${pasoTamano("Sin apalancamiento", "listo", frase("{n}x", { n: numero(p.apalancamiento, 0) }),
+        ${pasoTamano("Sin apalancamiento", "listo", `${numero(p.apalancamiento, 0)}x`,
           "Pilota solo compra al contado y con lo que hay: una orden con apalancamiento no se pone nunca.", true)}
         ${pasoTamano("Las posiciones a la vez", (c.posiciones || {}).quedan > 0 ? "listo" : "incompleto",
           frase("{n} de {maximas}", { n: numero((c.posiciones || {}).abiertas, 0), maximas: numero(p.posiciones, 0) }),
@@ -1387,6 +1387,8 @@
       ${banda()}
       <main class="contenido">
         ${panelUI.html(E.panel, { respondiendo: E.respondiendo })}
+        <details class="por-dentro" id="por-dentro">
+        <summary>Ver cómo lo pensé, paso a paso</summary>
         <h2>Cómo trabaja Pilota, paso a paso</h2>
         <p class="ayuda">Debajo está cada pieza por separado, con sus números: de dónde salen los datos, cómo se puntúa una oportunidad, cuánto se pone en cada operación y qué la frena. Nada de lo de arriba sale de otra parte.</p>
         <h2>Datos del mercado</h2>
@@ -1462,6 +1464,7 @@
         <p class="ayuda">${frase("**Propuesta**: una operación que te ofrezco con su puntaje, su razón, su monto en USDT y su stop, y que espera lo que elijas: 5, 15 o 60 minutos. Si nadie responde, vence. Siempre: no hay ningún camino donde el silencio opere.")}</p>
         <p class="ayuda">El modo lo eliges tú, pero no manda sobre nada más: el puntaje, la exigencia, el tamaño y los frenos son los mismos en los tres. Tras cualquier freno vuelvo a manual.</p>
         ${modos()}
+        </details>
       </main>`;
   }
   function ajustes() {
@@ -1493,11 +1496,14 @@
       bv.enfocar();
       return;
     }
+    // Lo plegado que la persona abrió sigue abierto al volver a pintar (cada <details> con id).
+    const abiertos = new Set([...raiz.querySelectorAll("details[id][open]")].map((d) => d.id));
     raiz.innerHTML = principal()
       + (bv.activa ? ui.envolver(bv.html(), { id: "t-bv", sinEsc: true }) : "")
       + (E.ajustes ? ui.dialogo({ id: "t-ajustes", titulo: "Ajustes", cuerpo: ajustes(),
         pie: '<button type="button" class="pz-boton pz-principal" data-pz-cerrar>Listo</button>' }) : "")
       + ui.capas();
+    for (const id of abiertos) { const d = raiz.querySelector(`details#${CSS.escape(id)}`); if (d) d.open = true; }
     i18n.traducirDOM(raiz);
     ui.despuesDePintar();
   }

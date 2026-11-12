@@ -7,6 +7,18 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- La pantalla principal ahora es una cabina: el robot te cuenta qué hizo, una cadena de seis luces muestra cómo va cada parte
+  de Pilota (mercado, puntaje, tamaño, frenos, tu sí y motor), el saldo se ve como un medidor entre el piso y tu capital, cada
+  moneda tiene su dial de puntaje y cada propuesta muestra su stop, su entrada y su objetivo en una línea de colores. El detalle
+  técnico sigue ahí, plegado en «Ver cómo lo pensé, paso a paso».
+  *The main screen is now a cockpit: the robot tells you what it did, a chain of six lights shows how each part of Pilota is
+  doing (market, score, size, brakes, your yes and engine), the balance is a gauge between the floor and your capital, each coin
+  has its score dial and each proposal shows its stop, entry and target on a colored line. The technical detail is still there,
+  folded under "See how I thought it through, step by step".*
+- Arreglado: la barra del piso y los medidores de puntaje se veían siempre llenos o vacíos. *Fixed: the floor bar and the score
+  meters always looked full or empty.*
+- Arreglado: en inglés, la fila «Sin apalancamiento» mostraba código en vez de «1x». *Fixed: in English, the "No leverage" row
+  showed code instead of "1x".*
 - Ahora puedes descargar los últimos 90 días de velas cerradas de Binance (BTC y ETH, en 1 h, 4 h y 1 d) y ver, par por par, si
   el historial está completo. Mientras falte historia, Pilota lo dice en vez de operar.
   *You can now download the last 90 days of closed Binance candles (BTC and ETH, in 1 h, 4 h and 1 d) and see, pair by pair,

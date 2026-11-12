@@ -40,11 +40,19 @@ const BASE = `http://127.0.0.1:${servidor.address().port}/index.html`;
 
 const navegador = await chromium.launch();
 const errores = [];
-async function abrir(consulta, ancho = 1280) {
+async function abrir(consulta, ancho = 1280, { plegado = false } = {}) {
   const page = await navegador.newPage({ viewport: { width: ancho, height: 800 } });
   page.on("pageerror", (e) => errores.push(`${consulta}: ${e.message}`));
   page.on("console", (m) => { if (m.type() === "error") errores.push(`${consulta}: ${m.text()}`); });
   await page.addInitScript(() => document.addEventListener("securitypolicyviolation", (e) => console.error(`CSP: ${e.violatedDirective}`)));
+  // Las pruebas de cada pieza miran lo que está plegado en «Ver cómo lo pensé»: se abre apenas aparece (y la app lo deja
+  // abierto al volver a pintar). La cabina plegada se revisa aparte, con `abrir(consulta, ancho, { plegado: true })`.
+  if (!plegado) {
+    await page.addInitScript(() => new MutationObserver(() => {
+      const d = document.getElementById("por-dentro");
+      if (d && !d.open) d.open = true;
+    }).observe(document, { childList: true, subtree: true }));
+  }
   await page.goto(BASE + consulta);
   return page;
 }
@@ -74,6 +82,22 @@ for (let i = 0; i < 10 && await page.locator(".pieza-bv [data-bv-ir].pz-principa
 }
 await page.click(".pieza-bv [data-bv-fin]:not([data-bv-fin=despues])");
 await page.waitForSelector("#descargar");
+
+// 1b. La cabina: lo importante a la vista (el robot, la cadena de seis agentes, el saldo y un dial por moneda) y el detalle
+// técnico plegado. Los dibujos son SVG con atributos: ninguno usa style="" (la CSP lo bloquearía y se verían vacíos).
+{
+  const cab = await abrir("?demo", 1280, { plegado: true });
+  await cab.waitForSelector(".cabina .cadena");
+  assert.equal(await cab.locator(".cadena .estacion").count(), 6, "la cadena muestra los seis agentes");
+  assert.equal(await cab.locator(".cabina .robot").count(), 1, "el robot está dibujado");
+  assert.ok(await cab.locator(".cabina .media-luna").count() === 1, "el saldo se ve como medidor");
+  assert.ok(await cab.locator(".cabina .dial").count() >= 1, "cada moneda tiene su dial");
+  assert.equal(await cab.locator("#panel [style]").count(), 0, "la cabina no usa style en línea");
+  assert.equal(await cab.evaluate(() => document.getElementById("por-dentro").open), false, "el detalle técnico parte plegado");
+  await cab.click("#por-dentro > summary");
+  await cab.waitForSelector("#descargar");
+  await cab.close();
+}
 
 // 2. Los datos del mercado, de punta a punta (en la vista previa responde simular(), como lo haría la app).
 assert.match(await page.textContent(".banda"), /Test mode: play money/, "la banda del modo tiene que estar siempre");

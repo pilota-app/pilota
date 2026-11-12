@@ -20,13 +20,20 @@
   --real-fondo: light-dark(var(--real-fondo-claro), var(--real-fondo-oscuro));
   --real-texto: light-dark(var(--real-texto-claro), var(--real-texto-oscuro));
   --real-linea: light-dark(var(--real-linea-claro), var(--real-linea-oscuro));
+  /* La cabina: verde lo que se gana, rojo lo que se pierde, ámbar lo que espera. Cada uno con su par claro/oscuro. */
+  --gana-claro: #1f8a4c; --gana-oscuro: #5fd68f;
+  --pierde-claro: #c8402f; --pierde-oscuro: #ff8a7a;
+  --espera-claro: #c98a00; --espera-oscuro: #ffc94d;
+  --gana: light-dark(var(--gana-claro), var(--gana-oscuro));
+  --pierde: light-dark(var(--pierde-claro), var(--pierde-oscuro));
+  --espera: light-dark(var(--espera-claro), var(--espera-oscuro));
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 @media (pointer: coarse), (max-width: 760px) { :root { --pz-boton-alto: var(--pz-tactil); --pz-chip-alto: var(--pz-tactil); } }
 .barra { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--linea); background: var(--panel); }
 .barra h1 { margin: 0; font-size: 18px; }
-.contenido { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+.contenido { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
 .contenido h2 { margin: 0 0 4px; font-size: 20px; }
 .suave { color: var(--texto-suave); margin: 0 0 8px; }
 
@@ -44,13 +51,6 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 /* La mascota: la carita, lo que cuenta de la decisión de ahora y la línea del día. */
 .mascota { display: flex; align-items: flex-start; gap: 12px; margin: 16px 0; padding: 12px 14px; border: 1px solid var(--linea); border-radius: var(--radio-chico, 8px); background: var(--panel); }
 /* Los cinco ánimos se ven de lejos: la carita cambia y el borde de la izquierda también. */
-.mascota-cara { flex: 0 0 auto; font-size: 32px; line-height: 1.1; }
-.mascota-cara::before { content: "🤖"; }
-.mascota-cara[data-animo="atento"]::before { content: "🤖👀"; font-size: 24px; }
-.mascota-cara[data-animo="dudando"]::before { content: "🤖❓"; font-size: 24px; }
-.mascota-cara[data-animo="operando"]::before { content: "🤖⚙️"; font-size: 24px; }
-.mascota-cara[data-animo="neutral"]::before { content: "🤖"; opacity: 0.7; }
-.mascota-cara[data-animo="frenado"]::before { content: "🤖✋"; font-size: 24px; }
 .mascota-dice { min-width: 0; }
 .mascota-animo { margin: 0; font-size: 13px; color: var(--texto-suave); text-transform: uppercase; letter-spacing: 0.04em; }
 .mascota-texto { margin: 2px 0 0; font-weight: 600; }
@@ -142,3 +142,91 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 .serie > .tramos { flex: 1 0 100%; margin: 8px 0 0; }
 .pantalla-idioma { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
 .pantalla-idioma > .pieza-bv { width: min(460px, 100%); padding: 24px; border: 1px solid var(--linea); border-radius: 12px; background: var(--panel); }
+
+/* ── La cabina (panel.js): todo lo importante en un vistazo, con dibujos y pocas palabras ── */
+.tarjeta { border: 1px solid var(--linea); border-radius: 14px; background: var(--panel); }
+.cabina .mascota { align-items: center; padding: 14px 18px; border-left-width: 1px; }
+.cabina .mascota-texto { font-size: 17px; }
+/* El robot: la antena y los ojos dicen el ánimo de lejos. */
+.robot { flex: 0 0 auto; width: 76px; height: 76px; }
+.robot-cabeza { fill: var(--panel-2); stroke: var(--linea); stroke-width: 2; }
+.robot-oreja { fill: var(--linea); }
+.robot-visor { fill: var(--texto); }
+.robot-ojo { fill: var(--acento); transform-box: fill-box; transform-origin: center; }
+.robot-boca { fill: var(--linea); }
+.robot-cable { stroke: var(--linea); }
+.robot-antena { fill: var(--texto-suave); }
+.robot[data-animo="operando"] .robot-antena, .robot[data-animo="operando"] .robot-ojo { fill: var(--gana); }
+.robot[data-animo="dudando"] .robot-antena { fill: var(--espera); }
+.robot[data-animo="dudando"] .robot-ojo:last-child { transform: scaleY(0.45); }
+.robot[data-animo="frenado"] .robot-antena, .robot[data-animo="frenado"] .robot-ojo { fill: var(--pierde); }
+.robot[data-animo="frenado"] .robot-ojo { transform: scaleY(0.25); }
+.robot[data-animo="neutral"] .robot-ojo { opacity: 0.7; }
+@media (prefers-reduced-motion: no-preference) {
+  .robot-ojos { animation: parpadeo 5s infinite; transform-box: fill-box; transform-origin: center; }
+  .robot[data-animo="operando"] .robot-antena, .estacion[data-estado="espera"] .estacion-luz { animation: latido 1.4s ease-in-out infinite; }
+  @keyframes parpadeo { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
+  @keyframes latido { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+}
+/* La cadena: un agente por estación, con su luz. Se lee de izquierda a derecha, como el camino de una orden. */
+.cadena { list-style: none; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 16px 0; padding: 0; counter-reset: paso; }
+.estacion { position: relative; display: grid; justify-items: center; gap: 2px; padding: 12px 6px 10px; text-align: center;
+  border: 1px solid var(--linea); border-radius: 12px; background: var(--panel); }
+.estacion + .estacion::before { content: ""; position: absolute; left: -9px; top: 22px; width: 9px; height: 2px; background: var(--linea); }
+.estacion-luz { width: 14px; height: 14px; border-radius: 50%; background: var(--linea); }
+.estacion[data-estado="ok"] .estacion-luz { background: var(--gana); }
+.estacion[data-estado="espera"] .estacion-luz { background: var(--espera); }
+.estacion[data-estado="alto"] .estacion-luz { background: var(--pierde); }
+.estacion[data-estado="alto"] { border-color: var(--pierde); }
+.estacion-nombre { font-weight: 600; font-size: 14px; }
+.estacion-dice { font-size: 12px; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+/* El saldo y las monedas, lado a lado; a lo angosto, uno sobre otro. */
+.cabina-grilla { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; margin: 8px 0 16px; }
+.cabina .saldo { margin: 0; padding: 16px; }
+.saldo-dibujo { position: relative; text-align: center; }
+.media-luna { display: block; width: 100%; max-width: 260px; margin: 0 auto; }
+.media-luna .pista, .dial .pista { stroke: var(--panel-2); }
+.media-luna .valor { stroke: var(--gana); }
+.media-luna .valor[data-estado="espera"] { stroke: var(--espera); }
+.media-luna .valor[data-estado="alto"] { stroke: var(--pierde); }
+.cabina .saldo-monto { position: absolute; left: 0; right: 0; top: 52%; font-size: 28px; }
+.saldo-extremos { display: flex; justify-content: space-between; max-width: 260px; margin: 4px auto 0; font-size: 12px; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.cabina-monedas h3 { margin-top: 0 !important; }
+.cabina .medidores { border: 0; display: grid; gap: 10px; overflow: visible; }
+.cabina .medidor { display: flex; flex-wrap: nowrap; align-items: center; gap: 14px; padding: 12px 14px; }
+.cabina .medidor + .medidor { border-top: 1px solid var(--linea); }
+.cabina .medidor[data-pasa="1"] { border-color: var(--gana); }
+.dial { position: relative; flex: 0 0 auto; width: 84px; height: 84px; }
+.dial svg { width: 100%; height: 100%; }
+.dial .valor { stroke: var(--texto-suave); }
+.dial .valor.pasa { stroke: var(--gana); }
+.dial .marca { stroke: var(--texto); }
+.dial-numero { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.medidor-texto { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+.medidor-texto .serie-detalle { flex: 1 0 100%; }
+/* Las propuestas y las posiciones como tarjetas, con su escalera de precios. */
+.series.tarjetas { border: 0; display: grid; gap: 10px; overflow: visible; }
+.series.tarjetas .serie + .serie { border-top: 1px solid var(--linea); }
+.serie.propuesta { border-color: var(--acento); border-width: 2px; padding: 14px 16px; }
+.escalera { flex: 1 0 100%; max-width: 440px; margin: 6px 0 2px; }
+.escalera svg { display: block; width: 100%; height: auto; }
+.tramo-pierde { stroke: var(--pierde); opacity: 0.55; }
+.tramo-gana { stroke: var(--gana); opacity: 0.55; }
+.punto-stop { fill: var(--pierde); }
+.punto-objetivo { fill: var(--gana); }
+.punto-entrada { fill: var(--texto); }
+.punto-ahora { fill: var(--acento); stroke: var(--panel); stroke-width: 2; }
+.escalera-leyenda { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0 0; font-size: 12px; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.ley-stop { color: var(--pierde); } .ley-objetivo { color: var(--gana); } .ley-ahora { color: var(--acento); }
+.serie.propuesta .pz-boton { min-width: 9em; }
+/* Lo que explica cada cosa, plegado: está, pero no tapa los dibujos. */
+.que-es { margin: 8px 0 0; }
+.que-es > summary, .por-dentro > summary { cursor: pointer; color: var(--texto-suave); font-size: 14px; }
+.por-dentro { margin: 32px 0 0; padding: 16px 0 0; border-top: 1px solid var(--linea); }
+.por-dentro > summary { font-size: 16px; font-weight: 600; color: var(--texto); padding: 8px 0; }
+.por-dentro[open] > summary { margin-bottom: 16px; }
+@media (max-width: 760px) {
+  .cadena { grid-template-columns: repeat(3, 1fr); }
+  .estacion:nth-child(4)::before { display: none; }
+  .cabina-grilla { grid-template-columns: 1fr; }
+}
