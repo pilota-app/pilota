@@ -4,6 +4,8 @@
   simular.py estado <entrada.json {}>              <salida.json>   → {ok, datos}
   simular.py correr <entrada.json {monto, dias}>   <salida.json>   → {ok, datos}
 
+`correr` devuelve además los cinco perfiles lado a lado (`lib_simulacion.comparar`), cada uno con sus movimientos.
+
 Ninguna de las dos toca la red: recorre las velas que ya están guardadas (`bin/lib_simulacion.py`). El resultado queda en
 `<datos>/mercado/simulacion.json`. Es una cuenta aparte, en memoria: el saldo de prueba y el real no se tocan.
 """
@@ -41,7 +43,7 @@ def estado(d, ahora_ms=None):
 def correr(d, ahora_ms=None):
     d = d if isinstance(d, dict) else {}
     recorrido = backtest.correr(ahora_ms, sensibilidad=False, con_todas=True)
-    r = lib_simulacion.simular(d.get("monto"), d.get("dias"), recorrido)
+    r = lib_simulacion.comparar(d.get("monto"), d.get("dias"), recorrido)
     r["cuando"] = lib_datos.iso(ahora_ms or lib_datos.ahora_local_ms())
     return {"ok": True, "datos": {**lib_simulacion.parametros(), "ultima": escribir(r)}}
 

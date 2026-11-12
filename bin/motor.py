@@ -30,7 +30,7 @@ ellos proponen y esperan el «Sí» (manual), operan solo si el puntaje es clara
 import time
 
 import lib_datos
-import lib_modos
+import lib_piloto
 import lib_reconciliar
 import lib_trabajo
 import nucleo
@@ -44,7 +44,7 @@ def estado(d=None, ahora_ms=None):
 def revisar(d=None, ahora_ms=None):
     """Una revisión ahora mismo: reconcilia la ventana que nadie miró, deja aplicado lo que pasó y, con el mundo al día,
     los tres modos deciden (`lib_modos.decidir`)."""
-    return {"ok": True, "datos": lib_reconciliar.reconciliar(ahora_ms, decidir=lib_modos.decidir)}
+    return {"ok": True, "datos": lib_reconciliar.reconciliar(ahora_ms, decidir=lib_piloto.decidir)}
 
 
 def encender(d=None, ahora_ms=None, dormir=time.sleep, ciclos=0, latir=True):
@@ -59,7 +59,7 @@ def encender(d=None, ahora_ms=None, dormir=time.sleep, ciclos=0, latir=True):
     while not t.detenido() and not (ciclos and vuelta >= ciclos):
         vuelta += 1
         try:
-            datos = lib_reconciliar.reconciliar(ahora_ms, plan=plan, decidir=lib_modos.decidir)
+            datos = lib_reconciliar.reconciliar(ahora_ms, plan=plan, decidir=lib_piloto.decidir)
             plan.update(lib_reconciliar.armar(datos["ultima_ms"], lib_trabajo.leer_plan(lib_reconciliar.TIPO)))
             plan.update({"estado": "corriendo", "trabajo": t.id, "fallos": 0, "error": "", "corriendo": True})
             # La primera vuelta es la que reconcilia lo que nadie miró; de ahí en adelante solo vigila.

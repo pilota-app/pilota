@@ -62,6 +62,8 @@ RAZONES = (
     # Los frenos, cada uno con su nombre, y la pausa que pone la persona
     "freno_diario", "freno_racha", "freno_piso", "freno_piso_absoluto", "freno_comision", "freno_fdusd",
     "pausa", "reanudar",
+    # La prueba en vivo con un perfil (`lib_piloto`): cuándo empezó y paró, y cada compra por partes del holding
+    "perfil_empezado", "perfil_detenido", "compra_holding",
 )
 #: Lo que se puede decir de la orden: qué se pidió. `id` es el clientOrderId con el prefijo propio de Pilota (lo que no
 #: lo tenga es de otro y Pilota no lo toca).
@@ -69,7 +71,7 @@ CAMPOS_ORDEN = ("id", "lado", "tipo", "precio", "cantidad", "monto", "stop", "ob
 #: Lo que se puede decir del resultado: cómo terminó. `por` es el motivo del cierre y `motivo` el código de un rechazo,
 #: un freno o un arranque frenado.
 CAMPOS_RESULTADO = ("por", "precio", "neto", "neto_relativo", "saldo", "referencia", "comision", "minutos",
-                    "supuesto", "motivo", "n")
+                    "supuesto", "motivo", "n", "perfil")
 
 
 # ── Las reglas de una línea ──────────────────────────────────────────────────────────────────────────────────────────

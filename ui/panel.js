@@ -464,7 +464,7 @@ window.PilotaPanel = (() => {
       return vivas;
     }
 
-    return { html, registro, latir };
+    return { html, registro, latir, robot };
   }
 
   return { crear };

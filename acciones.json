@@ -684,6 +684,49 @@
    "responde": "velasEstadoListo",
    "limite": 30,
    "pieza": "app"
+  },
+  "vivoDetener": {
+   "script": "vivo.py",
+   "args": [
+    "detener"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "vivoListo",
+   "limite": 30,
+   "pieza": "app"
+  },
+  "vivoEmpezar": {
+   "script": "vivo.py",
+   "args": [
+    "empezar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "perfil": {
+     "tipo": "texto",
+     "max": 20
+    },
+    "monto": {
+     "tipo": "entero",
+     "min": 10,
+     "max": 1000000
+    }
+   },
+   "responde": "vivoListo",
+   "limite": 60,
+   "pieza": "app"
+  },
+  "vivoEstado": {
+   "script": "vivo.py",
+   "args": [
+    "estado"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "vivoListo",
+   "limite": 30,
+   "pieza": "app"
   }
  }
 }

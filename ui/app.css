@@ -360,3 +360,86 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
   .paso-vivo { flex-direction: column; align-items: stretch; }
 }
 .activar-caja .campo-monto, .activar-caja .pz-campo, .activar-caja .boton-ancho { max-width: 480px; }
+
+/* El robot en vivo */
+.vivo { display: grid; gap: 16px; }
+.vivo > .tarjeta { padding: 20px; }
+.vivo-cabeza { display: flex; align-items: center; gap: 18px; }
+.vivo-cabeza .robot { width: 84px; height: 84px; flex: 0 0 auto; }
+.vivo-cabeza-texto { min-width: 0; }
+.vivo-perfil { margin: 0 0 4px; color: var(--texto-suave); font-size: 14px; font-weight: 600; }
+.vivo-piensa { margin: 0; font-size: 17px; line-height: 1.4; }
+.vivo-saldo-titulo { margin: 0; color: var(--texto-suave); font-size: 14px; font-weight: 600; }
+.vivo-saldo-monto { margin: 2px 0 0; font-size: 38px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.vivo-saldo-cambio { margin: 0 0 8px; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vivo-saldo[data-signo="sube"] .vivo-saldo-cambio, .vivo-valor[data-signo="sube"] { color: var(--gana); }
+.vivo-saldo[data-signo="baja"] .vivo-saldo-cambio, .vivo-valor[data-signo="baja"] { color: var(--pierde); }
+.vivo-saldo .suave { margin: 0; }
+.vivo-lista { list-style: none; display: grid; gap: 0; margin: 0; padding: 0; }
+.vivo-fila { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 0;
+  border-top: 1px solid var(--linea); font-size: 14px; font-variant-numeric: tabular-nums; }
+.vivo-fila:first-child { border-top: 0; }
+.vivo-moneda { font-weight: 700; }
+.vivo-valor { font-weight: 700; }
+.vivo-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.vivo-elegir { padding: 20px; }
+.perfiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0 0 16px; }
+.perfil { display: grid; align-content: start; gap: 4px; padding: 12px; border: 1px solid var(--linea); border-radius: 12px;
+  background: var(--fondo); color: var(--texto); text-align: left; font: inherit; cursor: pointer; }
+.perfil:hover { border-color: var(--texto-suave); }
+.perfil:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+.perfil[aria-checked="true"] { border-color: var(--acento); background: color-mix(in srgb, var(--acento) 10%, var(--fondo)); }
+.perfil-nombre { font-weight: 700; }
+.perfil-ritmo { color: var(--acento); font-size: 12px; font-weight: 700; }
+.perfil-que { color: var(--texto-suave); font-size: 13px; line-height: 1.35; }
+.vivo-elegir .boton-ancho { margin-top: 14px; }
+/* Movimientos, en vivo y en la película */
+.movs { list-style: none; display: grid; gap: 0; margin: 0; padding: 0; }
+.mov { display: grid; grid-template-columns: 12px 120px minmax(0, 1fr); align-items: baseline; gap: 10px; padding: 9px 0;
+  border-top: 1px solid var(--linea); font-size: 14px; line-height: 1.4; }
+.mov:first-child { border-top: 0; }
+.mov-punto { width: 9px; height: 9px; border-radius: 50%; background: var(--texto-suave); align-self: center; }
+.mov[data-tipo="compra"] .mov-punto { background: var(--acento); }
+.mov[data-tipo="gana"] .mov-punto { background: var(--gana); }
+.mov[data-tipo="pierde"] .mov-punto { background: var(--pierde); }
+.mov[data-tipo="nada"] .mov-punto { background: transparent; border: 2px solid var(--texto-suave); }
+.mov-cuando { color: var(--texto-suave); font-size: 13px; font-variant-numeric: tabular-nums; }
+.centro > section.tarjeta { padding: 16px 20px; margin-bottom: 12px; }
+#registro-completo { margin-top: 16px; }
+/* Comparar */
+.comp-elegir { padding: 20px; margin-bottom: 16px; }
+.comp-elegir .boton-ancho { margin-top: 14px; max-width: 480px; }
+.comp-grilla { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.comp-perfil { display: grid; align-content: start; gap: 2px; padding: 12px; color: var(--texto); text-align: left; font: inherit; cursor: pointer; }
+.comp-perfil:hover { border-color: var(--texto-suave); }
+.comp-perfil:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+.comp-perfil[aria-pressed="true"] { border-color: var(--acento); background: color-mix(in srgb, var(--acento) 8%, var(--panel)); }
+.comp-nombre { color: var(--texto-suave); font-size: 13px; font-weight: 700; }
+.comp-monto { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.comp-cambio { font-weight: 700; font-variant-numeric: tabular-nums; }
+.comp-perfil[data-signo="sube"] .comp-cambio { color: var(--gana); }
+.comp-perfil[data-signo="baja"] .comp-cambio { color: var(--pierde); }
+.comp-mini svg { display: block; width: 100%; height: 48px; margin: 6px 0; }
+.comp-detalle, .comp-nota { color: var(--texto-suave); font-size: 12px; }
+.comp-nota { color: var(--prueba-texto); }
+.comp-referencias { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 12px 0 4px; font-size: 14px; }
+.comp-referencias p { margin: 0; }
+.comp-referencias span { color: var(--texto-suave); }
+.comp-referencias strong { font-variant-numeric: tabular-nums; }
+.peli { padding: 20px; margin-top: 12px; }
+.peli-cabeza { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.peli-cabeza h3 { margin: 0; }
+.peli-botones { display: flex; flex-wrap: wrap; gap: 8px; }
+.peli .suave { margin: 6px 0 0; }
+.peli-marca { stroke: var(--acento); stroke-width: 1; opacity: 0.5; }
+.peli .movs { margin-top: 12px; max-height: 420px; overflow-y: auto; }
+@media (max-width: 960px) {
+  .perfiles, .comp-grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .perfiles, .comp-grilla { grid-template-columns: 1fr; }
+  .mov { grid-template-columns: 12px minmax(0, 1fr); }
+  .mov-cuando { grid-column: 2; }
+  .mov-texto { grid-column: 2; }
+  .vivo-saldo-monto { font-size: 32px; }
+}

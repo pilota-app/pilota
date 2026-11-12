@@ -135,11 +135,58 @@ class Simular(unittest.TestCase):
         self.assertTrue(r["sin_exigencia"], "sin calibrar, el resultado lo dice")
         self.assertEqual(r["usdt"]["saldo"], 100)
 
+    def test_comparar_da_los_cinco_perfiles(self):
+        self.minimos()
+        r = sim.comparar(100, 30, self.recorrido([op(95, 0.01)]), rapidas=[])
+        self.assertEqual([p["perfil"] for p in r["perfiles"]], list(sim.lib_perfiles.ORDEN))
+        rapido = r["perfiles"][-1]
+        self.assertEqual(rapido["operaciones"], 0)
+        self.assertEqual(r["sugerido"], "equilibrado")
+
     def test_sin_operaciones_en_el_periodo_lo_dice(self):
         self.minimos()
         r = sim.simular(100, 30, self.recorrido([op(10, 0.01)]), calibracion={})
         self.assertFalse(r["listo"])
         self.assertEqual(r["motivo"], "sin_operaciones")
+
+
+
+class Perfiles(unittest.TestCase):
+    def test_cada_compra_tiene_su_venta_en_los_movimientos(self):
+        r = sim.cartera([op(0, 0.015), op(1, -0.01)], 1000.0, PARES, SIN_COSTOS)
+        ques = [m["que"] for m in r["movimientos"]]
+        self.assertEqual(ques, ["compra", "venta", "compra", "venta"])
+        self.assertGreater(r["movimientos"][1]["ganancia"], 0)
+        self.assertLess(r["movimientos"][3]["ganancia"], 0)
+
+    def test_el_perfil_solo_toma_lo_suyo(self):
+        corta = op(0, 0.01)                                # gana 1,5 por cada 1: no le sirve al conservador
+        corta["objetivo"] = 101_500.0
+        larga = op(2, 0.02)
+        larga.update(temporalidad="4h", objetivo=102_500.0)  # 4 h y gana 2,5 por cada 1
+        self.assertEqual(sim.cartera([corta, larga], 1000.0, PARES, SIN_COSTOS, perfil="conservador")["operaciones"], 1)
+        self.assertEqual(sim.cartera([corta, larga], 1000.0, PARES, SIN_COSTOS, perfil="trader")["operaciones"], 1)
+        self.assertEqual(sim.cartera([corta, larga], 1000.0, PARES, SIN_COSTOS, perfil="equilibrado")["operaciones"], 2)
+
+    def test_el_conservador_tiene_una_posicion_a_la_vez(self):
+        ops = [op(0, 0.01, horas=10), op(0, 0.01, horas=10)]
+        for o in ops:
+            o.update(temporalidad="4h", objetivo=102_500.0)
+        ops[1]["entrada_ms"] += 1
+        r = sim.cartera(ops, 1000.0, PARES, SIN_COSTOS, perfil="conservador")
+        self.assertEqual((r["operaciones"], r["saltadas"]["posiciones"]), (1, 1))
+
+    def test_holding_compra_por_partes_y_mantiene(self):
+        series = {par: [[INICIO + d * DIA, 0, 0, 0, 100.0 + d, 0] for d in range(120)] for par in ("BTCFDUSD", "ETHFDUSD")}
+        r = sim.holding(120.0, INICIO, INICIO + 119 * DIA, SIN_COSTOS, series=series)
+        self.assertTrue(r["listo"])
+        self.assertEqual(r["operaciones"], 24, "12 semanas por dos monedas")
+        self.assertAlmostEqual(r["efectivo"], 0.0, places=6)
+        self.assertGreater(r["saldo"], 120.0, "el precio solo subió")
+        self.assertEqual(r["movimientos"][2]["ms"] - r["movimientos"][0]["ms"], 7 * DIA)
+
+    def test_holding_sin_historia_lo_dice(self):
+        self.assertEqual(sim.holding(100.0, INICIO, INICIO + DIA, SIN_COSTOS, series={})["motivo"], "sin_historial")
 
 
 if __name__ == "__main__":

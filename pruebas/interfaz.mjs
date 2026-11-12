@@ -83,47 +83,77 @@ for (let i = 0; i < 10 && await page.locator(".pieza-bv [data-bv-ir].pz-principa
 await page.click(".pieza-bv [data-bv-fin]:not([data-bv-fin=despues])");
 await page.waitForSelector("#descargar");
 
-// 1b. El centro de operaciones: cinco pestañas, la cabina con dibujos (sin style="" en línea: la CSP lo bloquearía), la
-// simulación con monto y el paso a real con sus requisitos.
+// 1b. El centro de operaciones: seis pestañas, el robot en vivo con un perfil, la comparación de los cinco perfiles con su
+// película, la cabina con dibujos (sin style="" en línea: la CSP lo bloquearía) y el paso a real con sus requisitos.
 {
   const cab = await abrir("?demo&idioma=es", 1280, { plegado: true });
-  await cab.waitForSelector(".cabina .cadena");
-  assert.equal(await cab.locator('[role="tab"]').count(), 5, "cinco pestañas");
-  assert.equal(await cab.locator('[role="tab"][aria-selected="true"]').getAttribute("id"), "tab-ahora", "parte en «Ahora»");
-  assert.equal(await cab.locator(".cadena .estacion").count(), 6, "la cadena muestra los seis agentes");
-  assert.equal(await cab.locator(".cabina .robot").count(), 1, "el robot está dibujado");
-  assert.equal(await cab.locator(".cabina .media-luna").count(), 1, "el saldo se ve como medidor");
-  assert.ok(await cab.locator(".cabina .dial").count() >= 1, "cada moneda tiene su dial");
-  assert.equal(await cab.locator("#app [style]").count(), 0, "nada usa style en línea");
+  await cab.waitForSelector("#pestana-vivo .perfiles");
+  assert.equal(await cab.locator('[role="tab"]').count(), 6, "seis pestañas");
+  assert.equal(await cab.locator('[role="tab"][aria-selected="true"]').getAttribute("id"), "tab-vivo", "parte en «En vivo»");
+  assert.equal(await cab.locator(".perfil").count(), 5, "los cinco perfiles");
+  assert.equal(await cab.getAttribute('.perfil[data-perfil="equilibrado"]', "aria-checked"), "true", "el sugerido viene elegido");
   assert.ok(await cab.locator("#pestana-como").isHidden(), "lo técnico vive en su pestaña");
+  // En vivo: el perfil y el monto, y el robot cuenta lo que hace.
+  await cab.click('[data-perfil="trader"]');
+  await cab.fill("#vivo-monto", "300");
+  await cab.click('[data-perfil="trader"]');
+  assert.equal(await cab.inputValue("#vivo-monto"), "300", "lo escrito sigue ahí al volver a pintar");
+  await cab.click("#vivo-empezar");
+  await cab.waitForSelector(".vivo-saldo");
+  assert.match(await cab.textContent(".vivo-perfil"), /Perfil Trader/);
+  assert.match(await cab.textContent(".vivo-saldo"), /Pusiste 300 USDT ficticios/);
+  assert.equal(await cab.locator(".vivo .robot").count(), 1, "el robot está dibujado");
+  assert.ok(await cab.locator(".vivo .mov").count() >= 3, "lo último que hizo, en palabras");
+  assert.match(await cab.textContent(".vivo .movs"), /Vendí BTC en el objetivo/);
+  await cab.click("#tab-movimientos");
+  assert.match(await cab.textContent("#pestana-movimientos"), /Empecé con 300 USDT ficticios, en perfil Trader/);
+  await cab.click("#tab-vivo");
+  await cab.click("#vivo-detener");
+  await cab.waitForSelector("#vivo-cambiar >> text=Empezar de nuevo");
   // Las flechas mueven entre pestañas, como en cualquier lista de pestañas.
-  await cab.focus("#tab-ahora");
+  await cab.focus("#tab-vivo");
   await cab.keyboard.press("ArrowRight");
-  assert.equal(await cab.evaluate(() => document.activeElement.id), "tab-simular");
-  assert.ok(await cab.locator("#pestana-simular").isVisible());
-  // Simular: el monto, el período y el resultado al lado de quedarse en USDT y de comprar BTC y esperar.
+  assert.equal(await cab.evaluate(() => document.activeElement.id), "tab-comparar");
+  assert.ok(await cab.locator("#pestana-comparar").isVisible());
+  // Comparar: el monto, el período y los cinco perfiles al lado de quedarse en USDT y de comprar BTC y esperar.
   await cab.fill("#sim-monto", "250");
   await cab.click('[data-sim-dias="365"]');
   assert.equal(await cab.inputValue("#sim-monto"), "250", "lo escrito sigue ahí al volver a pintar");
   await cab.click("#sim-correr");
-  await cab.waitForSelector(".sim-tarjetas");
-  assert.match(await cab.textContent(".sim-resultado"), /Con Pilota[\s\S]*Quedarte en USDT[\s\S]*250 USDT[\s\S]*Comprar BTC y esperar/);
-  assert.match(await cab.textContent(".sim-resultado"), /365 días/);
-  assert.equal(await cab.locator(".sim-grafico svg polyline").count(), 2, "las dos curvas");
-  // Operar: los cinco requisitos y la llave; sin cumplirlos, no hay cómo encender.
+  await cab.waitForSelector(".comp-grilla");
+  assert.equal(await cab.locator(".comp-perfil").count(), 5, "los cinco perfiles lado a lado");
+  assert.match(await cab.textContent(".sim-resultado"), /365 días\) con 250 USDT[\s\S]*Quedarte en USDT[\s\S]*Comprar BTC y esperar/);
+  assert.match(await cab.textContent('.comp-perfil[data-comparar="scalper"]'), /últimos 30 días/, "el scalper dice que mira menos");
+  // La película: tocar un perfil la pone a andar, movimiento por movimiento.
+  await cab.click('[data-comparar="conservador"]');
+  await cab.waitForSelector(".peli .mov");
+  await cab.waitForFunction(() => /Movimiento (\d+) de \1\b/.test(document.querySelector(".peli").textContent), null, { timeout: 20000 });
+  assert.equal(await cab.locator(".peli svg polyline").count(), 2, "al final, las dos curvas enteras");
+  await cab.click('[data-usar-perfil="conservador"]');
+  assert.equal(await cab.getAttribute('.perfil[data-perfil="conservador"]', "aria-checked"), "true", "pasa el perfil a «En vivo»");
+  assert.equal(await cab.inputValue("#vivo-monto"), "250", "y el monto");
+  // La cabina sigue: la cadena de los seis agentes, el medidor del saldo y un dial por moneda.
+  await cab.click("#tab-ahora");
+  await cab.waitForSelector(".cabina .cadena");
+  assert.equal(await cab.locator(".cadena .estacion").count(), 6, "la cadena muestra los seis agentes");
+  assert.equal(await cab.locator(".cabina .media-luna").count(), 1, "el saldo se ve como medidor");
+  assert.ok(await cab.locator(".cabina .dial").count() >= 1, "cada moneda tiene su dial");
+  assert.equal(await cab.locator("#app [style]").count(), 0, "nada usa style en línea");
+  // Dinero real: los cinco requisitos y la llave; sin cumplirlos, no hay cómo encender.
   await cab.click("#tab-operar");
   await cab.waitForSelector(".requisitos");
   assert.equal(await cab.locator(".requisito").count(), 5);
   assert.equal(await cab.locator('.requisito[data-cumple="1"] >> text=Simulaste el pasado').count(), 1,
-    "simular cuenta como requisito cumplido");
+    "comparar cuenta como requisito cumplido");
   assert.equal(await cab.locator("#real-activar").count(), 0, "sin los cinco pasos no aparece el botón de encender");
   assert.equal(await cab.getAttribute("#real-secreto", "type"), "password", "el secreto no se ve al escribirlo");
-  await cab.fill("#real-llave", "corta");
+  await cab.fill("#real-llave", "Llave9Corta");
   await cab.click("#real-conectar");
   await cab.waitForSelector(".pz-toast");
   assert.match(await cab.textContent(".pz-toast"), /solo letras y números/, "una llave mal copiada se dice antes de mandarla");
-  assert.equal(await cab.evaluate(() => JSON.stringify(window.Pilota._pruebas.E).includes("corta")), false,
+  assert.equal(await cab.evaluate(() => JSON.stringify(window.Pilota._pruebas.E).includes("Llave9Corta")), false,
     "la llave no se guarda en el estado de la pantalla");
+  assert.deepEqual(await faltantes(cab), [], "textos sin traducir al inglés");
   await cab.close();
 }
 

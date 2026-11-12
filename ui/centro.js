@@ -1,27 +1,18 @@
-// Pilota: el centro de operaciones. Las pestañas de arriba y dos de ellas: «Simular» (el pasado con tu monto y la prueba
-// en vivo) y «Operar» (los requisitos, la llave de Binance y el interruptor del dinero de verdad).
+// Pilota: el centro de operaciones. Las pestañas de arriba y la de «Dinero real» (los requisitos, la llave de Binance y el
+// interruptor). El robot en vivo, la comparación de perfiles y los movimientos viven en ui/vivo.js.
 // Nada de texto pegado: cada frase va completa, con sus marcadores, y su inglés en idiomas/en.json.
 // Los dibujos son SVG con atributos (nunca style=""): la CSP «style-src 'self'» lo bloquearía.
 window.PilotaCentro = (() => {
   "use strict";
 
   const PESTANAS = [
-    ["ahora", "Ahora", "M4 14a8 8 0 0 1 16 0M12 14l4-4"],
-    ["simular", "Simular", "M5 4v16l14-8z"],
-    ["operar", "Operar", "M13 2 4 14h7l-1 8 9-12h-7z"],
-    ["historial", "Historial", "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"],
-    ["como", "Cómo pienso", "M12 3a6 6 0 0 0-3 11v3h6v-3a6 6 0 0 0-3-11zM10 21h4"],
+    ["vivo", "En vivo", "M12 3a3 3 0 0 1 3 3v1h2a2 2 0 0 1 2 2v7a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9a2 2 0 0 1 2-2h2V6a3 3 0 0 1 3-3zM9.5 12h.01M14.5 12h.01"],
+    ["comparar", "Comparar", "M4 20V10M10 20V4M16 20v-7M22 20H2"],
+    ["movimientos", "Movimientos", "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"],
+    ["ahora", "Cabina", "M4 14a8 8 0 0 1 16 0M12 14l4-4"],
+    ["operar", "Dinero real", "M13 2 4 14h7l-1 8 9-12h-7z"],
+    ["como", "Avanzado", "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"],
   ];
-  const MONTOS = [50, 100, 200, 500, 1000];
-  const PERIODOS = [[30, "1 mes"], [90, "3 meses"], [180, "6 meses"], [365, "1 año"], [1095, "3 años"]];
-  // Por qué una simulación no se pudo (bin/lib_simulacion.py: MOTIVOS).
-  const MOTIVOS_SIM = {
-    sin_monto: "Elige un monto entre 10 y 1.000.000 USDT.",
-    sin_periodo: "Elige un período.",
-    sin_minimos: "Primero calcula el capital mínimo viable (en «Cómo pienso»): sin los mínimos de Binance no puedo simular.",
-    sin_historial: "Todavía no tengo historial: baja los 3 años en «Cómo pienso».",
-    sin_operaciones: "En ese período mis reglas no habrían abierto ninguna operación: habrías quedado en USDT.",
-  };
   // Los cinco requisitos para pasar a real (bin/lib_real.py: REQUISITOS).
   const REQUISITOS = {
     simulacion: "Simulaste el pasado con tu monto",
@@ -53,10 +44,7 @@ window.PilotaCentro = (() => {
 
   function crear({ i18n, esc, numero, usdt, porcentaje, fechaHora }) {
     const { Tp, frase } = i18n;
-    const dia = (texto) => {
-      const d = new Date(String(texto ?? ""));
-      return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(i18n.idioma, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-    };
+
 
     // ── Las pestañas ──
     function pestanas(actual, extra = {}) {
@@ -74,120 +62,16 @@ window.PilotaCentro = (() => {
       return `<section role="tabpanel" class="pestana-panel" id="pestana-${id}" aria-labelledby="tab-${id}"${id === actual ? "" : " hidden"}>${contenido}</section>`;
     }
 
-    // ── El gráfico de la simulación: la curva de Pilota y la de comprar BTC y esperar, sobre la línea del monto ──
-    function grafico(r) {
-      const p = ((r.pilota || {}).curva || []), b = ((r.btc || {}).curva || []);
-      const todos = [...p, ...b];
-      if (todos.length < 2) return "";
-      const x0 = r.desde_ms, x1 = r.hasta_ms;
-      let y0 = Math.min(r.monto, ...todos.map((q) => q[1])), y1 = Math.max(r.monto, ...todos.map((q) => q[1]));
-      const margen = (y1 - y0) * 0.08 || 1;
-      y0 -= margen; y1 += margen;
-      const X = (v) => (8 + 584 * (v - x0) / Math.max(1, x1 - x0)).toFixed(1);
-      const Y = (v) => (8 + 184 * (1 - (v - y0) / (y1 - y0))).toFixed(1);
-      const linea = (q) => q.map(([x, y]) => `${X(x)},${Y(y)}`).join(" ");
-      // Pilota cambia a escalones: el saldo se mueve solo al cerrar.
-      const escalones = p.flatMap(([x, y], i) => (i ? [[x, p[i - 1][1]], [x, y]] : [[x, y]]));
-      if (escalones.length) escalones.push([x1, escalones[escalones.length - 1][1]]);
-      return `<figure class="sim-grafico">
-        <svg viewBox="0 0 600 200" preserveAspectRatio="none" role="img" aria-label="${esc(Tp("La curva de tu saldo con Pilota y con comprar BTC y esperar"))}">
-          <line class="sim-base" x1="8" x2="592" y1="${Y(r.monto)}" y2="${Y(r.monto)}" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
-          ${b.length > 1 ? `<polyline class="sim-btc" points="${linea(b)}" fill="none" vector-effect="non-scaling-stroke"/>` : ""}
-          ${escalones.length > 1 ? `<polyline class="sim-pilota" points="${linea(escalones)}" fill="none" vector-effect="non-scaling-stroke"/>` : ""}
-        </svg>
-        <figcaption class="sim-leyenda">
-          <span class="ley-pilota">Pilota</span><span class="ley-btc">Comprar BTC y esperar</span>
-          <span class="ley-base">${frase("Tu monto: {monto}", { monto: usdt(r.monto) })}</span></figcaption></figure>`;
-    }
-    function tarjetaResultado(nombre, clase, saldo, rendimiento, detalle) {
-      const hay = typeof saldo === "number" && isFinite(saldo);
-      const signo = !hay || Math.abs(rendimiento) < 1e-9 ? "igual" : (rendimiento > 0 ? "sube" : "baja");
-      return `<div class="sim-tarjeta ${clase}" data-signo="${signo}">
-        <p class="sim-tarjeta-nombre">${nombre}</p>
-        <p class="sim-tarjeta-monto" data-sin-traducir>${hay ? esc(usdt(saldo)) : "–"}</p>
-        <p class="sim-tarjeta-cambio" data-sin-traducir>${hay ? esc(`${rendimiento > 0 ? "+" : ""}${porcentaje(rendimiento, 1)}`) : ""}</p>
-        ${detalle ? `<p class="sim-tarjeta-detalle" data-sin-traducir>${detalle}</p>` : ""}</div>`;
-    }
-    function resultado(r, corriendo) {
-      if (corriendo) return `<div class="tarjeta sim-resultado sim-cargando"><p class="suave">Recorriendo el historial con tus reglas…</p></div>`;
-      if (!r || !r.formato) {
-        return `<div class="tarjeta sim-resultado sim-vacio"><p class="sim-vacio-titulo">Elige un monto y un período, y toca «Simular».</p>
-          <p class="suave">Te muestro qué habría hecho Pilota con ese monto, al lado de quedarte en USDT y de comprar BTC y esperar.</p></div>`;
-      }
-      if (!r.listo) {
-        return `<div class="tarjeta sim-resultado sim-vacio"><p class="sim-vacio-titulo" data-sin-traducir>${esc(Tp(MOTIVOS_SIM[r.motivo] || "No pude simular."))}</p></div>`;
-      }
-      const p = r.pilota || {}, s = p.saltadas || {};
-      const frenados = (s.diario || 0) + (s.racha || 0) + (s.piso || 0);
-      return `<div class="tarjeta sim-resultado">
-        <p class="sim-periodo">${frase("Del {desde} al {hasta} ({dias} días)", { desde: dia(r.desde), hasta: dia(r.hasta), dias: numero(r.dias_reales, 0) })}</p>
-        <div class="sim-tarjetas">
-          ${tarjetaResultado("Con Pilota", "es-pilota", p.saldo, p.rendimiento,
-            frase("{n} operaciones · ganó {g} y perdió {q}", { n: numero(p.operaciones, 0), g: numero(p.ganadas, 0), q: numero(p.perdidas, 0) }))}
-          ${tarjetaResultado("Quedarte en USDT", "es-usdt", r.usdt.saldo, 0, esc(Tp("Sin riesgo y sin ganancia")))}
-          ${tarjetaResultado("Comprar BTC y esperar", "es-btc", r.btc.saldo, r.btc.rendimiento || 0,
-            typeof r.btc.caida_maxima === "number" ? frase("Peor caída: {n}", { n: porcentaje(r.btc.caida_maxima, 1) }) : "")}
-        </div>
-        ${grafico(r)}
-        <ul class="sim-datos">
-          <li><span>Peor caída con Pilota</span><strong data-sin-traducir>${esc(porcentaje(p.caida_maxima || 0, 1))}</strong></li>
-          <li><span>Mejor operación</span><strong data-sin-traducir>${esc(typeof p.mejor === "number" ? usdt(p.mejor) : "–")}</strong></li>
-          <li><span>Peor operación</span><strong data-sin-traducir>${esc(typeof p.peor === "number" ? usdt(p.peor) : "–")}</strong></li>
-          <li><span>Frenos que me pararon</span><strong data-sin-traducir>${esc(numero(frenados, 0))}</strong></li>
-        </ul>
-        <details class="que-es" id="sim-letra-chica"><summary>Lo que tienes que saber de este resultado</summary>
-          <p class="ayuda">Es el pasado, no una promesa: el mercado que viene puede hacer cosas que estos días no hicieron.</p>
-          <p class="ayuda">Usé las reglas de hoy: la reserva del 40 % en USDT, dos posiciones a la vez, 2 % de riesgo por operación, los mínimos de Binance, las comisiones y los frenos.</p>
-          ${r.sin_exigencia ? `<p class="ayuda">Mi puntaje todavía no está calibrado, así que simulé todas las señales permitidas, sin exigencia.</p>` : ""}
-          ${r.topado ? `<p class="ayuda">${frase("Mientras el modelo no esté validado, cada operación usa como máximo {n}. Por eso, con montos grandes, el resultado crece poco.", { n: usdt(r.tope) })}</p>` : ""}
-          ${(s.tamano || 0) ? `<p class="ayuda">${frase("{n} oportunidades no alcanzaron el mínimo de Binance con tu monto.", { n: numero(s.tamano, 0) })}</p>` : ""}
-        </details></div>`;
-    }
-
-    function simular(E) {
-      const s = E.sim || {};
-      const r = s.ultima;
-      const cuenta = ((E.estado || {}).cuentas || []).find((c) => c.ambiente === "prueba") || {};
-      const motor = E.motor || {};
-      return `<div class="centro">
-        <header class="centro-cabeza"><h2>Simula antes de poner un peso</h2>
-          <p class="ayuda">Primero mira qué habría hecho Pilota con tu monto en el pasado. Después pruébalo en vivo con dinero ficticio y precios de verdad.</p></header>
-        <ol class="pasos-centro">
-          <li class="paso-centro tarjeta">
-            <p class="paso-numero" data-sin-traducir>1</p>
-            <h3>Mira el pasado</h3>
-            <label class="campo-monto"><span>¿Cuánto pondrías?</span>
-              <span class="campo-monto-caja"><input id="sim-monto" type="number" inputmode="decimal" min="10" max="1000000" step="1" value="${esc(s.monto || 100)}"><span data-sin-traducir>USDT</span></span></label>
-            <div class="chips" role="group" aria-label="Montos sugeridos">${MONTOS.map((m) => `<button type="button" class="chip" data-sim-monto="${m}" aria-pressed="${Number(s.monto) === m}" data-sin-traducir>${esc(numero(m, 0))}</button>`).join("")}</div>
-            <p class="campo-titulo">¿Desde cuándo?</p>
-            <div class="chips" role="group" aria-label="Período">${PERIODOS.map(([d, t]) => `<button type="button" class="chip" data-sim-dias="${d}" aria-pressed="${Number(s.dias || 90) === d}">${t}</button>`).join("")}</div>
-            <button type="button" class="pz-boton pz-principal boton-ancho" id="sim-correr"${s.corriendo ? " disabled" : ""}>${s.corriendo ? "Simulando…" : "Simular"}</button>
-          </li>
-          <li class="paso-centro paso-resultado">${resultado(r, s.corriendo)}</li>
-        </ol>
-        <div class="paso-centro tarjeta paso-vivo">
-          <p class="paso-numero" data-sin-traducir>2</p>
-          <div class="paso-vivo-texto"><h3>Pruébalo en vivo</h3>
-            <p class="ayuda">Pilota opera desde ahora con dinero ficticio y precios reales de Binance, con todas sus reglas. Así ves cómo se porta antes de arriesgar nada.</p>
-            <p class="vivo-estado">${typeof cuenta.saldo === "number"
-              ? frase("Tu cuenta de prueba: {saldo} · {n} operaciones cerradas", { saldo: usdt(cuenta.saldo), n: numero(cuenta.operaciones || 0, 0) })
-              : "Todavía no tienes cuenta de prueba."}
-              <span class="serie-estado" data-estado="${motor.activo ? "listo" : "vacio"}">${motor.activo ? "Operando en prueba" : (motor.corriendo ? "Motor dormido" : "Motor apagado")}</span></p></div>
-          ${E.real && E.real.activo ? `<p class="freno-texto">Con el dinero real encendido no reinicio la prueba: el motor está operando tu cuenta de Binance.</p>` : ""}
-          <button type="button" class="pz-boton pz-principal" id="sim-vivo"${E.reiniciando || (E.real && E.real.activo) ? " disabled" : ""}>${frase("Empezar con {monto} ficticios", { monto: usdt(Math.round(Number(s.monto) || 100)) })}</button>
-        </div></div>`;
-    }
-
     // ── Operar con dinero de verdad ──
     function requisito(q) {
       const detalle = {
-        simulacion: q.cumple ? frase("Simulaste con {monto}.", { monto: usdt(q.n) }) : esc(Tp("Haz una simulación en la pestaña «Simular».")),
+        simulacion: q.cumple ? frase("Simulaste con {monto}.", { monto: usdt(q.n) }) : esc(Tp("Compara los perfiles en la pestaña «Comparar».")),
         prueba: frase("{dias} de {d} días y {ops} de {o} operaciones cerradas.", { dias: numero(q.dias, 0), d: numero(q.dias_pedidos, 0), ops: numero(q.operaciones, 0), o: numero(q.operaciones_pedidas, 0) }),
         llave: esc(!q.ok ? Tp("Conecta una llave de Binance aquí abajo.")
           : [q.lectura ? null : Tp("le falta permiso de lectura"), q.spot ? null : Tp("le falta permiso para operar spot"),
              q.retiro ? Tp("puede retirar: no se acepta") : null, q.ip ? null : Tp("no está limitada a tu IP")]
             .filter(Boolean).join(" · ") || Tp("Lee, opera spot, no puede retirar y está limitada a tu IP.")),
-        minimos: q.cumple ? frase("Desde {n} se puede operar.", { n: usdt(q.minimo) }) : esc(Tp("Calcúlalos en «Cómo pienso».")),
+        minimos: q.cumple ? frase("Desde {n} se puede operar.", { n: usdt(q.minimo) }) : esc(Tp("Pilota los calcula sola al abrir: espera un momento.")),
         fondos: frase("{fondos} libres en USDT y FDUSD; el mínimo es {minimo}.", { fondos: usdt(q.fondos), minimo: usdt(q.minimo) }),
       }[q.id];
       return `<li class="requisito" data-cumple="${q.cumple ? 1 : 0}">
@@ -228,7 +112,7 @@ window.PilotaCentro = (() => {
         <p class="real-saldo" data-sin-traducir>${esc(usdt(c.saldo))}</p>
         <p class="suave">${frase("Pilota maneja {saldo} de tu cuenta de Binance · {n} operaciones cerradas · {p} posiciones ahora", { saldo: usdt(c.saldo), n: numero(c.operaciones, 0), p: numero(c.posiciones, 0) })}</p>
         ${(ej.motivos || []).map((m) => `<p class="freno-texto" data-sin-traducir>${esc(Tp(ERRORES_REAL[m.codigo] || "Ahora no abro ninguna entrada nueva."))}</p>`).join("")}
-        <p class="ayuda">Lo que pasa minuto a minuto lo ves en «Ahora», igual que en prueba. Las protecciones quedan puestas en Binance aunque apagues el equipo.</p>
+        <p class="ayuda">Lo que pasa minuto a minuto lo ves en «Cabina», igual que en prueba. Las protecciones quedan puestas en Binance aunque apagues el equipo.</p>
         <div class="pz-pie"><button type="button" class="pz-boton" id="real-desactivar"${E.realOcupado ? " disabled" : ""}>Volver a prueba</button>
           <button type="button" class="pz-boton pz-principal pz-peligro" id="real-emergencia"${E.realOcupado ? " disabled" : ""}>Cerrar todo y volver a prueba</button></div></div>`;
     }
@@ -262,7 +146,7 @@ window.PilotaCentro = (() => {
         </div></div>`;
     }
 
-    return { pestanas, panel, simular, operar, ERRORES_REAL, PESTANAS: PESTANAS.map((p) => p[0]) };
+    return { pestanas, panel, operar, ERRORES_REAL, PESTANAS: PESTANAS.map((p) => p[0]) };
   }
 
   return { crear };

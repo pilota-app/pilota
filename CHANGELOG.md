@@ -7,14 +7,21 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
-- Pilota ahora se ordena en cinco pestañas: Ahora, Simular, Operar, Historial y Cómo pienso. *Pilota is now organized in five
-  tabs: Now, Simulate, Trade, History and How I think.*
-- Nuevo: «Simular». Eliges un monto y un período y ves qué habría hecho Pilota con él, con las reglas de hoy, al lado de quedarte
-  en USDT y de comprar BTC y esperar. Después lo pruebas en vivo con ese monto ficticio. *New: "Simulate". Choose an amount and a
-  period and see what Pilota would have done with it, with today's rules, next to staying in USDT and buying BTC and holding.
-  Then try it live with that play money.*
-- Nuevo: «Operar». Conectas tu llave de Binance (se guarda en el llavero del Mac, nunca en un archivo) y, cuando cumples los cinco
-  requisitos, enciendes el dinero real. Una llave que puede retirar no se acepta nunca. *New: "Trade". Connect your Binance key
+- Pilota ahora se ordena en seis pestañas: En vivo, Comparar, Movimientos, Cabina, Dinero real y Avanzado (lo técnico). *Pilota
+  is now organized in six tabs: Live, Compare, Moves, Cockpit, Real money and Advanced (the technical part).*
+- Nuevo: cinco perfiles para el robot: Holding, Conservador, Equilibrado, Trader y Scalper, del más lento al más rápido. *New: five
+  profiles for the robot: Holding, Conservative, Balanced, Trader and Scalper, from slowest to fastest.*
+- Nuevo: «En vivo». Eliges un perfil y un monto ficticio, y el robot opera solo con precios reales de Binance. Ves cuánto vale,
+  lo que tiene y lo que hizo, en palabras. *New: "Live". Choose a profile and a play-money amount, and the robot trades on its own
+  with real Binance prices. You see what it's worth, what it holds and what it did, in words.*
+- Nuevo: «Comparar». Los cinco perfiles con el mismo monto y período del pasado, lado a lado, con la película de lo que hizo cada
+  uno, movimiento por movimiento. *New: "Compare". The five profiles with the same amount and past period, side by side, with a
+  film of what each one did, move by move.*
+- Pilota prepara sola lo que necesita al abrir (los mínimos de Binance, el historial y el muestreo de precios): ya no hay que
+  apretar botones técnicos. *Pilota now prepares what it needs on its own when it opens (Binance's minimums, the history and the
+  price sampling): no more technical buttons to press.*
+- Nuevo: «Dinero real». Conectas tu llave de Binance (se guarda en el llavero del Mac, nunca en un archivo) y, cuando cumples los cinco
+  requisitos, enciendes el dinero real. Una llave que puede retirar no se acepta nunca. *New: "Real money". Connect your Binance key
   (stored in the Mac keychain, never in a file) and, once you meet the five requirements, turn on real money. A key that can
   withdraw is never accepted.*
 - Arreglado: los avisos y algunos textos se traducían dos veces, y el registro podía mostrar un código en vez de un motivo.

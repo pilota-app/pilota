@@ -26,8 +26,12 @@
     modos: null, decision: null, decidiendo: false, respondiendo: "", cambiandoModo: "",
     panel: null, guardandoLocal: false, pidiendoPanel: false,
     // El centro de operaciones: la pestaña de arriba, la simulación con monto y el paso a real.
-    pestana: "ahora", sim: { monto: 100, dias: 90, corriendo: false, ultima: null }, simVivo: false,
-    real: null, realOcupado: false, campos: {} };
+    pestana: "vivo", sim: { monto: 100, dias: 90, corriendo: false, ultima: null }, simVivo: false,
+    real: null, realOcupado: false, campos: {},
+    // El robot en vivo (bin/vivo.py), el perfil que se está eligiendo y la película de la comparación.
+    vivo: null, vivoPerfil: "equilibrado", vivoMonto: 100, vivoOcupado: false, vivoElegir: false, peli: null,
+    // Lo que Pilota prepara sola al abrir: cada cosa se pide una sola vez por sesión.
+    auto: {} };
   // La llave y el secreto mientras se escriben: solo en memoria, nunca en E (que se puede mirar en las pruebas) ni en
   // el HTML. Se borran apenas se mandan.
   const secretos = { "real-llave": "", "real-secreto": "" };
@@ -796,6 +800,14 @@
     binance: "Binance dijo que no", rechazada: "dijiste que no", vencida: "nadie respondió",
     llave_insegura: "la llave ya no es segura", ocupado: "otra revisión en curso", cambio_ambiente: "era de la otra cuenta",
     polvo: "bajo el mínimo de Binance, quedó en tu cuenta",
+    // Por qué el robot en vivo no entró (bin/lib_ejecutor_prueba.py: RECHAZOS).
+    posiciones_llenas: "posiciones llenas", repetida: "esa señal ya estaba puesta", sin_capital: "sin capital",
+    sin_minimos: "sin minimos de Binance", sin_filtros: "sin filtros de Binance",
+    tick: "la protección no cabe en los mínimos de Binance", paso: "la protección no cabe en los mínimos de Binance",
+    cantidad_minima: "la protección no cabe en los mínimos de Binance",
+    nocional_compra: "la protección no cabe en los mínimos de Binance",
+    nocional_stop: "la protección no cabe en los mínimos de Binance",
+    nocional_objetivo: "la protección no cabe en los mínimos de Binance",
   };
   // Por qué quedó anotada una línea (bin/lib_registro.py: RAZONES). Cada paso usa las suyas; el registro acepta solo
   // estos códigos, así que nunca hay una línea sin palabras.
@@ -811,6 +823,7 @@
     freno_diario: "Freno del día", freno_racha: "Freno por racha de pérdidas", freno_piso: "Freno del piso",
     freno_piso_absoluto: "Freno del piso absoluto", freno_comision: "Freno por la comisión",
     freno_fdusd: "Freno por FDUSD", pausa: "Pusiste todo en pausa", reanudar: "Quitaste la pausa",
+    perfil_empezado: "Empezó el robot en vivo", perfil_detenido: "Detuviste el robot", compra_holding: "Compra por partes",
   };
   const ETIQUETA_CIERRE = { objetivo: "el objetivo", stop: "el stop", stop_movil: "el stop móvil", manual: "tu decisión" };
   // Lo que se puede decir de una línea: solo las claves que conocemos (del Python vienen números y códigos, nunca
@@ -1261,7 +1274,7 @@
       <span class="tramo-nombre">${frase("{n} min sin cubrir", { n: numero(v.min, 0) })}</span>
       <span class="serie-estado" data-estado="${v.abierto ? "incompleto" : "vacio"}">${v.abierto ? "Abierta" : "Cerrada"}</span>
       <span class="serie-detalle">${frase("desde el {cuando}", { cuando: fechaHora(v.desde) })}</span>
-      <span class="serie-detalle">${Tp(VENTANAS_MOTOR[v.motivo] || "sin cobertura")}</span></li>`;
+      <span class="serie-detalle">${frase(VENTANAS_MOTOR[v.motivo] || "sin cobertura", {})}</span></li>`;
   }
   function botonMotor(m) {
     if (m.corriendo) {
@@ -1398,11 +1411,13 @@
   });
   // ── «Cómo pienso»: cada pieza por separado, con sus números (la pestaña de lo técnico) ──
   const centroUI = PilotaCentro.crear({ i18n, esc, numero, usdt, porcentaje, fechaHora });
+  const vivoUI = PilotaVivo.crear({ i18n, esc, numero, usdt, porcentaje, fechaHora, robot: panelUI.robot,
+    motivoCorto: (c) => MOTIVO_CORTO[c] || "otro motivo" });
   function comoPienso() {
     const series = (E.datos && Array.isArray(E.datos.series)) ? E.datos.series : [];
     return `
         <h2>Cómo trabaja Pilota, paso a paso</h2>
-        <p class="ayuda">Aquí está cada pieza por separado, con sus números: de dónde salen los datos, cómo se puntúa una oportunidad, cuánto se pone en cada operación y qué la frena. Lo que ves en «Ahora» no sale de otra parte.</p>
+        <p class="ayuda">Aquí está cada pieza por separado, con sus números: de dónde salen los datos, cómo se puntúa una oportunidad, cuánto se pone en cada operación y qué la frena. Lo que ves en «En vivo» y en «Cabina» no sale de otra parte.</p>
         <h2>Datos del mercado</h2>
         <p class="suave">${frase("Velas cerradas de Binance de los últimos {n} días. Pilota decide solo con velas cerradas y continuas.", { n: (E.datos && E.datos.dias) || DIAS })}</p>
         ${estadoDatos()}
@@ -1485,10 +1500,11 @@
       <button type="button" class="pz-boton" id="abrir-ajustes">Ajustes</button></header>
       ${banda()}
       <main class="contenido">
+        ${centroUI.panel("vivo", E.pestana, vivoUI.vivo(E))}
+        ${centroUI.panel("comparar", E.pestana, vivoUI.comparar(E))}
+        ${centroUI.panel("movimientos", E.pestana, vivoUI.movimientos(E, panelUI.registro(E.panel)))}
         ${centroUI.panel("ahora", E.pestana, panelUI.html(E.panel, { respondiendo: E.respondiendo }))}
-        ${centroUI.panel("simular", E.pestana, centroUI.simular(E))}
         ${centroUI.panel("operar", E.pestana, centroUI.operar(E))}
-        ${centroUI.panel("historial", E.pestana, panelUI.registro(E.panel))}
         ${centroUI.panel("como", E.pestana, comoPienso())}
       </main>`;
   }
@@ -1546,7 +1562,56 @@
     const b = ev.target.closest("button");
     if (!b) return;
     if (b.dataset.pestana) irA(b.dataset.pestana);
-    else if (b.dataset.simMonto) {
+    else if (b.dataset.irPestana) irA(b.dataset.irPestana);
+    else if (b.dataset.perfil) {
+      E.vivoPerfil = b.dataset.perfil;
+      pintar();
+    } else if (b.dataset.vivoMonto) {
+      E.vivoMonto = Number(b.dataset.vivoMonto);
+      delete E.campos["vivo-monto"];
+      pintar();
+    } else if (b.id === "vivo-empezar") {
+      const monto = Math.round(Number(E.campos["vivo-monto"] ?? E.vivoMonto));
+      if (!(monto >= 10 && monto <= 1000000)) { toast(Tp("Elige un monto entre 10 y 1.000.000 USDT."), { error: true }); return; }
+      if (E.vivo && E.vivo.perfil) {
+        const si = await ui.confirmar({ titulo: "¿Empezar de nuevo?",
+          texto: "Tu cuenta de prueba parte de nuevo con {monto} ficticios. Lo que hizo el robot hasta ahora queda en el registro.",
+          valores: { monto: usdt(monto) }, si: "Empezar" });
+        if (!si) return;
+      }
+      E.vivoOcupado = true;
+      E.vivoMonto = monto;
+      pintar();
+      host.enviar("vivoEmpezar", { perfil: E.vivoPerfil, monto });
+    } else if (b.id === "vivo-detener") {
+      E.vivoOcupado = true;
+      pintar();
+      host.enviar("vivoDetener", {});
+    } else if (b.id === "vivo-cambiar") {
+      E.vivoElegir = true;
+      if (E.vivo && E.vivo.perfil) E.vivoPerfil = E.vivo.perfil;
+      pintar();
+    } else if (b.id === "vivo-volver") {
+      E.vivoElegir = false;
+      pintar();
+    } else if (b.dataset.comparar) {
+      const p = (((E.sim.ultima || {}).perfiles) || []).find((x) => x.perfil === b.dataset.comparar);
+      E.peli = { perfil: b.dataset.comparar, i: 0, jugando: true, total: ((p || {}).movimientos || []).length };
+      pintar();
+      document.getElementById("peli")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    } else if (b.id === "peli-play") {
+      const P = E.peli || {};
+      if (P.jugando) P.jugando = false;
+      else { if ((P.i || 0) >= (P.total || 0)) P.i = 0; P.jugando = true; }
+      pintarPeli();
+    } else if (b.dataset.usarPerfil) {
+      E.vivoPerfil = b.dataset.usarPerfil;
+      E.vivoMonto = Math.round(Number(E.campos["sim-monto"] ?? E.sim.monto)) || E.vivoMonto;
+      delete E.campos["vivo-monto"];
+      E.vivoElegir = true;
+      if (E.peli) E.peli.jugando = false;
+      irA("vivo");
+    } else if (b.dataset.simMonto) {
       E.sim.monto = Number(b.dataset.simMonto);
       delete E.campos["sim-monto"];
       pintar();
@@ -1559,17 +1624,6 @@
       E.sim = { ...E.sim, monto, corriendo: true };
       pintar();
       host.enviar("simularCorrer", { monto, dias: E.sim.dias });
-    } else if (b.id === "sim-vivo") {
-      const monto = Math.round(Number(E.campos["sim-monto"] ?? E.sim.monto));
-      if (!(monto >= 10 && monto <= 1000000)) { toast(Tp("Elige un monto entre 10 y 1.000.000 USDT."), { error: true }); return; }
-      const si = await ui.confirmar({ titulo: "¿Empezar la prueba en vivo?",
-        texto: "Tu cuenta de prueba parte de nuevo con {monto} ficticios y Pilota empieza a mirar el mercado. Queda anotado en el registro.",
-        valores: { monto: usdt(monto) }, si: "Empezar" });
-      if (!si) return;
-      E.reiniciando = true;
-      E.simVivo = true;
-      pintar();
-      host.enviar("estadoReiniciar", { saldo: monto });
     } else if (b.id === "real-conectar") {
       const llave = (secretos["real-llave"] || "").trim(), secreto = (secretos["real-secreto"] || "").trim();
       if (!/^[A-Za-z0-9]{32,128}$/.test(llave) || !/^[A-Za-z0-9]{32,128}$/.test(secreto)) {
@@ -1746,7 +1800,9 @@
   function irA(id, enfocar = true) {
     if (!centroUI.PESTANAS.includes(id)) return;
     E.pestana = id;
-    if (id === "simular" && !E.sim.ultima) host.enviar("simularEstado", {});
+    if (id === "comparar" && !E.sim.ultima) host.enviar("simularEstado", {});
+    if (id === "vivo" || id === "movimientos") host.enviar("vivoEstado", {});
+    if (id !== "comparar" && E.peli) E.peli.jugando = false;
     if (id === "operar") host.enviar("realEstado", {});
     pintar();
     if (enfocar) document.getElementById(`tab-${id}`)?.focus();
@@ -1756,7 +1812,7 @@
     const el = ev.target;
     if (!el || !el.id) return;
     if (el.id in secretos) secretos[el.id] = el.value;
-    else if (["sim-monto", "real-presupuesto", "real-frase"].includes(el.id)) E.campos[el.id] = el.value;
+    else if (["sim-monto", "vivo-monto", "real-presupuesto", "real-frase"].includes(el.id)) E.campos[el.id] = el.value;
   });
   document.addEventListener("keydown", (ev) => {
     const tab = ev.target && ev.target.closest && ev.target.closest('[role="tab"]');
@@ -1780,6 +1836,44 @@
       host.enviar("panelEstado", {});
     }
   }, 1000);
+
+  // ── Lo que Pilota prepara sola al abrir ──
+  // La persona no tiene que saber qué es el muestreo, el historial o el capital mínimo: si falta, se pide solo, una vez
+  // por sesión. En la vista previa no (ahí cada botón se prueba a mano), salvo con ?auto.
+  function prepararSola() {
+    const enDemo = host.plataforma === "web" && !new URLSearchParams(location.search).has("auto");
+    if (enDemo || !E.iniciada) return;
+    const una = (clave, accion, datos = {}) => {
+      if (E.auto[clave]) return;
+      E.auto[clave] = true;
+      host.enviar(accion, datos);
+    };
+    if (E.minimo && !E.minimo.calculado) una("minimo", "minimoCalcular", { capital: CAPITAL_PRUEBA });
+    if (E.muestreo && !E.muestreo.corriendo) una("muestreo", "muestreoEncender");
+    const h = E.historial;
+    if (h && !h.corriendo && !(Number(h.pct) >= 100 && h.continuo !== false)) una("historial", "historialDescargar");
+    if (E.vivo && E.vivo.activo && E.motor && !E.motor.corriendo) una("motor", "motorEncender");
+  }
+  // La película de la comparación: solo se vuelve a pintar su recuadro, no la pantalla entera.
+  function pintarPeli() {
+    const el = document.getElementById("peli");
+    if (!el) return;
+    el.innerHTML = vivoUI.pelicula(E);
+    i18n.traducirDOM(el);
+  }
+  setInterval(() => {
+    const P = E.peli;
+    if (!P || !P.jugando || E.pestana !== "comparar") return;
+    P.i = Math.min((P.i || 0) + 1, P.total || 0);
+    if (P.i >= (P.total || 0)) P.jugando = false;
+    pintarPeli();
+  }, 450);
+  // El robot en vivo se mira de nuevo cada 30 segundos mientras su pestaña está a la vista (el motor decide cada 5 min).
+  setInterval(() => {
+    if (bv.activa || !E.vivo || !E.vivo.activo || !["vivo", "movimientos"].includes(E.pestana)) return;
+    host.enviar("vivoEstado", {});
+    host.enviar("motorEstado", {});
+  }, 30000);
 
   // ── Lo que manda la app ──
   host.responder({
@@ -1810,9 +1904,30 @@
         host.enviar("panelEstado", {});      // y todo eso junto, como se ve en la pantalla principal
         host.enviar("simularEstado", {});    // la última simulación con monto, si hay
         host.enviar("realEstado", {});       // y si hay llave de Binance, los requisitos y si el dinero real está encendido
+        host.enviar("vivoEstado", {});       // y el robot en vivo: con qué perfil, cuánto vale y qué hizo
         const q = new URLSearchParams(location.search).get("pestana");
         if (q && centroUI.PESTANAS.includes(q)) E.pestana = q;
       }
+      pintar();
+    },
+    // ── El robot en vivo ──
+    vivoListo(r) {
+      const antes = E.vivo;
+      E.vivoOcupado = false;
+      if (r && r.datos) E.vivo = r.datos;
+      if (r && r.ok === false) toast(Tp(vivoUI.ERRORES_VIVO[r.error] || "No se pudo."), { error: true });
+      else if (E.vivo && E.vivo.activo && !(antes && antes.activo && antes.desde_ms === E.vivo.desde_ms)) {
+        if (antes !== null) {
+          E.vivoElegir = false;
+          toast(Tp("Listo: el robot empezó con {monto} ficticios. Te cuento cada cosa que haga.", { monto: usdt(E.vivo.monto) }));
+          host.enviar("estadoArrancar", {});
+          host.enviar("panelEstado", {});
+          host.enviar("realEstado", {});
+          // Sin el motor encendido, nadie da las vueltas: se enciende al empezar.
+          if (!(E.motor && E.motor.corriendo)) { E.encendiendoMotor = true; host.enviar("motorEncender", {}); }
+        }
+      }
+      prepararSola();
       pintar();
     },
     // ── El centro de operaciones: la simulación con monto y el paso a real ──
@@ -1840,7 +1955,7 @@
       if (r && r.ok) {
         delete E.campos["real-frase"];
         const ahora = !!(E.real && E.real.activo);
-        if (ahora && !antes) toast(Tp("Listo: Pilota opera con dinero real. Lo ves en «Ahora»."));
+        if (ahora && !antes) toast(Tp("Listo: Pilota opera con dinero real. Lo ves en «Cabina»."));
         else if (!ahora && antes) toast(Tp("Listo: volviste a prueba."));
         else toast(Tp("Listo."));
         host.enviar("estadoArrancar", {});
@@ -1888,6 +2003,7 @@
     },
     minimoEstadoListo(r) {
       if (r && r.ok && r.datos) E.minimo = r.datos;
+      prepararSola();
       pintar();
     },
     minimoCalculoListo(r) {
@@ -1900,6 +2016,7 @@
     // ── Los dos trabajos en segundo plano: el avance llega en los eventos de progreso, el final en la respuesta ──
     historialEstadoListo(r) {
       if (r && r.ok && r.datos) E.historial = r.datos;
+      prepararSola();
       pintar();
     },
     historialProgreso(e) {
@@ -1924,6 +2041,7 @@
     },
     muestreoEstadoListo(r) {
       if (r && r.ok && r.datos) E.muestreo = r.datos;
+      prepararSola();
       pintar();
     },
     muestreoProgreso(e) {
@@ -2049,6 +2167,7 @@
     // `motorRevisar` reconcilia la ventana que nadie miró, así que después de él el estado y los frenos cambiaron.
     motorEstadoListo(r) {
       if (r && r.ok && r.datos) E.motor = r.datos;
+      prepararSola();
       pintar();
     },
     motorRevisado(r) {
@@ -2170,7 +2289,7 @@
           E.encendiendoMotor = true;
           host.enviar("motorEncender", {});
           host.enviar("realEstado", {});
-          E.pestana = "ahora";
+          E.pestana = "vivo";
         }
       } else {
         E.simVivo = false;
@@ -2295,7 +2414,65 @@
         operaciones: pasos, ganadas, perdidas, mejor: monto * 0.011, peor: -monto * 0.007,
         saltadas: { diario: 0, racha: 1, piso: 0, posiciones: 2, tamano: 0 } },
       usdt: { saldo: monto, rendimiento: 0 }, btc: { saldo: b, rendimiento: (b - monto) / monto, caida_maxima: 0.12, curva: btc },
-      sin_exigencia: true, topado: true, tope: 15 };
+      sin_exigencia: true, topado: true, tope: 15, perfiles: perfilesDemo(monto, desde, hasta), sugerido: "equilibrado" };
+  }
+  // Los cinco perfiles de la vista previa: números inventados, con la forma que devuelve lib_simulacion.comparar.
+  function perfilesDemo(monto, desde, hasta) {
+    const ritmo = { holding: 0, conservador: 6, equilibrado: 14, trader: 30, scalper: 60 };
+    return ["holding", "conservador", "equilibrado", "trader", "scalper"].map((perfil, k) => {
+      const d0 = perfil === "scalper" ? Math.max(desde, hasta - 30 * 86400000) : desde;
+      let saldo = monto, techo = monto, caida = 0;
+      const curva = [[d0, monto]], movimientos = [];
+      const n = perfil === "holding" ? 12 : ritmo[perfil];
+      for (let i = 1; i <= n; i++) {
+        const x = d0 + (hasta - d0) * i / (n + 1);
+        const par = i % 3 ? "BTCFDUSD" : "ETHFDUSD", precio = par === "BTCFDUSD" ? 95000 + i * 120 : 3500 + i * 6;
+        if (perfil === "holding") {
+          movimientos.push({ ms: x, que: "compra", par, precio, monto: monto / 12, estrategia: "holding", temporalidad: "1d" });
+          saldo = monto * (1 + Math.sin(i / 2) * 0.03 + i * 0.004);
+        } else {
+          const r = Math.sin(i * (1.3 + k / 5)) * 0.012 + 0.0015, nocional = saldo * 0.3;
+          movimientos.push({ ms: x - 3600000, que: "compra", par, precio, monto: nocional, stop: precio * 0.99, objetivo: precio * 1.015, estrategia: "rebote", temporalidad: "1h" });
+          saldo += nocional * r;
+          movimientos.push({ ms: x, que: "venta", par, precio: precio * (r > 0 ? 1.015 : 0.99), monto: nocional, por: r > 0 ? "objetivo" : "stop", ganancia: nocional * r, saldo });
+        }
+        techo = Math.max(techo, saldo);
+        caida = Math.max(caida, (techo - saldo) / techo);
+        curva.push([x, saldo]);
+      }
+      curva.push([hasta, saldo]);
+      return { perfil, listo: true, motivo: "", desde_ms: d0, hasta_ms: hasta, recortado: d0 > desde, saldo,
+        ganancia: saldo - monto, rendimiento: (saldo - monto) / monto, caida_maxima: caida, curva,
+        operaciones: perfil === "holding" ? 12 : n, movimientos, movimientos_total: movimientos.length };
+    });
+  }
+  // El robot en vivo de la vista previa: parte sin perfil; al empezar, ya hizo unas cosas en las últimas horas.
+  function vivoDemo() {
+    const v = DEMO.vivo;
+    if (!v) return { formato: 1, activo: false, perfil: "", monto: 0, movimientos: [], posiciones: [], tenencias: [] };
+    const h = 3600000, t0 = v.desde_ms, m = v.monto;
+    const linea = (ms, razon, par, orden, resultado) => ({ ms, fecha: new Date(ms).toISOString(), par, razon, orden, resultado });
+    const movs = v.perfil === "holding"
+      ? [linea(t0 + 60000, "compra_holding", "BTCFDUSD", { precio: 97250, cantidad: m / 12 * 0.6 / 97250, monto: m / 12 * 0.6 }, {}),
+        linea(t0 + 60000, "compra_holding", "ETHFDUSD", { precio: 3610, cantidad: m / 12 * 0.4 / 3610, monto: m / 12 * 0.4 }, {})]
+      : [linea(t0 + 0.5 * h, "entrada_rebote", "BTCFDUSD", { precio: 97250, monto: m * 0.3, stop: 96400, objetivo: 98600, estado: "puesta" }, {}),
+        linea(t0 + 0.9 * h, "entrada_rebote", "BTCFDUSD", { precio: 97250, monto: m * 0.3, stop: 96400, objetivo: 98600, estado: "llenada" }, {}),
+        linea(t0 + 2.2 * h, "objetivo", "BTCFDUSD", {}, { precio: 98600, neto: m * 0.3 * 0.0125, saldo: m * 1.0037 }),
+        linea(t0 + 2.6 * h, "rechazo", "ETHFDUSD", {}, { motivo: "bajo_minimo" }),
+        linea(t0 + 2.8 * h, "entrada_ruptura", "ETHFDUSD", { precio: 3610, monto: m * 0.25, stop: 3560, objetivo: 3665, estado: "llenada" }, {})];
+    movs.push(linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m }));
+    movs.sort((a, b) => b.ms - a.ms);
+    const holding = v.perfil === "holding";
+    const tenencias = holding ? [
+      { par: "BTCFDUSD", cantidad: m / 12 * 0.6 / 97250, gastado: m / 12 * 0.6, precio_ahora: 97800, valor: m / 12 * 0.6 / 97250 * 97800, precio_medio: 97250 },
+      { par: "ETHFDUSD", cantidad: m / 12 * 0.4 / 3610, gastado: m / 12 * 0.4, precio_ahora: 3592, valor: m / 12 * 0.4 / 3610 * 3592, precio_medio: 3610 }] : [];
+    const posiciones = holding || !v.activo ? [] : [{ par: "ETHFDUSD", estado: "abierta", precio: 3610, precio_ahora: 3622,
+      stop: 3560, objetivo: 3665, monto: m * 0.25, ganancia: m * 0.25 * (12 / 3610) }];
+    const valor = holding ? m * 11 / 12 + tenencias.reduce((a, x) => a + x.valor, 0) : m * 1.0037 + (posiciones[0] ? posiciones[0].ganancia : 0);
+    return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
+      ganancia_relativa: valor / m - 1, efectivo: holding ? m * 11 / 12 : m * 1.0037 - m * 0.25, posiciones, tenencias,
+      ultima: holding ? { decision: "esperando", proxima_ms: t0 + 7 * 24 * h } : { decision: "sin_senal" },
+      movimientos: movs };
   }
   function realDemo() {
     DEMO.real = DEMO.real || { conectado: false, pista: "", conexion: { ok: false }, activo: false, cuenta: { existe: false } };
@@ -2324,6 +2501,15 @@
         const cliente = mcpDemo().clientes.find((x) => x.id === d.cliente);
         if (cliente) Object.assign(cliente, { conectado: d.orden === "conectar", al_dia: true });
         c.responder("mcpListo", { ok: true, ...mcpDemo(), orden: d.orden, cliente: d.cliente });
+      });
+      case "vivoEstado": return c.responder("vivoListo", { ok: true, datos: vivoDemo() });
+      case "vivoEmpezar": return c.luego(400, () => {
+        DEMO.vivo = { perfil: d.perfil, monto: Number(d.monto), activo: true, desde_ms: Date.now() - 3 * 3600000 };
+        c.responder("vivoListo", { ok: true, datos: vivoDemo() });
+      });
+      case "vivoDetener": return c.luego(200, () => {
+        if (DEMO.vivo) DEMO.vivo.activo = false;
+        c.responder("vivoListo", { ok: true, datos: vivoDemo() });
       });
       case "simularEstado": return c.responder("simularEstadoListo", { ok: true, datos: { ultima: DEMO.simulacion || {} } });
       case "simularCorrer": return c.luego(700, () => {

@@ -35,7 +35,8 @@ PARES_OPERADOS = ("BTCFDUSD", "ETHFDUSD")
 TEMPORALIDADES = ("1h", "4h", "1d")
 #: El minuto va aparte: solo de los pares que se operan y solo los últimos días (el ejecutor de prueba y reconciliar).
 MINUTO = "1m"
-PASO_MS = {MINUTO: 60_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+PASO_MS = {MINUTO: 60_000, "5m": 300_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+#: «5m» no se baja ni se guarda: se arma con las de 1 m (lib_perfiles.agrupar), para el perfil más rápido.
 DIA_MS = 86_400_000
 #: Lo primero que se baja para poder calcular: 90 días. Los 3 años vienen después, en segundo plano.
 DIAS_MINIMOS = 90

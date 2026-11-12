@@ -59,6 +59,12 @@ cuentas ni publicidad; nada personal en el código (Ana Pérez, Matías Soto). B
 | `bin/lib_panel.py` | La pantalla principal en un solo lugar: el saldo con su línea del piso (`saldo_de`), los medidores de puntaje y exigencia por par (`medidor_de`), las posiciones como se ven (`posicion_de`), la línea diaria (`dia_de`), lo que cuenta la mascota (`mascota_de`, `ANIMOS`, `CUENTOS`), la moneda de referencia que escribe la persona (`local`, `guardar_local`, `MONEDA_LOCAL`) y todo junto (`estado`, `MOTIVOS`, `parametros`). No decide ni opera nada. No es una acción. |
 | `bin/panel.py` | Las dos acciones de la pantalla principal: `estado` (todo lo que se ve al abrir, sin tocar la red) y `local` (la moneda de referencia y a cuánto está un USDT en ella). |
 | `ui/panel.js` | La pantalla principal dibujada (`PilotaPanel.crear`): la mascota y su línea diaria, el saldo con su piso y su referencia local, los medidores, las posiciones, las propuestas con su cuenta atrás (`latir`), el motor y el registro. Las etiquetas que ya existen se las pasa `ui/app.js`. |
+| `bin/lib_perfiles.py` | Los cinco perfiles (`PERFILES`, `ORDEN`, `SUGERIDO`): qué temporalidades mira cada uno, la ganancia/riesgo mínima, el riesgo por operación y cuántas posiciones (`acepta`, `relacion`, `tamano`), y las velas de 5 m armadas con las de 1 m (`agrupar`, `serie`). No es una acción. |
+| `bin/lib_piloto.py` | El robot en vivo, solo en prueba: empezar con un perfil y un monto (`empezar`, `detener`), la vuelta que engancha el motor (`decidir`: con perfil opera el perfil, sin perfil o en real deciden los tres modos), las señales de la última vela cerrada (`senales_de_ahora`), el holding por partes y lo que lee la pantalla (`estado`, `movimientos`). No es una acción. |
+| `bin/vivo.py` | Las tres acciones del robot en vivo: `estado`, `empezar` (perfil y monto) y `detener`. |
+| `bin/lib_simulacion.py` | «Si hubiera puesto X»: el historial como una cartera con tamaño y frenos (`cartera`, con `perfil` y sus `movimientos`), comprar BTC y esperar, el holding por partes (`holding`), el scalper sobre 5 m (`ops_rapidas`) y los cinco perfiles lado a lado (`comparar`). No es una acción (la corre `bin/simular.py`). |
+| `ui/vivo.js` | Las pestañas «En vivo», «Comparar» (con la película de movimientos) y «Movimientos» (`PilotaVivo.crear`). Los movimientos se cuentan en frases completas desde los códigos del registro. |
+| `ui/centro.js` | Las pestañas de arriba y «Dinero real» (requisitos, llave de Binance e interruptor). |
 <!-- La app: suma una fila por cada carpeta o archivo propio importante (qué es y qué hay adentro), sin repetir lo de arriba. -->
 
 ## Los datos de mercado
@@ -601,6 +607,34 @@ Reglas que no se cambian sin pensarlo dos veces:
   `lib_ejecutor_prueba.repetida`): revisar de nuevo no abre dos posiciones por una señal.
 - **Es el gancho del motor** (`lib_reconciliar.reconciliar(decidir=…)`, que `bin/motor.py` conecta en `revisar` y en el
   trabajo): la revisión deja el mundo al día y recién entonces se decide, con los frenos ya aplicados.
+
+## Los perfiles y el robot en vivo
+
+Lo que ve la persona primero es el robot (`ui/vivo.js`, pestaña «En vivo»): elige un perfil y un monto ficticio, y el motor
+opera solo con precios reales de Binance (`bin/lib_piloto.py`). «Comparar» corre los cinco perfiles sobre el pasado con el
+mismo monto (`lib_simulacion.comparar`), y «Movimientos» cuenta todo lo que hizo, en palabras.
+
+| Perfil | Velas | Ganancia/riesgo mínima | Riesgo | Posiciones |
+|---|---|---|---|---|
+| holding | 1 d | — (compra BTC 60 % y ETH 40 % en 12 partes, una por semana, y mantiene) | — | — |
+| conservador | 4 h | 2 | 1 % | 1 |
+| equilibrado (el sugerido) | 1 h y 4 h | 1,5 | 1,5 % | 2 |
+| trader | 1 h | 1 | 2 % | 2 |
+| scalper | 5 m (armadas con las de 1 m; en el pasado, solo 30 días) | 1 | 1 % | 2 |
+
+Reglas que no se cambian sin pensarlo dos veces:
+- **Las mismas reglas en el pasado y en vivo.** `lib_perfiles` es el único lugar de los números, y lo usan `lib_simulacion` y
+  `lib_piloto`. Un perfil solo puede achicar el riesgo (`lib_tamano.RIESGO` es el techo, lo revisa un `assert`).
+- **Solo en prueba.** Con el ambiente real activo, `lib_piloto.decidir` no hace nada propio y deciden los tres modos. Empezar
+  reinicia el saldo de prueba (`lib_estado.reiniciar`, queda en el registro con `perfil_empezado`).
+- **La orden pasa por lo de siempre**: el tamaño del perfil, `lib_frenos` y `lib_ejecutor_prueba.entrar`, que no abre nada sin
+  su protección. El robot no tiene un camino propio para poner una orden.
+- **Cada vela se mira una sola vez** (`vistas` en `piloto.json`) y **una vela atrasada no es una señal de ahora**
+  (`sin_datos`). Por eso el muestreo deja al día también las velas de 1 h, 4 h y 1 d (`muestreo.velas_al_dia`).
+- **Las compras del holding viven en `estado/piloto.json`**, no en el estado firmado: es dinero ficticio y no tiene órdenes.
+  Cada compra queda en el registro (`compra_holding`).
+- **Pilota prepara sola lo que falta al abrir** (`prepararSola` en `ui/app.js`): los mínimos, el muestreo, el historial y,
+  con el robot en marcha, el motor. Cada cosa se pide una vez por sesión; en la vista previa no, salvo con `?auto`.
 
 ## La pantalla principal
 
