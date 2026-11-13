@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""lib_perfiles — las cinco formas de operar de Pilota. Solo biblioteca estándar. No es una acción.
+"""lib_perfiles — las formas de operar de Pilota. Solo biblioteca estándar. No es una acción.
 
 Un perfil es un juego de reglas, no una opinión. Los mismos números se usan en las dos partes:
 - en **Comparar** (el pasado, `lib_simulacion`), y
@@ -14,6 +14,11 @@ Así lo que se ve en vivo es coherente con lo que mostró la comparación.
 | trader | muchas operaciones chicas | 1 h | 1 | 2 % | 2 |
 | scalper | el más rápido: entra y sale en minutos | 5 m | 1 | 1 % | 2 |
 | rotacion | tiene las 2 monedas más fuertes de las 8 y cambia cuando otra las pasa | 1 d | — | — | 2 |
+
+**Se ofrecen solo dos** (`ORDEN`): holding y rotacion. Los cuatro perfiles de señales (conservador, equilibrado, trader y
+scalper) quedan **retirados**: perdieron contra quedarse en USDT con datos reales (nov 2026) y la pantalla ya no los ofrece.
+Sus reglas siguen aquí porque la máquina de señales es la misma que usan los tres modos del dinero real, y sus pruebas la
+cuidan. Un perfil retirado que estaba andando se detiene solo (`vivo.retirar`).
 
 Cada perfil de señales mira sus propias monedas, contra USDT (`pares`): el conservador solo las tres más grandes, el trader
 las ocho. Las monedas son las de `lib_datos.UNIVERSO`.
@@ -45,8 +50,10 @@ PERFILES = {
     "rotacion": {"tipo": "rotar", "temporalidades": ("1d",), "posiciones": 2, "pares": lib_datos.UNIVERSO,
                  "dias_fuerza": 30, "media": 50, "margen": 1},
 }
-ORDEN = ("holding", "conservador", "equilibrado", "trader", "scalper", "rotacion")
-SUGERIDO = "equilibrado"
+#: Los que se ofrecen, en el orden de la pantalla. El resto está retirado (ver arriba).
+ORDEN = ("holding", "rotacion")
+RETIRADOS = ("conservador", "equilibrado", "trader", "scalper")
+SUGERIDO = "holding"
 #: Las velas que no se guardan tal cual: se arman juntando velas de 1 m.
 AGRUPADAS = {"5m": 5}
 

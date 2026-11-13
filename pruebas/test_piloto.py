@@ -59,8 +59,9 @@ class Base(unittest.TestCase):
 
 
 class Perfiles(unittest.TestCase):
-    def test_hay_seis_y_el_sugerido_existe(self):
-        self.assertEqual(perfiles.ORDEN, ("holding", "conservador", "equilibrado", "trader", "scalper", "rotacion"))
+    def test_se_ofrecen_dos_y_el_sugerido_existe(self):
+        self.assertEqual(perfiles.ORDEN, ("holding", "rotacion"))
+        self.assertTrue(all(p in perfiles.PERFILES and p not in perfiles.ORDEN for p in perfiles.RETIRADOS))
         self.assertIn(perfiles.SUGERIDO, perfiles.PERFILES)
 
     def test_ningun_perfil_arriesga_mas_que_el_tamano(self):

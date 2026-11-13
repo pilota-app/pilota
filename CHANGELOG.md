@@ -7,6 +7,11 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- Pilota ahora ofrece solo dos perfiles: Holding (el sugerido) y Rotación (marcada como experimento). Conservador, Equilibrado,
+  Trader y Scalper se retiraron porque perdieron contra quedarse en USDT con datos reales; si tenías uno andando, se detiene
+  solo y lo abierto sigue protegido. *Pilota now offers only two profiles: Holding (the suggested one) and Rotation (marked as
+  an experiment). Conservative, Balanced, Trader and Scalper were retired because they lost against staying in USDT with real
+  data; if you had one running, it stops on its own and anything open stays protected.*
 - «Comparar» dice de cada perfil si le ganó a quedarte en USDT y a comprar BTC, o cuánto perdió. En «En vivo», los perfiles
   que perdieron quedan aparte, plegados y marcados «solo para experimentar», y el perfil de partida es el que mejor le fue.
   *"Compare" now says for each profile whether it beat staying in USDT and buying BTC, or how much it lost. In "Live", the

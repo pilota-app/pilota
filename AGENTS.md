@@ -59,16 +59,17 @@ cuentas ni publicidad; nada personal en el código (Ana Pérez, Matías Soto). B
 | `bin/lib_panel.py` | La pantalla principal en un solo lugar: el saldo con su línea del piso (`saldo_de`), los medidores de puntaje y exigencia por par (`medidor_de`), las posiciones como se ven (`posicion_de`), la línea diaria (`dia_de`), lo que cuenta la mascota (`mascota_de`, `ANIMOS`, `CUENTOS`), la moneda de referencia que escribe la persona (`local`, `guardar_local`, `MONEDA_LOCAL`) y todo junto (`estado`, `MOTIVOS`, `parametros`). No decide ni opera nada. No es una acción. |
 | `bin/panel.py` | Las dos acciones de la pantalla principal: `estado` (todo lo que se ve al abrir, sin tocar la red) y `local` (la moneda de referencia y a cuánto está un USDT en ella). |
 | `ui/panel.js` | La pantalla principal dibujada (`PilotaPanel.crear`): la mascota y su línea diaria, el saldo con su piso y su referencia local, los medidores, las posiciones, las propuestas con su cuenta atrás (`latir`), el motor y el registro. Las etiquetas que ya existen se las pasa `ui/app.js`. |
-| `bin/lib_perfiles.py` | Los cinco perfiles (`PERFILES`, `ORDEN`, `SUGERIDO`): qué temporalidades mira cada uno, la ganancia/riesgo mínima, el riesgo por operación y cuántas posiciones (`acepta`, `relacion`, `tamano`), y las velas de 5 m armadas con las de 1 m (`agrupar`, `serie`). No es una acción. |
+| `bin/lib_perfiles.py` | Los perfiles (`PERFILES`; se ofrecen los de `ORDEN`: holding y rotación; `RETIRADOS` los de señales; `SUGERIDO`): qué temporalidades mira cada uno, la ganancia/riesgo mínima, el riesgo por operación y cuántas posiciones (`acepta`, `relacion`, `tamano`), y las velas de 5 m armadas con las de 1 m (`agrupar`, `serie`). No es una acción. |
 | `bin/lib_piloto.py` | El robot en vivo, solo en prueba: empezar con un perfil y un monto (`empezar`, `detener`), la vuelta que engancha el motor (`decidir`: con perfil opera el perfil, sin perfil o en real deciden los tres modos), las señales de la última vela cerrada (`senales_de_ahora`), el holding por partes y lo que lee la pantalla (`estado`, `movimientos`). No es una acción. |
 | `bin/vivo.py` | Las acciones del robot en vivo: `estado`, `empezar` (perfil y monto), `detener`, `grafico` (velas, marcas de compra y venta y líneas de lo abierto) y el trabajo `encender` (el flujo de Binance al segundo: guarda cada vela de 1 m al cerrar y revisa en ese mismo instante). |
 | `bin/lib_flujo.py` | El flujo de Binance en vivo por WebSocket, solo biblioteca estándar: un solo destino (`HOST`, `PUERTO`, `ruta_de`), el saludo revisado, marcos con tope, ping/pong, silencio que corta (`SILENCIO_MAXIMO`) y cada mensaje revisado (`vela_de`). Solo lectura. No es una acción. |
 | `bin/lib_radar.py` | Qué está esperando el robot: por par y temporalidad del perfil, el gatillo de cada estrategia (a qué precio tendría que cerrar la vela), cuánto falta (`distancia`, `cerca`), la operación posible (entrada, stop, objetivo y `rr`, y si el perfil la acepta) y la historia de esa misma jugada (`estadisticas`, `agrupar`, `al_dia`: ganadas de cuántas y lo que dejó en promedio). Lo escribe el flujo en vivo en `mercado/radar.json`. No decide nada. No es una acción. |
 | `bin/lib_universo.py` | Las ocho monedas del robot en prueba contra USDT (`lib_datos.UNIVERSO`: BTC, ETH, BNB, SOL, XRP, ADA, TRX y DOGE): sus mínimos de Binance (`filtros`, una vez al día en `mercado/universo.json`), sus velas (`preparar`: 3 años de 1 d, 4 h y 1 h y 3 días de 1 m) y sus costos (`comisiones_de`: contra USDT no hay conversión). Lo corre el flujo en vivo en segundo plano. No es una acción. |
 | `bin/lib_rotacion.py` | La rotación: la fuerza de cada moneda (`fuerza`: lo que subió en 30 días dividido por cuánto se movió), el ranking, a cuáles pasarse (`elegir`, con margen para no cambiar por nada) y la misma regla sobre el pasado (`simular`). Pura: no lee el disco. No es una acción. |
+| `bin/lib_tendencia.py` | Seguir la tendencia y ajustar el tamaño por volatilidad (`en_tendencia`, `volatilidad`, `tamano`, `pesos_tendencia`, `pesos_rotacion`) y su recorrido por el pasado día por día (`simular`). **No lo usa ningún perfil**: no pasó la prueba con datos reales (ver «Los perfiles y el robot en vivo»). Queda para probarlo de nuevo con datos nuevos. Puro. No es una acción. |
 | `bin/lib_candado.py` | Una sola cosa a la vez entre procesos: un solo trabajo de cada tipo (`unico`, `YaCorriendo`), una revisión a la vez (`candado`) y el trabajo que quedó sin app (`huerfano`). No es una acción. |
 | `ui/grafico.js` | El gráfico de velas en vivo en un `<canvas>` (`PilotaGrafico.crear`): 1 m, 5 m, 1 h y 4 h, Bollinger, medias, volumen y RSI con un botón, las flechas de compra y venta, las líneas de entrada, stop y objetivo, el precio que se mueve cada segundo y el destello de color de cada operación. |
-| `bin/lib_simulacion.py` | «Si hubiera puesto X»: el historial como una cartera con tamaño y frenos (`cartera`, con `perfil` y sus `movimientos`), comprar BTC y esperar, el holding por partes (`holding`), el scalper sobre 5 m (`ops_rapidas`) y los cinco perfiles lado a lado (`comparar`). No es una acción (la corre `bin/simular.py`). |
+| `bin/lib_simulacion.py` | «Si hubiera puesto X»: el historial como una cartera con tamaño y frenos (`cartera`, con `perfil` y sus `movimientos`), comprar BTC y esperar, el holding por partes (`holding`), las señales sobre 5 m (`ops_rapidas`), la rotación (`rotacion`) y los perfiles que se ofrecen lado a lado (`comparar`). No es una acción (la corre `bin/simular.py`). |
 | `ui/vivo.js` | Las pestañas «En vivo», «Comparar» (con la película de movimientos) y «Movimientos» (`PilotaVivo.crear`). Los movimientos se cuentan en frases completas desde los códigos del registro. |
 | `ui/centro.js` | Las pestañas de arriba y «Dinero real» (requisitos, llave de Binance e interruptor). |
 <!-- La app: suma una fila por cada carpeta o archivo propio importante (qué es y qué hay adentro), sin repetir lo de arriba. -->
@@ -619,16 +620,27 @@ Reglas que no se cambian sin pensarlo dos veces:
 ## Los perfiles y el robot en vivo
 
 Lo que ve la persona primero es el robot (`ui/vivo.js`, pestaña «En vivo»): elige un perfil y un monto ficticio, y el motor
-opera solo con precios reales de Binance (`bin/lib_piloto.py`). «Comparar» corre los cinco perfiles sobre el pasado con el
-mismo monto (`lib_simulacion.comparar`), y «Movimientos» cuenta todo lo que hizo, en palabras.
+opera solo con precios reales de Binance (`bin/lib_piloto.py`). «Comparar» corre los perfiles que se ofrecen sobre el pasado
+con el mismo monto (`lib_simulacion.comparar`), y «Movimientos» cuenta todo lo que hizo, en palabras.
 
-| Perfil | Velas | Ganancia/riesgo mínima | Riesgo | Posiciones |
-|---|---|---|---|---|
-| holding | 1 d | — (compra BTC 60 % y ETH 40 % en 12 partes, una por semana, y mantiene) | — | — |
-| conservador | 4 h | 2 | 1 % | 1 |
-| equilibrado (el sugerido) | 1 h y 4 h | 1,5 | 1,5 % | 2 |
-| trader | 1 h | 1 | 2 % | 2 |
-| scalper | 5 m (armadas con las de 1 m; en el pasado, solo 30 días) | 1 | 1 % | 2 |
+**Se ofrecen dos perfiles** (`lib_perfiles.ORDEN`), los únicos que los datos respaldan:
+
+| Perfil | Qué hace |
+|---|---|
+| holding (el sugerido) | compra BTC 60 % y ETH 40 % en 12 partes, una por semana, y mantiene |
+| rotacion (experimento) | una vez al día tiene las 2 monedas más fuertes de las 8 contra USDT (`lib_rotacion`); puede caer tanto como BTC |
+
+**Por qué solo dos** (medido en nov 2026 con velas diarias reales de Binance, eligiendo con 2018-06 → 2023-11 y probando una
+sola vez con 2023-11 → 2026-11, el tramo que nadie miró al elegir):
+- Los cuatro perfiles de señales (conservador, equilibrado, trader y scalper) perdieron o quedaron en cero contra quedarse en
+  USDT en 3 años. Quedan **retirados** (`RETIRADOS`): no se ofrecen y uno que estaba andando se detiene solo (`vivo.retirar`).
+  Su máquina sigue porque es la de los tres modos del dinero real.
+- Seguir la tendencia, la rotación con tamaño por volatilidad, comprar las bajas dentro de una subida y no vender nunca con
+  pérdida: la mejor variante de cada idea en el tramo de elegir quedó muy por debajo de comprar BTC y esperar en el tramo de
+  prueba (de −28 % a +32 %, contra +96 % de BTC). No se suman.
+- La rotación simple fue la única que aguantó los dos tramos, y sin ventaja clara: según cuándo reparte da entre +55 % y +96 %
+  en el tramo de prueba. Por eso va como experimento y la pantalla lo dice.
+- Para volver a probar una idea hace falta un tramo nuevo que nadie haya mirado: el de 2023-11 → 2026-11 ya se usó.
 
 Reglas que no se cambian sin pensarlo dos veces:
 - **Las mismas reglas en el pasado y en vivo.** `lib_perfiles` es el único lugar de los números, y lo usan `lib_simulacion` y

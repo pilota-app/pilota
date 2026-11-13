@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""lib_tendencia — seguir la tendencia y ajustar el tamaño a cuánto se mueve el mercado. Solo biblioteca estándar.
+No es una acción.
+
+Lo que hacen hace décadas los fondos que operan con reglas, en tres ideas:
+1. **Seguir la tendencia** (`pesos_tendencia`): una moneda se tiene mientras su cierre está sobre su media de `media` días y
+   esa media sube. Cuando lo pierde, se vende. No se adivina el techo ni el piso.
+2. **Rotar a lo más fuerte** (`pesos_rotacion`): la regla de `lib_rotacion`, con el tamaño de abajo.
+3. **El tamaño según cuánto se mueve** (`tamano`): cada cupo tiene su parte del capital cuando la moneda se mueve como
+   `objetivo` (volatilidad anual); si se mueve más, se pone menos y el resto queda en USDT. Así una moneda nerviosa no
+   decide sola cuánto se pierde.
+
+Todo sale de velas diarias cerradas. `simular` recorre el pasado día por día con la misma regla que se usaría en vivo:
+decide con el cierre de ayer, compra y vende a ese precio con la diferencia de puntas y la comisión taker, y solo
+reajusta una posición si el cambio pasa de `umbral` (para no pagar comisiones por centavos).
+
+Lo que no se negocia aquí:
+- **Nunca se mira el futuro**: cada decisión usa solo las velas que ya cerraron antes de ese día.
+- **Cada movimiento paga lo que cuesta.**
+- **Es puro**: no lee el disco ni la red. Recibe las velas y devuelve números.
+"""
+import bisect
+import math
+
+import lib_rotacion
+
+DIA_MS = lib_rotacion.DIA_MS
+#: Cuántos días de volatilidad se miran para el tamaño.
+DIAS_VOLATILIDAD = 30
+#: Cuántos días atrás se compara la media para saber si sube.
+PENDIENTE = 20
+ANUAL = math.sqrt(365)
+
+
+def _media(xs):
+    return sum(xs) / len(xs) if xs else 0.0
+
+
+def volatilidad(cierres, dias=DIAS_VOLATILIDAD):
+    """Cuánto se mueve una moneda: la desviación de sus cambios diarios en `dias`, llevada a un año. `None` sin datos."""
+    tramo = cierres[-dias - 1:]
+    if len(tramo) < dias + 1:
+        return None
+    cambios = [tramo[i] / tramo[i - 1] - 1 for i in range(1, len(tramo)) if tramo[i - 1] > 0]
+    m = _media(cambios)
+    return math.sqrt(_media([(c - m) ** 2 for c in cambios])) * ANUAL if cambios else None
+
+
+def tamano(cupos, vol, objetivo=None):
+    """La parte del capital de un cupo: 1/cupos, achicada si la moneda se mueve más que `objetivo`. Sin objetivo, entera."""
+    if cupos <= 0:
+        return 0.0
+    if not objetivo or not vol:
+        return 1.0 / cupos
+    return min(1.0, objetivo / vol) / cupos
+
+
+def en_tendencia(cierres, media):
+    """Si una moneda está en tendencia: cierre sobre su media de `media` días y esa media más alta que hace `PENDIENTE`."""
+    if len(cierres) < media + PENDIENTE:
+        return False
+    ahora = _media(cierres[-media:])
+    antes = _media(cierres[-media - PENDIENTE:-PENDIENTE])
+    return cierres[-1] > ahora and ahora > antes
+
+
+def pesos_tendencia(tramos, media=100, objetivo=None, cupos=None):
+    """La parte del capital en cada moneda: las que están en tendencia, cada una con su cupo. `tramos`: {par: cierres}."""
+    cupos = cupos or len(tramos)
+    salida = {}
+    for par, c in tramos.items():
+        if en_tendencia(c, media):
+            salida[par] = tamano(cupos, volatilidad(c), objetivo)
+    return salida
+
+
+def pesos_rotacion(tramos, actuales, posiciones=2, margen=1, dias=30, media=50, objetivo=None, filtro_pasa=True):
+    """Las `posiciones` más fuertes (`lib_rotacion`), cada una con su cupo achicado por la volatilidad."""
+    filas = []
+    for par, c in tramos.items():
+        f = lib_rotacion.fuerza(c, dias, media)
+        if f is not None:
+            filas.append({"par": par, **f})
+    filas.sort(key=lambda x: (-x["fuerza"], x["par"]))
+    for i, f in enumerate(filas):
+        f["puesto"] = i + 1
+    elegidas = lib_rotacion.elegir(filas, list(actuales), posiciones, margen, filtro_pasa)
+    return {par: tamano(posiciones, volatilidad(tramos[par]), objetivo) for par in elegidas}
+
+
+# ── El pasado, día por día ───────────────────────────────────────────────────────────────────────────────────────────
+
+def _series(diarias):
+    return {par: ([v[0] for v in velas], [v[4] for v in velas]) for par, velas in diarias.items() if velas}
+
+
+def tramos_en(series, ms, largo):
+    """Los últimos `largo` cierres de cada moneda que cerraron antes de `ms`."""
+    salida = {}
+    for par, (ts, cierres) in series.items():
+        i = bisect.bisect_right(ts, ms - DIA_MS)
+        if i > 0:
+            salida[par] = cierres[max(0, i - largo):i]
+    return salida
+
+
+def simular(monto, diarias, desde_ms, hasta_ms, com, regla, spread=0.0005, umbral=0.02, largo=260, filtro=None):
+    """Recorre el pasado con una regla de pesos. `regla(tramos, actuales, filtro_pasa) -> {par: parte}`.
+    Devuelve el saldo, la curva, la peor caída, los movimientos y cuánto estuvo invertido en promedio."""
+    taker = (com or {}).get("taker", 0.001)
+    series = _series(diarias)
+    precio = {par: dict(zip(ts, cierres)) for par, (ts, cierres) in series.items()}
+    dias_ms = sorted({t for ts, _ in series.values() for t in ts if desde_ms <= t <= hasta_ms})
+    efectivo, cantidad, costo = float(monto), {}, {}
+    movimientos, curva, techo, caida, invertido = [], [], float(monto), 0.0, []
+    for d in dias_ms:
+        ms = d + DIA_MS
+        hoy = {par: p[d] for par, p in precio.items() if d in p}
+        valor = efectivo + sum(q * hoy.get(par, 0) for par, q in cantidad.items())
+        pasa = filtro(ms).get("pasa") if filtro else True
+        tramos = tramos_en(series, ms, largo)
+        objetivo = regla(tramos, [p for p, q in cantidad.items() if q > 0], pasa) if valor > 0 else {}
+        # Primero se vende (lo que sale y lo que sobra) y después se compra con lo que quedó.
+        for par in sorted(set(cantidad) | set(objetivo), key=lambda x: objetivo.get(x, 0)):
+            p = hoy.get(par)
+            if not p:
+                continue
+            ahora = cantidad.get(par, 0.0) * p
+            quiero = objetivo.get(par, 0.0) * valor
+            diferencia = quiero - ahora
+            sale, entra = quiero == 0 and ahora > 0, ahora == 0 and quiero > 0
+            if not (sale or entra) and abs(diferencia) < umbral * valor:
+                continue
+            if diferencia < 0:
+                vende = min(cantidad.get(par, 0.0), -diferencia / p)
+                recibe = vende * p * (1 - spread) * (1 - taker)
+                base = costo.get(par, 0.0) * (vende / cantidad[par]) if cantidad.get(par) else 0.0
+                cantidad[par] -= vende
+                costo[par] = costo.get(par, 0.0) - base
+                efectivo += recibe
+                movimientos.append({"ms": ms, "que": "venta", "par": par, "precio": p * (1 - spread), "monto": recibe,
+                                    "ganancia": recibe - base, "saldo": None, "por": "tendencia"})
+                if cantidad[par] <= 1e-12:
+                    cantidad.pop(par)
+                    costo.pop(par, None)
+        for par in sorted(objetivo, key=lambda x: -objetivo[x]):
+            p = hoy.get(par)
+            if not p:
+                continue
+            diferencia = objetivo[par] * valor - cantidad.get(par, 0.0) * p
+            entra = cantidad.get(par, 0.0) == 0
+            if diferencia <= 0 or (not entra and diferencia < umbral * valor):
+                continue
+            gasto = min(diferencia, efectivo)
+            if gasto <= 0:
+                continue
+            cantidad[par] = cantidad.get(par, 0.0) + gasto * (1 - taker) / (p * (1 + spread))
+            costo[par] = costo.get(par, 0.0) + gasto
+            efectivo -= gasto
+            movimientos.append({"ms": ms, "que": "compra", "par": par, "precio": p * (1 + spread), "monto": gasto})
+        valor = efectivo + sum(q * hoy.get(par, 0) for par, q in cantidad.items())
+        for m in movimientos:
+            if m["que"] == "venta" and m["saldo"] is None:
+                m["saldo"] = valor
+        invertido.append(1 - efectivo / valor if valor > 0 else 0.0)
+        techo = max(techo, valor)
+        caida = max(caida, (techo - valor) / techo if techo > 0 else 0.0)
+        curva.append([int(d), round(valor, 6)])
+    if not curva:
+        return {"listo": False, "motivo": "sin_historial"}
+    saldo = curva[-1][1]
+    ventas = [m for m in movimientos if m["que"] == "venta"]
+    return {"listo": True, "motivo": "", "saldo": saldo, "ganancia": saldo - monto, "rendimiento": saldo / monto - 1,
+            "caida_maxima": caida, "curva": curva, "operaciones": len(ventas),
+            "ganadas": sum(1 for m in ventas if m["ganancia"] > 0), "perdidas": sum(1 for m in ventas if m["ganancia"] <= 0),
+            "movimientos": movimientos, "movimientos_total": len(movimientos),
+            "invertido_medio": _media(invertido)}

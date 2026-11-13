@@ -296,5 +296,24 @@ class OchoMonedas(Grafico):
         self.assertEqual(vivo.grafico({"par": "DOGEUSDT", "temporalidad": "1m"})["datos"]["par"], "DOGEUSDT")
 
 
+class Retirados(Grafico):
+    """Los perfiles que perdieron con datos reales ya no se ofrecen: no se pueden empezar y, si estaba andando uno, para."""
+
+    def test_un_perfil_retirado_no_se_empieza(self):
+        import lib_estado
+        with mock.patch.object(lib_estado, "activo", return_value=lib_estado.PRUEBA):
+            r = vivo.empezar({"perfil": "scalper", "monto": 100}, AHORA)
+        self.assertEqual((r["ok"], r["error"]), (False, "sin_perfil"))
+
+    def test_si_andaba_uno_retirado_se_detiene_solo(self):
+        import lib_piloto
+        lib_piloto.guardar({**lib_piloto.guardado(), "activo": True, "perfil": "scalper", "monto": 100, "desde_ms": AHORA})
+        with mock.patch.object(lib_piloto, "detener") as detener:
+            self.assertTrue(vivo.retirar(AHORA))
+        detener.assert_called_once_with(AHORA)
+        lib_piloto.guardar({**lib_piloto.guardado(), "perfil": "rotacion"})
+        self.assertFalse(vivo.retirar(AHORA), "uno que se ofrece sigue andando")
+
+
 if __name__ == "__main__":
     unittest.main()

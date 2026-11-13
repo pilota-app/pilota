@@ -73,6 +73,7 @@ def flujo_estado():
 
 
 def estado(d=None, ahora_ms=None):
+    retirar(ahora_ms or _ms())
     return {"ok": True, "datos": {**lib_piloto.estado(ahora_ms), "flujo": flujo_estado(),
                                   "radar": lib_radar.guardado().get("radar") or {}}}
 
@@ -80,16 +81,31 @@ def estado(d=None, ahora_ms=None):
 def radar_de(ms):
     """Qué está esperando el robot (`lib_radar`), para el perfil puesto o, sin perfil, para el sugerido. La historia de cada
     jugada se mide de nuevo cada tanto (es una pasada por el historial: la hace este trabajo, que no tiene apuro)."""
+    perfil = lib_piloto.guardado().get("perfil") or lib_perfiles.SUGERIDO
+    if (lib_perfiles.de(perfil) or {}).get("tipo") != "senales":
+        # El holding y la rotación no esperan un precio: no hay radar ni historia que medir.
+        return lib_radar.escribir(lib_radar.radar(perfil, ms, historia={}))
     try:
         historia = lib_radar.al_dia(ms).get("jugadas") or {}
     except (OSError, ValueError, KeyError):
         historia = (lib_radar.guardado().get("historia") or {}).get("jugadas") or {}
-    perfil = lib_piloto.guardado().get("perfil") or lib_perfiles.SUGERIDO
     return lib_radar.escribir(lib_radar.radar(perfil, ms, historia=historia))
+
+
+def retirar(ms):
+    """Si el perfil andando es uno retirado (`lib_perfiles.RETIRADOS`), se detiene: lo abierto sigue con su protección y
+    la pantalla vuelve a ofrecer los que se ofrecen. Devuelve si lo detuvo."""
+    d = lib_piloto.guardado()
+    if d.get("activo") and d.get("perfil") in lib_perfiles.RETIRADOS:
+        lib_piloto.detener(ms)
+        return True
+    return False
 
 
 def empezar(d=None, ahora_ms=None):
     d = d if isinstance(d, dict) else {}
+    if d.get("perfil") not in lib_perfiles.ORDEN:
+        return {"ok": False, "error": "sin_perfil", "datos": estado(None, ahora_ms)["datos"]}
     r = lib_piloto.empezar(d.get("perfil"), d.get("monto"), ahora_ms)
     if not r["ok"]:
         return {"ok": False, "error": r["error"], "datos": estado(None, ahora_ms)["datos"]}
@@ -194,6 +210,7 @@ def revisar(cliente, ms, desde_ms):
     except (lib_datos.Limitado, lib_datos.Temporal, lib_datos.Respuesta):
         pass                                 # sin las velas largas la decisión dice «sin_datos»: no se inventa nada
     resumen = {}
+    retirar(ms)
     try:
         r = lib_reconciliar.reconciliar(ms, decidir=lib_piloto.decidir)
         resumen = (r or {}).get("resumen") or {}

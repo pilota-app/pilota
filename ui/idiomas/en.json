@@ -1376,6 +1376,12 @@
   "Perfiles que perdieron": "Profiles that lost",
   "{n} años": "{n} years",
   "{n} meses": "{n} months",
-  "{n} días": "{n} days"
+  "{n} días": "{n} days",
+  "Compra BTC y ETH por partes, una vez por semana, y los guarda. No intenta adivinar: es lo que mejor resistió en los datos.": "Buys BTC and ETH in parts, once a week, and keeps them. It does not try to guess: it is what held up best in the data.",
+  "Experimento: tiene las 2 monedas que vienen más fuertes de las 8 y cambia a la que pasa adelante. Se parece a comprar BTC: a veces gana y a veces pierde, y puede caer tanto como BTC.": "Experiment: holds the 2 strongest of the 8 coins and switches to the one that moves ahead. It behaves like buying BTC: sometimes it wins and sometimes it loses, and it can fall as much as BTC.",
+  "La tengo: es la número {puesto} de las 8 en fuerza.": "I hold it: it is number {puesto} of the 8 in strength.",
+  "La tengo: compré {cantidad} a {medio} en promedio.": "I hold it: I bought {cantidad} at {medio} on average.",
+  "Número {puesto} en fuerza: podría entrar si pasa adelante.": "Number {puesto} in strength: it could get in if it moves ahead.",
+  "Número {puesto} en fuerza: está bajo su promedio, no la compro.": "Number {puesto} in strength: it is below its average, I do not buy it."
  }
 }

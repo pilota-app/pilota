@@ -8,14 +8,16 @@ window.PilotaVivo = (() => {
 
   // Los seis perfiles (bin/lib_perfiles.py: ORDEN). El nombre, qué hace en una frase, qué tan rápido opera y con qué monedas.
   const PERFILES = {
-    holding: { nombre: "Holding", que: "Compra BTC y ETH por partes, una vez por semana, y los guarda. No vende.", ritmo: "Muy lento" },
+    holding: { nombre: "Holding", que: "Compra BTC y ETH por partes, una vez por semana, y los guarda. No intenta adivinar: es lo que mejor resistió en los datos.", ritmo: "Muy lento" },
     conservador: { nombre: "Conservador", que: "Pocas operaciones: solo las muy claras, en velas de 4 horas, donde puede ganar el doble de lo que arriesga.", ritmo: "Lento" },
     equilibrado: { nombre: "Equilibrado", que: "Operaciones medianas en velas de 1 y 4 horas. Es el punto de partida que te sugiero.", ritmo: "Medio" },
     trader: { nombre: "Trader", que: "Muchas operaciones chicas en velas de 1 hora.", ritmo: "Rápido" },
     scalper: { nombre: "Scalper", que: "El más rápido: velas de 5 minutos, entra y sale en minutos u horas. Más operaciones, más comisiones.", ritmo: "Muy rápido" },
-    rotacion: { nombre: "Rotación", que: "Tiene las 2 monedas que vienen más fuertes de las 8 y cambia a la que pasa adelante. Decide una vez al día.", ritmo: "Lento" },
+    rotacion: { nombre: "Rotación", que: "Experimento: tiene las 2 monedas que vienen más fuertes de las 8 y cambia a la que pasa adelante. Se parece a comprar BTC: a veces gana y a veces pierde, y puede caer tanto como BTC.", ritmo: "Lento" },
   };
-  const ORDEN = ["holding", "conservador", "equilibrado", "trader", "scalper", "rotacion"];
+  // Los que se ofrecen (bin/lib_perfiles.py: ORDEN). Los otros cuatro quedaron retirados: perdieron con datos reales. Sus
+  // nombres siguen arriba para contar lo que ya pasó en el registro.
+  const ORDEN = ["holding", "rotacion"];
   // Las monedas de cada perfil (bin/lib_perfiles.py: «pares»). Todas contra USDT; el holding guarda BTC y ETH.
   const MONEDAS = {
     holding: ["BTC", "ETH"], conservador: ["BTC", "ETH", "BNB"], equilibrado: ["BTC", "ETH", "BNB", "SOL", "XRP"],
@@ -187,7 +189,7 @@ window.PilotaVivo = (() => {
     // Sin elegir nada todavía, el perfil de partida es el que mejor le fue entre los que no perdieron.
     function perfilDePartida(E) {
       const fuera = perdedores(E);
-      if (E.vivoPerfilTocado || !fuera[E.vivoPerfil]) return E.vivoPerfil || "equilibrado";
+      if (E.vivoPerfilTocado || !fuera[E.vivoPerfil]) return E.vivoPerfil || "holding";
       const r = (E.sim || {}).ultima || {};
       const mejor = (r.perfiles || []).filter((p) => !fuera[p.perfil] && typeof p.rendimiento === "number")
         .sort((a, b) => b.rendimiento - a.rendimiento)[0];
@@ -374,6 +376,18 @@ window.PilotaVivo = (() => {
       if (abierta) {
         return { estado: "comprado", animo: "operando", texto: frase("Comprado. Stop {stop} · objetivo {objetivo}.", { stop: usdt(abierta.stop), objetivo: usdt(abierta.objetivo) }) };
       }
+      const tengo = (v.tenencias || []).find((x) => x.cantidad > 0 && moneda(x.par) === moneda(par));
+      const fila = (((v.rotacion || {}).ranking) || []).find((x) => x.par === par);
+      if (tengo) {
+        return { estado: "comprado", animo: "operando", texto: fila
+          ? frase("La tengo: es la número {puesto} de las 8 en fuerza.", { puesto: numero(fila.puesto, 0) })
+          : frase("La tengo: compré {cantidad} a {medio} en promedio.", { cantidad: numero(tengo.cantidad, 6), medio: tengo.precio_medio ? usdt(tengo.precio_medio) : "–" }) };
+      }
+      if (fila) {
+        return fila.elegible
+          ? { estado: "espera", animo: "atento", texto: frase("Número {puesto} en fuerza: podría entrar si pasa adelante.", { puesto: numero(fila.puesto, 0) }) }
+          : { estado: "nada", animo: "dudando", texto: frase("Número {puesto} en fuerza: está bajo su promedio, no la compro.", { puesto: numero(fila.puesto, 0) }) };
+      }
       const puesta = (v.posiciones || []).find((p) => p.par === par && p.estado === "puesta");
       if (puesta) return { estado: "casi", animo: "operando", texto: frase("Compra puesta en {precio}: espero que llegue.", { precio: usdt(puesta.precio) }) };
       if (!f) return null;
@@ -554,7 +568,6 @@ window.PilotaVivo = (() => {
           <details class="que-es" id="sim-letra-chica"><summary>Lo que tienes que saber de este resultado</summary>
             <p class="ayuda">Es el pasado, no una promesa: el mercado que viene puede hacer cosas que estos días no hicieron.</p>
             <p class="ayuda">Usé las mismas reglas que usa el robot en vivo: la reserva del 40 % en USDT, el máximo de posiciones de cada perfil, su riesgo por operación, los mínimos de Binance, las comisiones y los frenos.</p>
-            <p class="ayuda">El scalper solo se puede mirar en los últimos 30 días: es lo que guardo de velas de 1 minuto.</p>
           </details></div>`;
       }
       return `<div class="centro">

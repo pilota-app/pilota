@@ -139,11 +139,10 @@ class Simular(unittest.TestCase):
         self.minimos()
         r = sim.comparar(100, 30, self.recorrido([op(95, 0.01)]), rapidas=[])
         self.assertEqual([p["perfil"] for p in r["perfiles"]], list(sim.lib_perfiles.ORDEN))
-        rapido = next(p for p in r["perfiles"] if p["perfil"] == "scalper")
-        self.assertEqual(rapido["operaciones"], 0)
+        self.assertNotIn("scalper", [p["perfil"] for p in r["perfiles"]], "los perfiles retirados no se comparan")
         rota = next(p for p in r["perfiles"] if p["perfil"] == "rotacion")
         self.assertEqual(rota["motivo"], "sin_historial", "sin velas diarias de las 8 monedas, la rotación lo dice")
-        self.assertEqual(r["sugerido"], "equilibrado")
+        self.assertEqual(r["sugerido"], "holding")
 
     def test_sin_operaciones_en_el_periodo_lo_dice(self):
         self.minimos()

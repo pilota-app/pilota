@@ -29,7 +29,7 @@
     pestana: "vivo", sim: { monto: 100, dias: 90, corriendo: false, ultima: null }, simVivo: false,
     real: null, realOcupado: false, campos: {},
     // El robot en vivo (bin/vivo.py), el perfil que se está eligiendo y la película de la comparación.
-    vivo: null, vivoPerfil: "equilibrado", vivoMonto: 100, vivoOcupado: false, vivoElegir: false, peli: null,
+    vivo: null, vivoPerfil: "holding", vivoMonto: 100, vivoOcupado: false, vivoElegir: false, peli: null,
     // El gráfico en vivo (ui/grafico.js) y el flujo de Binance (bin/vivo.py encender): conectado o no.
     graf: null, flujo: null,
     // Lo que Pilota prepara sola al abrir: cada cosa se pide una sola vez por sesión.
@@ -2573,12 +2573,12 @@
         operaciones: pasos, ganadas, perdidas, mejor: monto * 0.011, peor: -monto * 0.007,
         saltadas: { diario: 0, racha: 1, piso: 0, posiciones: 2, tamano: 0 } },
       usdt: { saldo: monto, rendimiento: 0 }, btc: { saldo: b, rendimiento: (b - monto) / monto, caida_maxima: 0.12, curva: btc },
-      sin_exigencia: true, topado: true, tope: 15, perfiles: perfilesDemo(monto, desde, hasta), sugerido: "equilibrado" };
+      sin_exigencia: true, topado: true, tope: 15, perfiles: perfilesDemo(monto, desde, hasta), sugerido: "holding" };
   }
-  // Los seis perfiles de la vista previa: números inventados, con la forma que devuelve lib_simulacion.comparar.
+  // Los perfiles que se ofrecen, en la vista previa: números inventados, con la forma que devuelve lib_simulacion.comparar.
   function perfilesDemo(monto, desde, hasta) {
-    const ritmo = { holding: 0, conservador: 6, equilibrado: 14, trader: 30, scalper: 60, rotacion: 8 };
-    return ["holding", "conservador", "equilibrado", "trader", "scalper", "rotacion"].map((perfil, k) => {
+    const ritmo = { holding: 0, rotacion: 8 };
+    return ["holding", "rotacion"].map((perfil, k) => {
       const d0 = perfil === "scalper" ? Math.max(desde, hasta - 30 * 86400000) : desde;
       let saldo = monto, techo = monto, caida = 0;
       const curva = [[d0, monto]], movimientos = [];
@@ -2684,7 +2684,7 @@
     const suyas = MONEDAS_DEMO[(v && v.perfil) || "equilibrado"] || ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"];
     const DISTANCIA = { BTC: 0.0018, ETH: 0.0091, BNB: 0.0052, SOL: 0.0123, XRP: 0.0034, ADA: 0.0167, TRX: 0.0071, DOGE: 0.0208 };
     const radar = { perfil: (v && v.perfil) || "equilibrado", filtro: { pasa: true, motivo: "" },
-      filas: suyas.map((m) => fila(`${m}USDT`, t, precio(`${m}USDT`), DISTANCIA[m])) };
+      filas: (v && ["holding", "rotacion"].includes(v.perfil)) || !v ? [] : suyas.map((m) => fila(`${m}USDT`, t, precio(`${m}USDT`), DISTANCIA[m])) };
     // La rotación de la vista previa: las 8 ordenadas por fuerza, con SOL y TRX en la mano.
     const FUERZA = [["SOLUSDT", 1.62, 0.214], ["TRXUSDT", 1.31, 0.118], ["BNBUSDT", 0.94, 0.087], ["BTCUSDT", 0.71, 0.064],
       ["XRPUSDT", 0.33, 0.041], ["ETHUSDT", 0.12, 0.016], ["ADAUSDT", -0.28, -0.052], ["DOGEUSDT", -0.61, -0.133]];
