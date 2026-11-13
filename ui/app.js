@@ -1427,9 +1427,31 @@
     for (const P of graficoUI.visibles(E.graf)) { P.cargando = !P.datos; P.minutos = {}; }
     for (const q of graficoUI.pedidos(E)) host.enviar("vivoGrafico", q);
   }
+  // Lo que Pilota prepara sola con la app abierta, en una lista: así nadie cree que tiene que apretar algo para que funcione.
+  function soloCorre() {
+    const h = E.historial || {}, m = E.muestreo || {}, v = E.vivo || {};
+    const filas = [
+      ["Datos del mercado", E.datos && E.datos.puede_operar ? ["listo", Tp("Listo")]
+        : (E.descargando ? ["haciendo", Tp("Bajando…")] : ["haciendo", Tp("Empieza solo")])],
+      ["Historial de 3 años", Number(h.pct) >= 100 ? ["listo", Tp("Listo")]
+        : (h.corriendo ? ["haciendo", Tp("Bajando · {pct} %", { pct: numero(Number(h.pct) || 0, 0) })] : ["haciendo", Tp("Empieza solo")])],
+      ["Muestras del mercado", m.corriendo ? ["listo", Tp("Encendido")] : ["haciendo", Tp("Se enciende solo")]],
+      ["Precios en vivo", v.flujo && v.flujo.corriendo ? ["listo", Tp("Conectado")] : ["haciendo", Tp("Conectando…")]],
+      ["Mínimos de Binance", E.minimo && E.minimo.calculado ? ["listo", Tp("Listo")] : ["haciendo", Tp("Calculando…")]],
+    ];
+    const todo = filas.every(([, [e]]) => e === "listo");
+    return `<section class="tarjeta solo-corre" id="solo-corre" aria-labelledby="solo-corre-titulo">
+      <h2 id="solo-corre-titulo">${todo ? "Todo listo" : "Me estoy preparando sola"}</h2>
+      <p class="solo-corre-dice">${frase("**No tienes que apretar nada.** Con la app abierta, Pilota prepara todo esto sola y lo mantiene al día.")}</p>
+      <ul class="solo-corre-lista">${filas.map(([nombre, [estado, dice]]) => `<li data-estado="${estado}">
+        <span class="estacion-luz" aria-hidden="true"></span><span>${nombre}</span>
+        <span class="solo-corre-estado" data-sin-traducir>${esc(dice)}</span></li>`).join("")}</ul>
+      <p class="ayuda">Más abajo está cada pieza por dentro, para quien quiera mirar. Sus botones son solo para hacer algo antes de tiempo: el backtest y la calibración sirven para estudiar, el robot funciona sin ellos.</p></section>`;
+  }
   function comoPienso() {
     const series = (E.datos && Array.isArray(E.datos.series)) ? E.datos.series : [];
     return `
+        ${soloCorre()}
         <h2>Cómo trabaja Pilota, paso a paso</h2>
         <p class="ayuda">Aquí está cada pieza por separado, con sus números: de dónde salen los datos, cómo se puntúa una oportunidad, cuánto se pone en cada operación y qué la frena. Lo que ves en «En vivo» y en «Cabina» no sale de otra parte.</p>
         <h2>Datos del mercado</h2>
@@ -1507,17 +1529,34 @@
         ${modos()}
 `;
   }
+  // La cabina es la de los tres modos (puntaje, monto y tu sí): la que manda con dinero real. Con un perfil andando en
+  // prueba decide el perfil, así que la cabina no muestra una cadena vieja: dice quién manda y dónde mirarlo.
+  function cabina() {
+    const v = E.vivo || {};
+    if (v.activo && !(E.real && E.real.activo)) {
+      return `<section id="panel" class="panel cabina">
+        <div class="tarjeta cabina-perfil" id="cabina-perfil">
+          <h2>${frase("Ahora manda el perfil {perfil}", { perfil: Tp(vivoUI.nombre(v.perfil)) })}</h2>
+          <p>Compra y vende solo, con dinero ficticio, y no te pide permiso. Todo lo que mira y lo que hace lo ves en «En vivo».</p>
+          <div class="pz-pie"><button type="button" class="pz-boton pz-principal" data-ir-pestana="vivo">Ir a En vivo</button></div>
+        </div>
+        <h3>¿Para qué sirve la cabina?</h3>
+        <p class="ayuda">Es la pantalla del dinero real. Ahí cada compra pasa por cuatro pasos: datos al día, una oportunidad con buen puntaje, un monto que Binance acepte y, según el modo, tu sí. Cuando pases a real, la vas a ver llena.</p>
+      </section>`;
+    }
+    return panelUI.html(E.panel, { respondiendo: E.respondiendo, datos: E.datos ? !!E.datos.puede_operar : undefined });
+  }
   function principal() {
     const real = !!(E.real && E.real.activo);
     return `<header class="barra"><h1 data-sin-traducir>${esc(NOMBRE)}</h1>
-      ${centroUI.pestanas(E.pestana, { real, esperando: E.panel && E.panel.esperando })}
+      ${centroUI.pestanas(E.pestana, { real, esperando: !(E.vivo && E.vivo.activo && !real) && E.panel && E.panel.esperando })}
       <button type="button" class="pz-boton" id="abrir-ajustes">Ajustes</button></header>
       ${banda()}
       <main class="contenido">
         ${centroUI.panel("vivo", E.pestana, vivoUI.vivo(E))}
         ${centroUI.panel("comparar", E.pestana, vivoUI.comparar(E))}
         ${centroUI.panel("movimientos", E.pestana, vivoUI.movimientos(E, panelUI.registro(E.panel)))}
-        ${centroUI.panel("ahora", E.pestana, panelUI.html(E.panel, { respondiendo: E.respondiendo }))}
+        ${centroUI.panel("ahora", E.pestana, cabina())}
         ${centroUI.panel("operar", E.pestana, centroUI.operar(E))}
         ${centroUI.panel("como", E.pestana, comoPienso())}
       </main>`;
@@ -1891,6 +1930,12 @@
     if (enDemo) return;
     if (E.minimo && !E.minimo.calculado) una("minimo", "minimoCalcular", { capital: CAPITAL_PRUEBA });
     if (E.muestreo && !E.muestreo.corriendo) una("muestreo", "muestreoEncender");
+    // Los datos con que se calcula el puntaje: si no están completos, se bajan solos (una vez cada media hora como mucho).
+    if (E.datos && !E.datos.puede_operar && !E.descargando && !(E.auto.velas && Date.now() - E.auto.velas < 1800000)) {
+      E.auto.velas = Date.now();
+      E.descargando = true;
+      host.enviar("velasDescargar", { dias: DIAS });
+    }
     const h = E.historial;
     if (h && !h.corriendo && !(Number(h.pct) >= 100 && h.continuo !== false)) una("historial", "historialDescargar");
   }

@@ -552,3 +552,17 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 .graf-robot[data-estado="pausa"] { border-color: var(--pierde); color: var(--pierde); }
 .chip-robot[aria-pressed="true"] { border-color: var(--acento); }
 @media (prefers-reduced-motion: reduce) { .graf-robot { animation: none; } }
+
+/* Lo que se prepara solo (Avanzado) y la frase que explica la cadena (Cabina): se leen de un vistazo. */
+.cadena-explica { margin: -4px 0 16px; padding: 10px 14px; border-radius: 10px; background: var(--superficie-2, rgba(127,127,127,.08)); }
+.solo-corre { margin: 0 0 24px; padding: 16px 18px; }
+.solo-corre h2 { margin: 0 0 4px; }
+.solo-corre-dice { margin: 0 0 12px; }
+.solo-corre-lista { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.solo-corre-lista li { display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: 10px; }
+.solo-corre-lista li[data-estado="listo"] .estacion-luz { background: var(--gana); }
+.solo-corre-lista li[data-estado="haciendo"] .estacion-luz { background: var(--espera); animation: latido 1.4s ease-in-out infinite; }
+.solo-corre-estado { color: var(--suave, inherit); font-variant-numeric: tabular-nums; }
+.cabina-perfil { padding: 18px; margin: 0 0 20px; }
+.cabina-perfil h2 { margin: 0 0 6px; }
+@media (prefers-reduced-motion: reduce) { .solo-corre-lista li .estacion-luz { animation: none; } }

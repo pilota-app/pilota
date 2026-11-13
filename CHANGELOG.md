@@ -7,6 +7,15 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- «Avanzado» dice arriba que todo se prepara solo (datos, historial, muestras, precios en vivo y mínimos) y en qué va cada
+  cosa: no hay que apretar ningún botón para que el robot funcione. Los datos del mercado ahora también se bajan solos.
+  *"Advanced" now says at the top that everything gets ready on its own (data, history, samples, live prices and minimums)
+  and how each one is going: you do not have to press any button for the robot to work. Market data now downloads by itself.*
+- La cabina habla claro: sus pasos se llaman Datos, Oportunidad, Monto, Frenos, Tu sí y Robot, y una frase dice qué falta y
+  si tienes que hacer algo. Con un perfil andando en prueba, dice que manda el perfil y te lleva a «En vivo». *The cockpit
+  speaks plainly: its steps are Data, Opportunity, Amount, Brakes, Your yes and Robot, and one sentence says what is missing
+  and whether you need to do anything. With a profile running in test mode, it says the profile is in charge and takes you
+  to "Live".*
 - Pilota ahora se ordena en seis pestañas: En vivo, Comparar, Movimientos, Cabina, Dinero real y Avanzado (lo técnico). *Pilota
   is now organized in six tabs: Live, Compare, Moves, Cockpit, Real money and Advanced (the technical part).*
 - Nuevo: «Qué estoy esperando». El robot dice a qué precio compraría cada moneda, cuánto falta («¡Casi casi!»), cómo sería la

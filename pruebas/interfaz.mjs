@@ -100,6 +100,12 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.inputValue("#vivo-monto"), "300", "lo escrito sigue ahí al volver a pintar");
   await cab.click("#vivo-empezar");
   await cab.waitForSelector(".vivo-saldo");
+  // Con un perfil andando, la cabina no muestra una cadena vieja: dice quién manda y lleva a «En vivo».
+  await cab.click("#tab-ahora");
+  assert.match(await cab.textContent("#cabina-perfil"), /Ahora manda el perfil Trader/);
+  assert.equal(await cab.locator(".cabina .cadena").count(), 0, "sin la cadena de los modos");
+  await cab.click('#cabina-perfil [data-ir-pestana="vivo"]');
+  assert.equal(await cab.getAttribute("#tab-vivo", "aria-selected"), "true");
   // El gráfico en vivo: velas en un lienzo, el precio que se mueve solo y los indicadores que se prenden con un botón.
   await cab.waitForSelector("#grafico-lienzo-0");
   await cab.waitForFunction(() => /\d/.test(document.getElementById("precio-BTCFDUSD").textContent), null, { timeout: 10000 });
@@ -165,6 +171,7 @@ await page.waitForSelector("#descargar");
   await cab.click("#tab-ahora");
   await cab.waitForSelector(".cabina .cadena");
   assert.equal(await cab.locator(".cadena .estacion").count(), 6, "la cadena muestra los seis agentes");
+  assert.ok((await cab.textContent("#cadena-explica")).trim().length > 20, "y una frase dice qué falta y quién lo hace");
   assert.equal(await cab.locator(".cabina .media-luna").count(), 1, "el saldo se ve como medidor");
   assert.ok(await cab.locator(".cabina .dial").count() >= 1, "cada moneda tiene su dial");
   assert.equal(await cab.locator("#app [style]").count(), 0, "nada usa style en línea");
@@ -188,6 +195,9 @@ await page.waitForSelector("#descargar");
 
 // 2. Los datos del mercado, de punta a punta (en la vista previa responde simular(), como lo haría la app).
 assert.match(await page.textContent(".banda"), /Test mode: play money/, "la banda del modo tiene que estar siempre");
+// Arriba de todo, lo que corre solo: nadie tiene que apretar un botón de esta pantalla para que el robot funcione.
+assert.match(await page.textContent("#solo-corre"), /You do not have to press anything/);
+assert.equal(await page.locator("#solo-corre li").count(), 5, "las cinco cosas que se preparan solas");
 assert.match(await page.textContent("#datos-estado"), /I can't trade yet/, "si falta historial, se dice en vez de operar");
 assert.match(await page.textContent("#datos-estado"), /BTCFDUSD 4 h: 12 candles missing/);
 assert.equal(await page.locator("#datos-series .serie").count(), 12, "el estado va por par y temporalidad (4 × 3)");

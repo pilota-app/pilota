@@ -380,35 +380,64 @@ window.PilotaPanel = (() => {
 
     // ── La cadena: cada agente de Pilota con su luz (al día, esperando, frenado o apagado) ──
     // Sale de lo mismo que el resto de la pantalla: no hay otra fuente de verdad.
+    // Los nombres son de todos los días: qué mira cada paso, no cómo se llama por dentro.
     const CADENA = [
-      ["mercado", "Mercado"], ["puntaje", "Puntaje"], ["tamano", "Tamaño"],
-      ["frenos", "Frenos"], ["si", "Tu sí"], ["motor", "Motor"],
+      ["mercado", "Datos"], ["puntaje", "Oportunidad"], ["tamano", "Monto"],
+      ["frenos", "Frenos"], ["si", "Tu sí"], ["motor", "Robot"],
     ];
-    function estaciones(p) {
+    // El primer paso que no está listo, dicho en una frase: qué pasa, quién lo arregla y si tienes que hacer algo.
+    const EXPLICA = {
+      mercado: "Estoy bajando los datos del mercado que necesito para calcular. Lo hago solo: no tienes que apretar nada.",
+      puntaje_nada: "Los datos están al día, pero ahora no veo ninguna compra clara. Sigo mirando cada minuto.",
+      puntaje_bajo: "Lo mejor de ahora es {par} con {n} puntos, y para comprar pido {exigencia}: me quedo en USDT.",
+      tamano: "Hay una oportunidad, pero con este saldo no me sale una compra que Binance acepte.",
+      frenos: "Hay un freno puesto: no compro nada nuevo hasta que se suelte.",
+      si: "Te estoy proponiendo una compra: respóndeme más abajo.",
+      motor: "El robot está apagado. Con la app abierta se enciende solo en un momento.",
+      listo: "Todo listo: si aparece una compra que pasa la exigencia, la hago.",
+    };
+    function estaciones(p, extra = {}) {
       const med = Array.isArray(p.medidores) ? p.medidores : [];
       const con = med.filter((m) => typeof m.puntaje === "number");
       const f = p.frenos || {}, m = p.motor || {};
       const esperan = Array.isArray(p.propuestas) ? p.propuestas.length : 0;
       const mejor = con.reduce((a, x) => (a && a.puntaje >= x.puntaje ? a : x), null);
+      // Sin puntaje no siempre es falta de datos: con los datos al día puede ser que no haya nada claro.
+      const datos = extra.datos === false && !con.length ? false : true;
       return {
-        mercado: con.length ? ["ok", Tp("Mirando")] : ["espera", Tp("Falta historia")],
-        puntaje: !mejor ? ["apagado", Tp("Sin puntaje")]
-          : [mejor.pasa ? "ok" : "espera", Tp("{n} de {maximo}", { n: numero(mejor.puntaje, 0), maximo: numero(MAXIMO, 0) })],
-        tamano: con.some((x) => x.puede) ? ["ok", Tp("Hay monto")] : ["apagado", Tp("Sin monto")],
+        mercado: datos ? ["ok", Tp("Al día")] : ["espera", Tp("Bajando datos")],
+        puntaje: !datos ? ["apagado", Tp("Espera datos")]
+          : (!mejor ? ["espera", Tp("Nada claro")]
+            : [mejor.pasa ? "ok" : "espera", Tp("{n} de {maximo}", { n: numero(mejor.puntaje, 0), maximo: numero(MAXIMO, 0) })]),
+        tamano: con.some((x) => x.puede) ? ["ok", Tp("Listo")] : ["apagado", Tp("Sin compra")],
         frenos: f.frenado ? ["alto", Tp("Frenado")] : (f.pausado ? ["alto", Tp("En pausa")] : ["ok", Tp("Libres")]),
         si: esperan ? ["espera", Tp("{n} esperando", { n: numero(esperan, 0) })] : ["ok", Tp(E.modo[p.modo] || p.modo || "")],
         motor: m.activo ? ["ok", Tp("Mirando")] : (m.corriendo ? ["espera", Tp("Dormido")] : ["apagado", Tp("Apagado")]),
+        _mejor: mejor,
       };
     }
-    function cadena(p) {
-      const e = estaciones(p);
+    function explicacion(p, e) {
+      const f = p.frenos || {};
+      if (f.frenado || f.pausado) return frase(EXPLICA.frenos);
+      if (e.si[0] === "espera") return frase(EXPLICA.si);
+      if (e.mercado[0] !== "ok") return frase(EXPLICA.mercado);
+      if (e.motor[0] === "apagado") return frase(EXPLICA.motor);
+      const mejor = e._mejor;
+      if (!mejor) return frase(EXPLICA.puntaje_nada);
+      if (!mejor.pasa) return frase(EXPLICA.puntaje_bajo, { par: mejor.par, n: numero(mejor.puntaje, 0), exigencia: numero(mejor.exigencia, 0) });
+      if (!mejor.puede) return frase(EXPLICA.tamano);
+      return frase(EXPLICA.listo);
+    }
+    function cadena(p, extra = {}) {
+      const e = estaciones(p, extra);
       return `<ol class="cadena" aria-label="Así va mi cadena">${CADENA.map(([id, nombre]) => {
         const [estado, dice] = e[id];
         return `<li class="estacion" data-estado="${estado}">
           <span class="estacion-luz" aria-hidden="true"></span>
           <span class="estacion-nombre">${nombre}</span>
           <span class="estacion-dice" data-sin-traducir>${esc(dice)}</span></li>`;
-      }).join("")}</ol>`;
+      }).join("")}</ol>
+      <p class="cadena-explica" id="cadena-explica">${explicacion(p, e)}</p>`;
     }
 
     // ── La pantalla entera: la cabina ──
@@ -423,7 +452,7 @@ window.PilotaPanel = (() => {
       return `<section id="panel" class="panel cabina">
         <p class="ayuda">${frase(AMBIENTES[p.ambiente === "real" ? "real" : "prueba"])}</p>
         ${mascota(p)}
-        ${cadena(p)}
+        ${cadena(p, extra)}
         ${motivos.map((m) => `<p class="indicadores-linea freno">${frase(MOTIVOS[m.codigo] || E.motivosFrenos[m.codigo] || "Ahora no abro ninguna entrada nueva.", { n: numero(m.n, 0), par: m.par || "" })}</p>`).join("")}
         <div class="cabina-grilla">
           ${saldo(p)}

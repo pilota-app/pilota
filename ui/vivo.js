@@ -460,7 +460,7 @@ window.PilotaVivo = (() => {
         <details class="que-es" id="registro-completo"><summary>El registro completo (técnico)</summary>${registro}</details></div>`;
     }
 
-    return { vivo, comparar, pelicula, movimientos, textoLinea, ERRORES_VIVO, ORDEN, narra, estadoFila };
+    return { vivo, comparar, pelicula, movimientos, textoLinea, ERRORES_VIVO, ORDEN, narra, estadoFila, nombre };
   }
   return { crear };
 })();
