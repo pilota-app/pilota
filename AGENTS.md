@@ -694,6 +694,17 @@ sola vez con 2023-11 → 2026-11, el tramo que nadie miró al elegir):
   2024) y ganan en las caídas (inicios de 2025). Son 103 intentos y el tramo de prueba es un solo mercado: es una pista, no
   una ventaja probada. Por eso entra como experimento el perfil «tendencia» (BTC y ETH sobre su media de 50 días). Las
   acciones no se midieron: tienen pocos meses de historia.
+- **Fórmulas con pesos** (nov 2026, cripto): 15 indicadores con una nota de 0 a 1 (medias, impulso, RSI, Bollinger,
+  MACD, volumen, calma, BTC sobre su media de 200, caída desde el techo) y 6.000 mezclas de pesos y cortes. Las 10 mejores
+  al elegir le ganaron a BTC en 55 % de las ventanas de prueba; «sobre su media de 50 días» sola, en 64 %. Mezclar muchos
+  indicadores se ajusta al pasado y prueba peor. En cripto sirven los indicadores de tendencia e impulso; los de rebote
+  (RSI bajo, Bollinger abajo, comprar la caída) perdieron en los dos tramos.
+- **Acciones con historia larga** (Yahoo, solo para el estudio; elegir con 2005–2018 y probar desde 2019, ejecutando en la
+  apertura siguiente con 0,15 % por lado): ninguna regla de tendencia, rebote, miedo (VIX) o calendario sobre SPY o QQQ le
+  ganó a mantener el índice de forma pareja; las de tendencia bajan la peor caída. Operar intradía (1 h y 5 m) pierde con
+  las comisiones de Binance aunque sin costos gane. Después de un día de −3 % o peor, el S&P 500 subió más que lo normal a
+  60 días (desde 2019: +11 % contra +4 %, con pocos casos y casi todos de 2020 y 2025). Rotar entre las 8 grandes parece
+  ganar, pero esas 8 se eligieron hoy, sabiendo cuáles subieron: no vale como prueba.
 - **Cripto y acciones van aparte** en la pantalla (`lib_perfiles.mercado_de`: `cripto`, `acciones` o `mixto`, que sale en los
   dos lados): las criptos operan siempre, caen más y tienen años de historia; las acciones siguen el horario de EE. UU. y en
   Binance tienen meses. El mapa de inicios solo se muestra en cripto.
