@@ -2121,6 +2121,16 @@
       E.sim = { ...E.sim, corriendo: false, ultima: (r && r.datos && r.datos.ultima) || E.sim.ultima };
       if (!(r && r.ok)) toast(Tp("No pude simular."), { error: true });
       host.enviar("realEstado", {});        // simular es uno de los requisitos para pasar a real
+      // Las probabilidades del mismo período: se piden solas, al lado del resultado.
+      const dias = Number((E.sim.ultima || {}).dias) || Number(E.sim.dias) || 90;
+      if (r && r.ok && !(E.prob && E.prob.dias === dias && (E.prob.datos || E.prob.cargando))) {
+        E.prob = { dias, cargando: true };
+        host.enviar("simularProbabilidades", { dias });
+      }
+      pintar();
+    },
+    probabilidadesListo(r) {
+      E.prob = { ...(E.prob || {}), cargando: false, datos: r && r.ok ? r.datos : null, error: !(r && r.ok) };
       pintar();
     },
     realEstadoListo(r) {
@@ -2598,7 +2608,7 @@
   // Los perfiles que se ofrecen, en la vista previa: números inventados, con la forma que devuelve lib_simulacion.comparar.
   function perfilesDemo(monto, desde, hasta) {
     const ritmo = { holding: 0, holding_ocho: 0, compra_semanal: 0, rebalanceo: 0, cosecha: 0, indice_eeuu: 0, indice_semanal: 0,
-      acciones_ocho: 0, semanal_rotacion: 0, nucleo_satelite: 0, cripto_acciones: 0, rotacion: 8 };
+      acciones_ocho: 0, semanal_rotacion: 0, nucleo_satelite: 0, cripto_acciones: 0, tendencia: 6, rotacion: 8 };
     // Cuánto deja cada holding en la vista previa, por semana de compra (números inventados, con la forma de los reales).
     const RUMBO = { holding: 0.004, holding_ocho: 0.0034, compra_semanal: 0.0045, rebalanceo: 0.0028, cosecha: 0.0036,
       indice_eeuu: 0.003, indice_semanal: 0.0025, acciones_ocho: 0.0035, semanal_rotacion: 0.0042, nucleo_satelite: 0.0038,
@@ -2619,6 +2629,11 @@
           if (i > 1) movimientos.push({ ms: x, que: "venta", par: ["SOLUSDT", "TRXUSDT", "BNBUSDT", "XRPUSDT"][(i + 2) % 4], precio: 100, monto: saldo / 2, por: "rotacion", estrategia: "rotacion", ganancia: saldo / 2 * r, saldo: saldo + saldo / 2 * r });
           saldo += saldo / 2 * r;
           movimientos.push({ ms: x, que: "compra", par: nueva, precio: 100, monto: saldo / 2, estrategia: "rotacion", temporalidad: "1d" });
+        } else if (perfil === "tendencia") {
+          const p2 = i % 2 ? "BTCUSDT" : "ETHUSDT", r = Math.sin(i * 1.1) * 0.08 + 0.03;
+          movimientos.push({ ms: x - 9 * 86400000, que: "compra", par: p2, precio: 100, monto: saldo * 0.6, estrategia: "tendencia", temporalidad: "1d" });
+          saldo += saldo * 0.6 * r;
+          movimientos.push({ ms: x, que: "venta", par: p2, precio: 100 * (1 + r), monto: saldo * 0.6, por: "tendencia", ganancia: saldo * 0.6 * r, saldo });
         } else if (familia) {
           movimientos.push({ ms: x, que: "compra", par, precio, monto: monto / 12, estrategia: "holding", temporalidad: "1d" });
           if (perfil === "cosecha" && i === 9) movimientos.push({ ms: x, que: "venta", par, precio: precio * 1.3, monto: monto / 20, por: "cosecha", ganancia: monto / 80, saldo });
@@ -2737,6 +2752,20 @@
           linea(t0 + 60000, "rotacion_compra", "SOLUSDT", { precio: 166.1, monto: m / 2 }, { puesto: 1 }),
           linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m })], flujo, radar, jugadas: {} };
     }
+    if (v.perfil === "tendencia") {
+      // La tendencia de la vista previa: BTC sobre su promedio (lo tiene) y ETH bajo el suyo (su parte en USDT).
+      const btc = precio("BTCUSDT"), parte = m * 0.6 * 0.9985;
+      const tenencias = [{ par: "BTCUSDT", cantidad: parte / 96100, gastado: m * 0.6, precio_ahora: btc, valor: parte / 96100 * btc, precio_medio: 96100 }];
+      const valor = m * 0.4 + tenencias[0].valor;
+      const tendencia = { dia_ms: hoy, frenado: false, filas: [
+        { par: "BTCUSDT", precio: btc, media: btc / 1.042, sobre: true, parte: 0.6, reparto: 0.6 },
+        { par: "ETHUSDT", precio: precio("ETHUSDT"), media: precio("ETHUSDT") / 0.971, sobre: false, parte: 0, reparto: 0.4 }] };
+      return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
+        ganancia_relativa: valor / m - 1, efectivo: m * 0.4, posiciones: [], tenencias, tendencia,
+        ultima: { decision: "mantiene", tiene: ["BTCUSDT"] },
+        movimientos: [linea(t0 + 60000, "tendencia_compra", "BTCUSDT", { precio: 96100, monto: m * 0.6 }, {}),
+          linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m })], flujo, radar, jugadas: {} };
+    }
     const familia = ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "indice_eeuu", "indice_semanal",
       "acciones_ocho"].includes(v.perfil);
     const movs = familia
@@ -2765,9 +2794,23 @@
         pendiente: v.perfil === "compra_semanal" ? { BTCUSDT: { limite: 71000, monto: m / 52 * 0.6 } } : {} } : null };
   }
   // El mapa de inicios de la vista previa: números inventados, con la forma de lib_simulacion.mapa.
+  // Las probabilidades de la vista previa: números inventados, con la forma de lib_simulacion.probabilidades.
+  function probDemo(dias) {
+    const r = azar(dias), acciones = /indice|acciones/;
+    const fila = (perfil, k) => {
+      if (acciones.test(perfil)) return { perfil, n: 0, listo: false };
+      const gana = 0.55 + r() * 0.3, tipico = 0.02 + r() * 0.25 * Math.sqrt(dias / 365);
+      return { perfil, n: Math.round((3000 - dias) / 14), listo: true, gana, pierde_grande: 0.05 + r() * 0.2, gana_btc: 0.25 + r() * 0.4,
+        malo: -0.15 - r() * 0.3, tipico, bueno: tipico + 0.4 + k * 0.03 };
+    };
+    const perfiles = ["holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "indice_eeuu", "indice_semanal", "acciones_ocho",
+      "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "tendencia", "rotacion"];
+    return { formato: 1, dias, cada_dias: 14, perdida_grande: 0.2, filas: perfiles.map(fila),
+      btc: { n: 200, listo: true, gana: 0.66, pierde_grande: 0.21, malo: -0.42, tipico: 0.31, bueno: 1.9 } };
+  }
   function mapaDemo() {
     const inicios = [], perfiles = ["holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "indice_eeuu", "indice_semanal",
-      "acciones_ocho", "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "rotacion"];
+      "acciones_ocho", "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "tendencia", "rotacion"];
     for (let a = 2018, m = 6; a < 2026 || (a === 2026 && m <= 1); m += 6) { if (m > 12) { m -= 12; a += 1; continue; } inicios.push(Date.UTC(a, m - 1, 1)); }
     const r = azar(7), forma = (k, i) => (6 - i * 0.7) * (0.5 + 0.15 * Math.sin(i + k)) - 0.35 + r() * 0.2;
     return { formato: 1, hasta_ms: Date.now(), inicios, monto: 100,
@@ -2821,6 +2864,7 @@
         c.responder("vivoListo", { ok: true, datos: vivoDemo() });
       });
       case "simularMapa": return c.responder("mapaListo", { ok: true, datos: mapaDemo() });
+      case "simularProbabilidades": return c.luego(300, () => c.responder("probabilidadesListo", { ok: true, datos: probDemo(Number(d.dias)) }));
       case "simularEstado": return c.responder("simularEstadoListo", { ok: true, datos: { ultima: DEMO.simulacion || {} } });
       case "simularCorrer": return c.luego(700, () => {
         DEMO.simulacion = simulacionDemo(Number(d.monto), Number(d.dias));

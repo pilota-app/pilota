@@ -34,6 +34,7 @@ import lib_modos
 import lib_perfiles
 import lib_registro
 import lib_rotacion
+import lib_tendencia
 import lib_tamano
 import lib_universo
 import nucleo
@@ -112,6 +113,8 @@ def empezar(perfil, monto, ahora_ms=None):
                         "ultima_ms": 0, "compras": []}
     if p["tipo"] == "rotar":
         d["rotacion"] = {"efectivo": monto, "tenencias": {}, "gastado": {}, "dia_ms": 0, "ranking": []}
+    if p["tipo"] == "tendencia":
+        d["tendencia"] = {**lib_tendencia.nuevo(monto), "dia_ms": 0, "filas": []}
     guardar(d)
     lib_registro.anotar(AMBIENTE, "perfil_empezado", ms=ms, resultado={"perfil": perfil, "saldo": monto})
     return {"ok": True, "datos": d}
@@ -315,6 +318,53 @@ def _vuelta_rotacion(d, ms, f, perfil=None):
     return {"decision": "mantiene" if actuales else ("frenado" if not pasa else "sin_senal"), "tiene": actuales}
 
 
+def _vuelta_tendencia(d, ms, f, perfil=None):
+    """Una vez por día, apenas cierra la vela diaria: cada moneda del reparto con su parte si cerró sobre su media, y nada si
+    cerró bajo (`lib_tendencia.pesos_cruce`). Lleva el libro ahí con `lib_tendencia.paso`, el mismo de la comparación, a
+    precio de 1 m de ahora. Con un freno puesto vende todo y espera en USDT."""
+    p = lib_perfiles.de(perfil or d["perfil"])
+    t = d.get("tendencia") or {**lib_tendencia.nuevo(d.get("monto") or 0), "dia_ms": 0}
+    dia = ms // lib_tendencia.DIA_MS * lib_tendencia.DIA_MS
+    if int(t.get("dia_ms") or 0) >= dia:
+        return {"decision": "esperando", "proxima_ms": dia + lib_tendencia.DIA_MS}
+    tramos = {}
+    for par in p["reparto"]:
+        velas = [v for v in _diaria(par) if v[0] + lib_tendencia.DIA_MS <= dia]
+        if not velas or velas[-1][0] != dia - lib_tendencia.DIA_MS:      # sin la vela de ayer no se decide
+            return {"decision": "sin_datos", "faltan": [par]}
+        tramos[par] = [v[4] for v in velas[-p["media"] - 5:]]
+    filas = lib_tendencia.filas_cruce(tramos, p["reparto"], p["media"])
+    if filas is None:
+        return {"decision": "sin_datos"}
+    puerta = lib_frenos.permite_entrada(f)
+    objetivo = lib_tendencia.pesos_cruce(tramos, p["reparto"], p["media"]) if puerta["puede"] else {}
+    hoy = {par: precio_fresco(par, ms) for par in set(objetivo) | set(t.get("cantidad") or {})}
+    if any(not x for x in hoy.values()):
+        return {"decision": "sin_datos", "faltan": [par for par, x in hoy.items() if not x]}
+    taker = lib_tamano.comisiones(lib_costos.comisiones())["taker"]
+    movs = lib_tendencia.paso(t, ms, hoy, objetivo, taker, lib_tendencia.SPREAD, p["umbral"])
+    for m in movs:
+        if m["que"] == "compra":
+            lib_registro.anotar(AMBIENTE, "tendencia_compra", par=m["par"], ms=ms,
+                                orden={"lado": "compra", "tipo": "mercado", "precio": m["precio"], "cantidad": m["cantidad"],
+                                       "monto": m["monto"], "estado": "llenada"},
+                                resultado={"comision": m["comision"]})
+        else:
+            lib_registro.anotar(AMBIENTE, "tendencia_venta", par=m["par"], ms=ms,
+                                orden={"lado": "venta", "tipo": "mercado", "precio": m["precio"], "cantidad": m["cantidad"],
+                                       "monto": m["monto"], "estado": "llenada"},
+                                resultado={"precio": m["precio"], "neto": m["ganancia"], "comision": m["comision"]})
+    t["dia_ms"] = dia
+    t["filas"] = [{k: x[k] for k in ("par", "precio", "media", "sobre", "parte", "reparto")} for x in filas]
+    t["frenado"] = not puerta["puede"]
+    d["tendencia"] = t
+    if movs:
+        return {"decision": "tendencia", "compra": [m["par"] for m in movs if m["que"] == "compra"],
+                "vende": [m["par"] for m in movs if m["que"] == "venta"]}
+    tiene = [par for par, q in (t.get("cantidad") or {}).items() if q > 0]
+    return {"decision": "mantiene" if tiene else ("frenado" if not puerta["puede"] else "sin_senal"), "tiene": tiene}
+
+
 def _bajo_de(par, dia_ms):
     """El mínimo de la vela diaria que empezó en `dia_ms`, si ya cerró y está guardada."""
     try:
@@ -396,6 +446,8 @@ def decidir(ctx=None, ahora_ms=None):
         vuelta = _vuelta_holding(d, ms)
     elif lib_perfiles.de(d["perfil"])["tipo"] == "rotar":
         vuelta = _vuelta_rotacion(d, ms, f)
+    elif lib_perfiles.de(d["perfil"])["tipo"] == "tendencia":
+        vuelta = _vuelta_tendencia(d, ms, f)
     else:
         puerta = lib_frenos.permite_entrada(f)
         vuelta = ({"decision": "frenado", "motivo": puerta["motivo"]} if not puerta["puede"]
@@ -409,7 +461,8 @@ def decidir(ctx=None, ahora_ms=None):
 
 # ── Lo que lee la pantalla ───────────────────────────────────────────────────────────────────────────────────────────
 
-MOVIMIENTOS = ("perfil_empezado", "perfil_detenido", "compra_holding", "venta_holding", "rotacion_compra", "rotacion_venta", "entrada_ruptura", "entrada_rebote", "objetivo",
+MOVIMIENTOS = ("perfil_empezado", "perfil_detenido", "compra_holding", "venta_holding", "rotacion_compra", "rotacion_venta",
+               "tendencia_compra", "tendencia_venta", "entrada_ruptura", "entrada_rebote", "objetivo",
                "stop", "stop_movil", "cierre_manual", "propuesta_vencida", "rechazo", "freno_diario", "freno_racha",
                "freno_piso", "freno_piso_absoluto", "saldo_reiniciado")
 
@@ -481,6 +534,17 @@ def estado(ahora_ms=None, minutos=None):
                               "valor": gastado if precio is None else _numero(cantidad) * precio,
                               "precio_medio": gastado / _numero(cantidad) if _numero(cantidad) > 0 else None})
         valor = efectivo + sum(_numero(x["valor"]) for x in tenencias)
+    elif perfil and perfil["tipo"] == "tendencia":
+        t = d.get("tendencia") or {}
+        efectivo = _numero(t.get("efectivo"))
+        for par, cantidad in sorted((t.get("cantidad") or {}).items()):
+            gastado = _numero((t.get("costo") or {}).get(par))
+            precio = ahora.get(par) or precio_fresco(par, ms)
+            ahora[par] = precio
+            tenencias.append({"par": par, "cantidad": _numero(cantidad), "gastado": gastado, "precio_ahora": precio,
+                              "valor": gastado if precio is None else _numero(cantidad) * precio,
+                              "precio_medio": gastado / _numero(cantidad) if _numero(cantidad) > 0 else None})
+        valor = efectivo + sum(_numero(x["valor"]) for x in tenencias)
     else:
         ej = lib_ejecutor_prueba.estado(ms, minutos=minutos)
         efectivo = _numero(ej.get("saldo")) - _numero(ej.get("comprometido"))
@@ -500,6 +564,7 @@ def estado(ahora_ms=None, minutos=None):
             "rotacion": d.get("rotacion") if perfil and perfil["tipo"] == "rotar"
             else next((x.get("rotacion") for x in (d.get("mezcla") or {}).values() if x.get("rotacion")), None),
             "mezcla": mezcla,
+            "tendencia": d.get("tendencia") if perfil and perfil["tipo"] == "tendencia" else None,
             "pares": list(lib_perfiles.pares_de(d.get("perfil"))) if perfil else [],
             # Las reglas del perfil puesto, para que la pantalla diga su plan con los mismos números.
             "reglas": {k: (list(x) if isinstance(x, tuple) else x) for k, x in (perfil or {}).items()},

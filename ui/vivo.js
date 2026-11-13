@@ -23,22 +23,23 @@ window.PilotaVivo = (() => {
     semanal_rotacion: { nombre: "Semanal + Rotación", que: "La mitad en Compra semanal y la mitad en Rotación. Cada mitad sigue sus reglas por su lado.", ritmo: "Lento" },
     nucleo_satelite: { nombre: "Núcleo y satélite", que: "70 % guardado en BTC y ETH (el núcleo) y 30 % en Rotación (el satélite): lo grande no se mueve, lo chico prueba.", ritmo: "Lento" },
     cripto_acciones: { nombre: "Cripto + Acciones", que: "La mitad en Compra semanal de BTC y ETH y la mitad en Índice semanal de EE. UU. Dos mercados distintos que no siempre caen juntos.", ritmo: "Muy lento" },
+    tendencia: { nombre: "Tendencia", que: "Experimento: BTC y ETH solo mientras su precio está sobre su promedio de 50 días. Cuando cae bajo el promedio, esa parte espera en USDT. Sale antes de las caídas grandes y entra tarde en las subidas.", ritmo: "Lento" },
     rotacion: { nombre: "Rotación", que: "Experimento: tiene las 2 monedas que vienen más fuertes de las 8 y cambia a la que pasa adelante. Se parece a comprar BTC: a veces gana y a veces pierde, y puede caer tanto como BTC.", ritmo: "Lento" },
   };
   // Los que se ofrecen (bin/lib_perfiles.py: ORDEN). Los otros cuatro quedaron retirados: perdieron con datos reales. Sus
   // nombres siguen arriba para contar lo que ya pasó en el registro.
   const ORDEN = ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "indice_eeuu", "indice_semanal",
-    "acciones_ocho", "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "rotacion"];
+    "acciones_ocho", "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "tendencia", "rotacion"];
   // Cómo se agrupan en la pantalla: la familia holding primero (comprar y guardar) y aparte los experimentos.
   const GRUPOS = [["guardar", "Comprar y guardar", ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha"]],
     ["acciones", "Acciones de EE. UU.", ["indice_eeuu", "indice_semanal", "acciones_ocho"]],
     ["mezclas", "Mezclas", ["semanal_rotacion", "nucleo_satelite", "cripto_acciones"]],
-    ["experimento", "Experimento", ["rotacion"]]];
+    ["experimento", "Experimentos", ["tendencia", "rotacion"]]];
   const GRUPO_AYUDA = {
     guardar: "Compran por partes y guardan. Cada uno cambia una sola cosa: qué monedas, cada cuánto compra o si vende una parte.",
     acciones: "Acciones tokenizadas de Binance: cada una respaldada por la acción real. Llegaron en junio de 2026, así que su historia es corta.",
     mezclas: "Reparten el monto entre dos perfiles. Cada parte sigue sus reglas y la pantalla muestra cuánto vale cada una.",
-    experimento: "Opera más seguido. Se mide igual que los otros, pero no tiene una ventaja probada.",
+    experimento: "Compran y venden según el mercado. Se miden igual que los otros, pero su ventaja no está probada.",
   };
   // Las monedas de cada perfil (bin/lib_perfiles.py: «pares»). Todas contra USDT; el holding guarda BTC y ETH.
   const MONEDAS = {
@@ -50,7 +51,7 @@ window.PilotaVivo = (() => {
     nucleo_satelite: ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"],
     cripto_acciones: ["BTC", "ETH", "SPY", "QQQ"], conservador: ["BTC", "ETH", "BNB"], equilibrado: ["BTC", "ETH", "BNB", "SOL", "XRP"],
     trader: ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"], scalper: ["BTC", "ETH", "SOL", "XRP", "DOGE"],
-    rotacion: ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"],
+    rotacion: ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"], tendencia: ["BTC", "ETH"],
   };
   // Cripto y acciones se muestran aparte porque se comportan distinto (bin/lib_perfiles.py: mercado_de). Sale de las monedas
   // de cada perfil: solo acciones, solo cripto o las dos («mixto», que aparece en los dos lados).
@@ -88,6 +89,7 @@ window.PilotaVivo = (() => {
     esperando: "Ya compré esta semana. La próxima compra es el {fecha}.",
     completo: "Ya compré todas las partes: ahora solo mantengo.",
     rotacion: "Cambié de moneda: vendí {salen} y compré {entran}.",
+    tendencia: "Hoy cambió el mercado: compré {compra} y vendí {vende}.",
     venta: "Vendí una parte: está en «Lo último que hizo».",
     mantiene: "Comparé las 8 y sigo con {tiene}: siguen entre las más fuertes.",
   };
@@ -172,6 +174,10 @@ window.PilotaVivo = (() => {
         case "rotacion_venta": return (r.neto || 0) >= 0
           ? frase("Salí de {moneda}: se cayó del grupo de las más fuertes. Vendí a {precio} y gané {neto}.", { moneda: m, precio: usdt(o.precio), neto: usdt(r.neto || 0) })
           : frase("Salí de {moneda}: se cayó del grupo de las más fuertes. Vendí a {precio} y perdí {neto}.", { moneda: m, precio: usdt(o.precio), neto: usdt(Math.abs(r.neto || 0)) });
+        case "tendencia_compra": return frase("{moneda} cerró sobre su promedio de 50 días: compré {monto} a {precio}.", { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio) });
+        case "tendencia_venta": return (r.neto || 0) >= 0
+          ? frase("Vendí {monto} de {moneda} a {precio} y gané {neto}.", { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio), neto: usdt(r.neto || 0) })
+          : frase("Vendí {monto} de {moneda} a {precio} y perdí {neto}.", { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio), neto: usdt(Math.abs(r.neto || 0)) });
         case "entrada_ruptura": case "entrada_rebote":
           if (J[o.id] && o.estado !== "llenada") {
             return `${frase("Dejé una compra de {moneda} esperando en {precio} ({monto}), con stop en {stop} y objetivo en {objetivo}.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto), stop: usdt(o.stop), objetivo: usdt(o.objetivo) })}
@@ -194,7 +200,7 @@ window.PilotaVivo = (() => {
       }
     }
     const claseLinea = (l) => ({ objetivo: "gana", stop: "pierde", stop_movil: (l.resultado || {}).neto > 0 ? "gana" : "pierde",
-      compra_holding: "compra", venta_holding: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", rotacion_compra: "compra", rotacion_venta: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", entrada_ruptura: "compra", entrada_rebote: "compra", rechazo: "nada", propuesta_vencida: "nada" })[l.razon] || "info";
+      compra_holding: "compra", venta_holding: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", rotacion_compra: "compra", rotacion_venta: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", tendencia_compra: "compra", tendencia_venta: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", entrada_ruptura: "compra", entrada_rebote: "compra", rechazo: "nada", propuesta_vencida: "nada" })[l.razon] || "info";
     function filaLinea(l) {
       return `<li class="mov" data-tipo="${claseLinea(l)}"><span class="mov-punto" aria-hidden="true"></span>
         <span class="mov-cuando" data-sin-traducir>${esc(fechaHora(l.fecha))}</span>
@@ -207,6 +213,9 @@ window.PilotaVivo = (() => {
         return v.por === "cosecha"
           ? frase("Coseché {moneda} a {precio}: dejó {neto}. Saldo: {saldo}.", { moneda: m, precio: usdt(v.precio), neto: usdt(v.ganancia || 0), saldo: usdt(v.saldo) })
           : frase("Rebalanceo: vendí {moneda} a {precio} porque cripto pasó de su parte. Saldo: {saldo}.", { moneda: m, precio: usdt(v.precio), saldo: usdt(v.saldo) });
+      }
+      if (v.que === "venta" && v.por === "tendencia") {
+        return frase("Vendí {moneda} a {precio}: cayó bajo su promedio o sobraba. Dejó {neto}. Saldo: {saldo}.", { moneda: m, precio: usdt(v.precio), neto: usdt(v.ganancia || 0), saldo: usdt(v.saldo) });
       }
       if (v.que === "venta" && v.por === "rotacion") {
         return frase("Vendí {moneda} a {precio}: pasé a una más fuerte. Dejó {neto}. Saldo: {saldo}.", { moneda: m, precio: usdt(v.precio), neto: usdt(v.ganancia || 0), saldo: usdt(v.saldo) });
@@ -302,11 +311,14 @@ window.PilotaVivo = (() => {
       const plantilla = VUELTA[u.decision];
       if (!plantilla) return "Estoy mirando.";
       const lista = (xs) => (xs || []).map(moneda).join(", ") || "—";
+      if (v.perfil === "tendencia" && ["esperando", "mantiene", "sin_senal"].includes(u.decision)) {
+        return frase("Ya miré los promedios hoy. Vuelvo a mirar cuando cierre la vela del día, a las {hora}.", { hora: hora(u.proxima_ms || (((v.tendencia || {}).dia_ms || 0) + 86400000)) });
+      }
       if (u.decision === "esperando" && v.perfil === "rotacion") {
         return frase("Ya comparé las 8 hoy. Vuelvo a comparar cuando cierre la vela del día, a las {hora}.", { hora: hora(u.proxima_ms) });
       }
       return frase(plantilla, { motivo: Tp(motivoCorto(u.motivo)), n: numero(u.parte || 0, 0), fecha: dia(u.proxima_ms),
-        salen: lista(u.salen), entran: lista(u.entran), tiene: lista(u.tiene) });
+        salen: lista(u.salen), entran: lista(u.entran), tiene: lista(u.tiene), compra: lista(u.compra), vende: lista(u.vende) });
     }
     // ── Qué estoy esperando (bin/lib_radar.py): el gatillo de cada estrategia, cuánto falta, la operación y su historia ──
     const NOMBRE_ESTRATEGIA = { rebote: "rebote", ruptura: "ruptura" };
@@ -403,8 +415,27 @@ window.PilotaVivo = (() => {
         }).join("")}</ol>
         <p class="ayuda">Fuerza: cuánto subió en 30 días, dividido por cuánto se movió en el camino. Gana la que sube más parejo, no la que más salta. Solo entra una moneda que está sobre su promedio de 50 días, y cambio una solo cuando se cae del grupo: cada cambio paga comisión.</p></div>`;
     }
+    // La tendencia no espera un precio de entrada: mira si cada moneda está sobre su promedio de 50 días. Su tarjeta es eso.
+    function cruce(E) {
+      const v = E.vivo || {}, t = v.tendencia || {}, filas = t.filas || [];
+      if (!filas.length) {
+        return `<div class="tarjeta ranking"><h3>Sobre o bajo su promedio</h3>
+          <p class="suave">Estoy preparando BTC y ETH. En cuanto tenga sus velas diarias, te muestro si están sobre su promedio de 50 días.</p></div>`;
+      }
+      return `<div class="tarjeta ranking"><h3>Sobre o bajo su promedio</h3>
+        ${t.frenado ? `<p class="freno-texto">Hay un freno puesto: vendí todo y espero en USDT.</p>`
+          : `<p class="suave">${frase("Vuelvo a mirar cuando cierra la vela del día, a las {hora}.", { hora: hora((t.dia_ms || 0) + 86400000) })}</p>`}
+        <ol class="ranking-filas">${filas.map((f) => `<li class="ranking-fila" data-estado="${f.sobre ? "tengo" : "no"}">
+            <span class="ranking-moneda" data-sin-traducir>${esc(moneda(f.par))}</span>
+            <span class="ranking-cambio" data-signo="${signo(f.precio / f.media - 1)}" data-sin-traducir>${esc(conSigno(f.precio / f.media - 1, (x) => porcentaje(x, 1)))}</span>
+            <span class="radar-estado" data-estado="${f.sobre ? "casi" : "nada"}">${f.sobre
+              ? frase("Sobre su promedio ({media}): tengo {pct}", { media: usdt(f.media), pct: porcentaje(f.reparto, 0) })
+              : frase("Bajo su promedio ({media}): su {pct} espera en USDT", { media: usdt(f.media), pct: porcentaje(f.reparto, 0) })}</span></li>`).join("")}</ol>
+        <p class="ayuda">El número es cuánto está el precio sobre o bajo su promedio de los últimos 50 días. Cuando pasa de un lado al otro, compro o vendo esa parte.</p></div>`;
+    }
     function radar(E) {
       const v = E.vivo || {};
+      if ((v.perfil || (v.radar || {}).perfil) === "tendencia") return cruce(E);
       if ((v.perfil || (v.radar || {}).perfil) === "rotacion") return ranking(E);
       const R = v.radar || {};
       const filas = ordenFilas(R.filas || []);
@@ -511,6 +542,15 @@ window.PilotaVivo = (() => {
     }
     // La frase del robot: lo más cerca que está de comprar, o lo último que hizo.
     function narra(v) {
+      if (v.perfil === "tendencia") {
+        const filas = (v.tendencia || {}).filas || [];
+        if (v.ultima && v.ultima.decision === "tendencia") return vuelta(v);
+        const sobre = filas.filter((f) => f.sobre).map((f) => moneda(f.par)), bajo = filas.filter((f) => !f.sobre).map((f) => moneda(f.par));
+        if (filas.length && sobre.length && bajo.length) return frase("Tengo {sobre}: está sobre su promedio. {bajo} está bajo el suyo y espero en USDT.", { sobre: sobre.join(" y "), bajo: bajo.join(" y ") });
+        if (filas.length && sobre.length) return frase("Tengo {sobre}: están sobre su promedio de 50 días.", { sobre: sobre.join(" y ") });
+        if (filas.length) return frase("BTC y ETH están bajo su promedio de 50 días: espero en USDT.", {});
+        return vuelta(v);
+      }
       if (v.perfil === "rotacion") {
         const tengo = (v.tenencias || []).filter((t) => t.cantidad > 0).map((t) => moneda(t.par));
         if (v.ultima && v.ultima.decision === "rotacion") return vuelta(v);
@@ -548,6 +588,7 @@ window.PilotaVivo = (() => {
       semanal_rotacion: "Mitad del monto en Compra semanal (BTC y ETH, 52 semanas) y mitad en Rotación (las 2 más fuertes de las 8). Cada mitad tiene su propia plata y sus propias reglas.",
       nucleo_satelite: "70 % compra BTC y ETH en 12 partes y los guarda; 30 % va a Rotación. Si la rotación falla, lo grande sigue guardado.",
       cripto_acciones: "Mitad en Compra semanal de BTC y ETH y mitad en Índice semanal de EE. UU. Si cripto cae fuerte, las acciones no siempre caen igual.",
+      tendencia: "Una vez al día, cuando cierra la vela diaria, mira si BTC y ETH cerraron sobre su promedio de los últimos 50 días. La que está sobre su promedio se tiene con su parte (BTC 60 %, ETH 40 %); la que está bajo, esa parte espera en USDT. Si una parte se aleja más de 2 % de lo que le toca, la ajusta. No pone stop: sale cuando el precio cruza el promedio para abajo. Con un freno de la cuenta, vende todo.",
       rotacion: "Una vez al día, cuando cierra la vela diaria, ordena las 8 monedas por fuerza: cuánto subieron en 30 días, dividido por cuánto se movieron en el camino. Tiene las 2 primeras que estén sobre su promedio de 50 días, mitad y mitad. Cambia una solo cuando sale del grupo de las 3 mejores: cada cambio paga comisión. No pone stop: sale cuando la moneda pierde fuerza.",
     };
     function reglas(perfil) {
@@ -704,7 +745,41 @@ window.PilotaVivo = (() => {
           <div class="chips" role="group" aria-label="Período">${PERIODOS.map(([d, t]) => `<button type="button" class="chip" data-sim-dias="${d}" aria-pressed="${Number(s.dias || 90) === d}">${t}</button>`).join("")}</div>
           <button type="button" class="pz-boton pz-principal boton-ancho" id="sim-correr"${s.corriendo ? " disabled" : ""}>${s.corriendo ? "Comparando…" : "Comparar"}</button></div>
         ${cuerpo}
+        ${probabilidades(E)}
         ${mapa(E)}</div>`;
+    }
+
+    // ── Qué tan seguido sale bien (bin/lib_simulacion.py: probabilidades): el mismo período en cientos de inicios ──
+    // Un solo resultado depende mucho del día en que empezaste. Esto repite la cuenta empezando cada dos semanas desde 2018.
+    function probabilidades(E) {
+      const P = E.prob || {};
+      if (!P.cargando && !P.datos && !P.error) return "";
+      const titulo = `<h3>¿Qué tan seguido sale bien?</h3>`;
+      if (P.cargando) return `<div class="tarjeta prob" id="prob">${titulo}<p class="suave">Repitiendo la cuenta con cientos de fechas de inicio…</p></div>`;
+      if (!P.datos) return `<div class="tarjeta prob" id="prob">${titulo}<p class="suave">No pude calcular las probabilidades.</p></div>`;
+      const D = P.datos, m = mercadoElegido(E);
+      const periodo = Tp((PERIODOS.find(([d]) => d === D.dias) || [0, frase("{n} días", { n: numero(D.dias, 0) })])[1]);
+      const filas = D.filas.filter((f) => (m === "cripto" ? mercadoDe(f.perfil) === "cripto" : enMercado(f.perfil, m)));
+      const listas = filas.filter((f) => f.listo);
+      const de100 = (x) => (x == null ? "–" : frase("{n} de 100", { n: numero(Math.round(x * 100), 0) }));   // frase ya escapa
+      const pct = (x) => conSigno(x, (y) => porcentaje(y, 0));
+      const tono = (x) => (x >= 0.2 ? "muy-bien" : (x >= 0 ? "bien" : (x >= -0.2 ? "mal" : "muy-mal")));
+      const celdas = (f) => `<td>${de100(f.gana)}</td><td>${de100(f.gana_btc)}</td><td>${de100(f.pierde_grande)}</td>
+        <td data-tono="${tono(f.malo)}" data-sin-traducir>${esc(pct(f.malo))}</td><td data-tono="${tono(f.tipico)}" data-sin-traducir>${esc(pct(f.tipico))}</td>
+        <td data-tono="${tono(f.bueno)}" data-sin-traducir>${esc(pct(f.bueno))}</td>`;
+      if (!listas.length) {
+        return `<div class="tarjeta prob" id="prob">${titulo}
+          <p class="ayuda">${frase("Con acciones todavía no se puede: llevan muy poco tiempo en Binance para repetir la cuenta con ventanas de {periodo}.", { periodo })}</p></div>`;
+      }
+      const n = Math.max(...listas.map((f) => f.n));
+      return `<div class="tarjeta prob" id="prob">${titulo}
+        <p class="ayuda">${frase("Un resultado solo depende mucho del día en que empiezas. Aquí repetí la cuenta empezando cada 2 semanas desde 2018 y esperando {periodo}: {n} inicios distintos, con comisiones.", { periodo, n: numero(n, 0) })}</p>
+        <div class="mapa-caja"><table class="mapa-tabla prob-tabla">
+          <thead><tr><th scope="col">Perfil</th><th scope="col">Terminó ganando</th><th scope="col">Le ganó a BTC</th><th scope="col">Perdió más de 20 %</th>
+            <th scope="col">Si sale mal</th><th scope="col">Lo normal</th><th scope="col">Si sale bien</th></tr></thead>
+          <tbody>${listas.map((f) => `<tr><th scope="row">${Tp(nombre(f.perfil))}</th>${celdas(f)}</tr>`).join("")}
+            ${D.btc && D.btc.listo ? `<tr class="mapa-btc"><th scope="row">${Tp("Comprar BTC de una")}</th>${celdas({ ...D.btc, gana_btc: null })}</tr>` : ""}</tbody></table></div>
+        <p class="ayuda">«Si sale mal» es lo que te pasa en 1 de cada 10 inicios, los peores. «Si sale bien», en 1 de cada 10, los mejores. Es lo que ya pasó, no una promesa: el mercado que viene puede ser distinto.</p></div>`;
     }
 
     // ── El mapa de inicios (bin/lib_simulacion.py: mapa): cuánto tendrías hoy según cuándo empezaste ──

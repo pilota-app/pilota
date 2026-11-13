@@ -7,6 +7,11 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- Nuevo perfil Tendencia (experimento): BTC y ETH solo mientras están sobre su promedio de 50 días. Y en «Comparar», «¿Qué
+  tan seguido sale bien?»: el mismo período repetido con cientos de fechas de inicio, con cuántas veces ganó, le ganó a BTC o
+  perdió más de 20 %. *New Trend profile (experiment): BTC and ETH only while they are above their 50-day average. And in
+  "Compare", "How often does it go well?": the same period repeated with hundreds of start dates, with how often it won,
+  beat BTC or lost more than 20%.*
 - Cripto y acciones ahora van aparte en «En vivo» y en «Comparar», con lo que cambia entre los dos. La mezcla de los dos
   sale en ambos lados. *Crypto and stocks are now separate in "Live" and "Compare", with what is different between them.
   The mix of both shows on both sides.*

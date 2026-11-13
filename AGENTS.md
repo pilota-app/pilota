@@ -67,8 +67,8 @@ cuentas ni publicidad; nada personal en el código (Ana Pérez, Matías Soto). B
 | `bin/lib_universo.py` | Las ocho monedas del robot en prueba contra USDT (`lib_datos.UNIVERSO`: BTC, ETH, BNB, SOL, XRP, ADA, TRX y DOGE): sus mínimos de Binance (`filtros`, una vez al día en `mercado/universo.json`), sus velas (`preparar`: 3 años de 1 d, 4 h y 1 h y 3 días de 1 m) y sus costos (`comisiones_de`: contra USDT no hay conversión). Lo corre el flujo en vivo en segundo plano. No es una acción. |
 | `bin/lib_rotacion.py` | La rotación: la fuerza de cada moneda (`fuerza`: lo que subió en 30 días dividido por cuánto se movió), el ranking, a cuáles pasarse (`elegir`, con margen para no cambiar por nada) y la misma regla sobre el pasado (`simular`). Pura: no lee el disco. No es una acción. |
 | `bin/lib_holding.py` | Las formas de holdear: comprar por partes y guardar, con una variante cada una (`reparto`, `partes`, `descuento`, `rebalanceo`, `cosecha`). `paso` es un día y lo usan igual la comparación (`simular`) y el robot en vivo (`lib_piloto._vuelta_holding_v`). Puro. No es una acción. |
-| `bin/simular.py` | Las acciones de «Comparar»: `estado`, `correr` (todos los perfiles con un monto y un período) y `mapa` (el mapa de inicios, `simularMapa`). |
-| `bin/lib_tendencia.py` | Seguir la tendencia y ajustar el tamaño por volatilidad (`en_tendencia`, `volatilidad`, `tamano`, `pesos_tendencia`, `pesos_rotacion`) y su recorrido por el pasado día por día (`simular`). **No lo usa ningún perfil**: no pasó la prueba con datos reales (ver «Los perfiles y el robot en vivo»). Queda para probarlo de nuevo con datos nuevos. Puro. No es una acción. |
+| `bin/simular.py` | Las acciones de «Comparar»: `estado`, `correr` (todos los perfiles con un monto y un período), `mapa` (el mapa de inicios, `simularMapa`) y `probabilidades` (qué tan seguido sale bien, `simularProbabilidades`). |
+| `bin/lib_tendencia.py` | Seguir la tendencia y ajustar el tamaño por volatilidad (`en_tendencia`, `volatilidad`, `tamano`, `pesos_tendencia`, `pesos_rotacion`), la regla del perfil tendencia (`pesos_cruce`, `filas_cruce`), un día (`paso`, el mismo en la comparación y en vivo) y su recorrido por el pasado día por día (`simular`). Puro. No es una acción. |
 | `bin/lib_candado.py` | Una sola cosa a la vez entre procesos: un solo trabajo de cada tipo (`unico`, `YaCorriendo`), una revisión a la vez (`candado`) y el trabajo que quedó sin app (`huerfano`). No es una acción. |
 | `ui/grafico.js` | El gráfico de velas en vivo en un `<canvas>` (`PilotaGrafico.crear`): 1 m, 5 m, 1 h y 4 h, Bollinger, medias, volumen y RSI con un botón, las flechas de compra y venta, las líneas de entrada, stop y objetivo, el precio que se mueve cada segundo y el destello de color de cada operación. |
 | `bin/lib_simulacion.py` | «Si hubiera puesto X»: el historial como una cartera con tamaño y frenos (`cartera`, con `perfil` y sus `movimientos`), comprar BTC y esperar, el holding por partes (`holding`), las señales sobre 5 m (`ops_rapidas`), la rotación (`rotacion`) y los perfiles que se ofrecen lado a lado (`comparar`). No es una acción (la corre `bin/simular.py`). |
@@ -641,6 +641,7 @@ con el mismo monto (`lib_simulacion.comparar`), y «Movimientos» cuenta todo lo
 | semanal_rotacion (mezcla) | 50 % compra_semanal y 50 % rotacion |
 | nucleo_satelite (mezcla) | 70 % holding_usdt (BTC y ETH contra USDT, no se ofrece solo) y 30 % rotacion |
 | cripto_acciones (mezcla) | 50 % compra_semanal y 50 % indice_semanal |
+| tendencia (experimento) | BTC 60 % y ETH 40 %, cada una solo mientras su cierre diario está sobre su media de 50 días (`lib_tendencia.pesos_cruce`); bajo la media, esa parte espera en USDT |
 | rotacion (experimento) | una vez al día tiene las 2 monedas más fuertes de las 8 contra USDT (`lib_rotacion`); puede caer tanto como BTC |
 
 **Las acciones** son los bStocks de Binance (`lib_datos.ACCIONES`, contra USDT): acciones de EE. UU. tokenizadas y respaldadas
@@ -657,6 +658,15 @@ con dinero real depende de su país: el conector real todavía no las conoce.
 cuánto tendrías hoy con cada perfil y con comprar BTC de una. Los holding se corren de nuevo desde cada inicio; la rotación
 y BTC se corren una vez y se miden desde cada inicio (sus reglas no dependen del día en que partiste, salvo la primera
 compra). Sirve para ver qué perfil aguanta un mal comienzo, no para elegir el momento: eso solo se sabe mirando atrás.
+
+**Qué tan seguido sale bien** (`lib_simulacion.probabilidades`, acción `simularProbabilidades`, se pide sola después de
+«Comparar» con el mismo período): la misma cuenta empezando cada `PROB_CADA_DIAS` (14) días desde junio de 2018. Por perfil:
+en cuántas ventanas terminó ganando, le ganó a comprar BTC o perdió más de `PROB_PERDIDA_GRANDE` (20 %), y los percentiles
+10, 50 y 90 («si sale mal», «lo normal», «si sale bien»). Con menos de `PROB_MINIMO` ventanas no da porcentajes (las acciones).
+
+**La tendencia decide una vez al día** (`lib_piloto._vuelta_tendencia`): con la vela diaria de ayer cerrada y el precio de 1 m
+fresco, lleva el libro a `lib_tendencia.pesos_cruce` con `lib_tendencia.paso`. Cada movimiento queda como `tendencia_compra` o
+`tendencia_venta`. Sin la vela de ayer no decide (`sin_datos`) y con un freno de la cuenta vende todo.
 
 Las variantes de holding (`variante` en `lib_perfiles`) se deciden una vez por día, al cerrar la vela diaria, con
 `lib_holding.paso`: el mismo paso que mide la comparación. En vivo compran y venden con el precio de 1 m de ahora y la orden
@@ -682,7 +692,8 @@ sola vez con 2023-11 → 2026-11, el tramo que nadie miró al elegir):
   las ventanas. Las de «BTC (o BTC y ETH) solo sobre su media de 50 días» le ganan en 5 o 6 de cada 10 ventanas de prueba,
   con una peor ventana de 1 año de −7 % a −17 % contra −45 % de BTC: pierden un poco en las subidas fuertes (inicios de
   2024) y ganan en las caídas (inicios de 2025). Son 103 intentos y el tramo de prueba es un solo mercado: es una pista, no
-  una ventaja probada. Las acciones no se midieron: tienen pocos meses de historia.
+  una ventaja probada. Por eso entra como experimento el perfil «tendencia» (BTC y ETH sobre su media de 50 días). Las
+  acciones no se midieron: tienen pocos meses de historia.
 - **Cripto y acciones van aparte** en la pantalla (`lib_perfiles.mercado_de`: `cripto`, `acciones` o `mixto`, que sale en los
   dos lados): las criptos operan siempre, caen más y tienen años de historia; las acciones siguen el horario de EE. UU. y en
   Binance tienen meses. El mapa de inicios solo se muestra en cripto.

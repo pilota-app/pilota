@@ -504,6 +504,22 @@
    "responde": "mapaListo",
    "limite": 600
   },
+  "simularProbabilidades": {
+   "script": "simular.py",
+   "args": [
+    "probabilidades"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "dias": {
+     "tipo": "entero",
+     "min": 30,
+     "max": 1095
+    }
+   },
+   "responde": "probabilidadesListo",
+   "limite": 600
+  },
   "simularCorrer": {
    "script": "simular.py",
    "args": [

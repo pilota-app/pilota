@@ -68,6 +68,35 @@ class Simular(unittest.TestCase):
         T.simular(100, d, INICIO + 299 * DIA, INICIO + 299 * DIA, {}, regla)
         self.assertEqual(vistos, [100.0])
 
+class Cruce(unittest.TestCase):
+    """La regla del perfil tendencia: cada moneda con su parte mientras cierra sobre su media."""
+    REPARTO = {"BTCUSDT": 0.6, "ETHUSDT": 0.4}
+
+    def test_solo_las_que_cierran_sobre_su_media(self):
+        p = T.pesos_cruce({"BTCUSDT": subida(60), "ETHUSDT": subida(60, ritmo=-0.01)}, self.REPARTO, 50)
+        self.assertEqual(p, {"BTCUSDT": 0.6})
+        self.assertIsNone(T.filas_cruce({"BTCUSDT": subida(60), "ETHUSDT": subida(20)}, self.REPARTO, 50),
+                          "sin historia de una no se decide con media regla")
+
+    def test_el_paso_vende_lo_que_sale_y_compra_con_lo_que_queda(self):
+        libro = T.nuevo(100)
+        movs = T.paso(libro, INICIO, {"BTCUSDT": 10.0}, {"BTCUSDT": 0.6}, 0.001)
+        self.assertEqual([m["que"] for m in movs], ["compra"])
+        self.assertAlmostEqual(libro["efectivo"], 40)
+        self.assertEqual(T.paso(libro, INICIO, {"BTCUSDT": 10.1}, {"BTCUSDT": 0.6}, 0.001), [], "bajo el umbral no reajusta")
+        movs = T.paso(libro, INICIO, {"BTCUSDT": 9.0}, {}, 0.001)
+        self.assertEqual([m["que"] for m in movs], ["venta"])
+        self.assertEqual(libro["cantidad"], {})
+        self.assertLess(movs[0]["ganancia"], 0, "vendió más barato de lo que compró, con costos")
+
+    def test_simular_con_la_regla_de_cruce_sale_en_la_caida(self):
+        cierres = subida(120) + subida(80, ritmo=-0.02)[1:]
+        r = T.simular(100, {"BTCUSDT": velas([c * 1 for c in cierres]), "ETHUSDT": velas(cierres)}, INICIO, INICIO + 400 * DIA,
+                      {"taker": 0.001}, lambda t, a, pasa: T.pesos_cruce(t, self.REPARTO, 50))
+        self.assertTrue(r["listo"])
+        quieto = cierres[-1] / cierres[60]
+        self.assertGreater(r["saldo"] / 100, quieto, "vender bajo la media pierde menos que quedarse en la caída")
+
 
 if __name__ == "__main__":
     unittest.main()

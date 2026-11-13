@@ -65,7 +65,7 @@ RAZONES = (
     # La prueba en vivo con un perfil (`lib_piloto`): cuándo empezó y paró, y cada compra por partes del holding
     "perfil_empezado", "perfil_detenido", "compra_holding", "venta_holding",
     # La rotación: pasa a la moneda que viene más fuerte (vende la que se cae del grupo y compra la que entra)
-    "rotacion_compra", "rotacion_venta",
+    "rotacion_compra", "rotacion_venta", "tendencia_compra", "tendencia_venta",
 )
 #: Lo que se puede decir de la orden: qué se pidió. `id` es el clientOrderId con el prefijo propio de Pilota (lo que no
 #: lo tenga es de otro y Pilota no lo toca).

@@ -651,6 +651,23 @@
    "limite": 600,
    "pieza": "app"
   },
+  "simularProbabilidades": {
+   "script": "simular.py",
+   "args": [
+    "probabilidades"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "dias": {
+     "tipo": "entero",
+     "min": 30,
+     "max": 1095
+    }
+   },
+   "responde": "probabilidadesListo",
+   "limite": 600,
+   "pieza": "app"
+  },
   "tamanoEstado": {
    "script": "tamano.py",
    "args": [

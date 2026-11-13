@@ -62,7 +62,7 @@ class Perfiles(unittest.TestCase):
     def test_se_ofrecen_los_holding_y_la_rotacion(self):
         self.assertEqual(perfiles.ORDEN, ("holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha",
                                           "indice_eeuu", "indice_semanal", "acciones_ocho",
-                                          "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "rotacion"))
+                                          "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "tendencia", "rotacion"))
         self.assertEqual(perfiles.pares_de("cripto_acciones"), ("BTCUSDT", "ETHUSDT", "SPYBUSDT", "QQQBUSDT"))
         self.assertTrue(all(p in perfiles.PERFILES and p not in perfiles.ORDEN for p in perfiles.RETIRADOS))
         self.assertIn(perfiles.SUGERIDO, perfiles.PERFILES)
@@ -298,6 +298,42 @@ class RotacionEnVivo(Base):
             r = piloto.decidir({"ahora_ms": AHORA, "ambiente": "prueba"})["piloto"]
         self.assertEqual(r["decision"], "sin_datos")
         self.assertNotIn("rotacion_compra", self.razones())
+
+
+class TendenciaEnVivo(Base):
+    """El perfil tendencia con dinero ficticio: BTC y ETH solo mientras cierran sobre su media de 50 días."""
+    DIA = lib_datos.DIA_MS
+
+    def diarias(self, ms, ritmo):
+        """70 velas diarias por moneda que terminan ayer: cada una sube o baja a su ritmo."""
+        hoy = ms // self.DIA * self.DIA
+        return {par: [[hoy - (70 - i) * self.DIA, 0, 0, 0, 100 * (1 + ritmo.get(par, 0.01)) ** i, 1] for i in range(70)]
+                for par in ("BTCUSDT", "ETHUSDT")}
+
+    def vuelta(self, ms, ritmo):
+        series = self.diarias(ms, ritmo)
+        with mock.patch.object(piloto, "_diaria", side_effect=lambda par: series.get(par, [])), \
+                mock.patch.object(piloto, "precio_fresco", side_effect=lambda par, m: series[par][-1][4]):
+            return piloto.decidir({"ahora_ms": ms, "ambiente": "prueba"})["piloto"]
+
+    def test_compra_la_que_esta_sobre_su_media_y_la_vende_al_perderla(self):
+        piloto.empezar("tendencia", 200, AHORA)
+        r = self.vuelta(AHORA, {"BTCUSDT": 0.01, "ETHUSDT": -0.01})
+        self.assertEqual((r["decision"], r["compra"]), ("tendencia", ["BTCUSDT"]))
+        self.assertEqual(self.vuelta(AHORA + HORA, {})["decision"], "esperando", "una vez por día")
+        e = piloto.estado(AHORA, minutos={})
+        self.assertAlmostEqual(e["efectivo"], 80, delta=0.5, msg="ETH bajo su media: su 40 % espera en USDT")
+        self.assertEqual([f["sobre"] for f in e["tendencia"]["filas"]], [True, False])
+        r = self.vuelta(AHORA + self.DIA, {"BTCUSDT": -0.01, "ETHUSDT": -0.01})
+        self.assertEqual(r["vende"], ["BTCUSDT"])
+        self.assertEqual((self.razones().count("tendencia_compra"), self.razones().count("tendencia_venta")), (1, 1))
+
+    def test_sin_la_vela_de_ayer_no_decide(self):
+        piloto.empezar("tendencia", 200, AHORA)
+        series = self.diarias(AHORA - 3 * self.DIA, {})
+        with mock.patch.object(piloto, "_diaria", side_effect=lambda par: series.get(par, [])):
+            r = piloto.decidir({"ahora_ms": AHORA, "ambiente": "prueba"})["piloto"]
+        self.assertEqual(r["decision"], "sin_datos")
 
 
 class Holding(Base):

@@ -177,6 +177,29 @@ class Mezclas(unittest.TestCase):
         self.assertEqual((r["recorte"], r["desde_ms"]), ("acciones", self.INICIO + 300 * self.DIA))
 
 
+class Probabilidades(unittest.TestCase):
+    """Qué tan seguido sale bien: la misma cuenta en muchas ventanas del pasado."""
+    DIA = sim.lib_datos.DIA_MS
+    INICIO = 1_600_000_000_000 // DIA * DIA
+
+    def velas(self, n, desde=0, ritmo=0.002):
+        return [[self.INICIO + (desde + i) * self.DIA, 0, 0, 100 * (1 + ritmo) ** i, 100 * (1 + ritmo) ** i, 1]
+                for i in range(n)]
+
+    def test_en_un_mercado_que_solo_sube_todas_las_ventanas_ganan(self):
+        d = {par: self.velas(900) for par in sim.lib_datos.UNIVERSO}
+        d.update({par: self.velas(100, desde=800) for par in sim.lib_datos.ACCIONES})
+        hasta = self.INICIO + 899 * self.DIA
+        r = sim.probabilidades(90, {"taker": 0.001}, hasta, d, ["compra_semanal", "tendencia", "indice_eeuu"], desde_ms=self.INICIO)
+        filas = {f["perfil"]: f for f in r["filas"]}
+        self.assertTrue(filas["compra_semanal"]["listo"])
+        self.assertEqual((filas["compra_semanal"]["gana"], filas["compra_semanal"]["pierde_grande"]), (1.0, 0.0))
+        self.assertLessEqual(filas["compra_semanal"]["malo"], filas["compra_semanal"]["tipico"])
+        self.assertEqual(filas["tendencia"]["gana_btc"], 0.0, "con costos no le gana a BTC si BTC solo sube")
+        self.assertFalse(filas["indice_eeuu"]["listo"], "las acciones no tienen ventanas suficientes")
+        self.assertEqual(r["btc"]["gana"], 1.0)
+
+
 class Perfiles(unittest.TestCase):
     def test_cada_compra_tiene_su_venta_en_los_movimientos(self):
         r = sim.cartera([op(0, 0.015), op(1, -0.01)], 1000.0, PARES, SIN_COSTOS)

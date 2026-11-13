@@ -14,6 +14,7 @@ Así lo que se ve en vivo es coherente con lo que mostró la comparación.
 | trader | muchas operaciones chicas | 1 h | 1 | 2 % | 2 |
 | scalper | el más rápido: entra y sale en minutos | 5 m | 1 | 1 % | 2 |
 | rotacion | tiene las 2 monedas más fuertes de las 8 y cambia cuando otra las pasa | 1 d | — | — | 2 |
+| tendencia | BTC 60 % y ETH 40 %, cada una solo mientras cierra sobre su media de 50 días | 1 d | — | — | 2 |
 
 **Se ofrecen** (`ORDEN`) la familia holding —holding, holding_ocho, compra_semanal, rebalanceo y cosecha, cada una con
 una sola variante de comprar por partes y guardar (`lib_holding`)— y la rotacion. Los cuatro perfiles de señales (conservador, equilibrado, trader y
@@ -75,11 +76,16 @@ PERFILES = {
     # con margen (`margen`), para no ir y venir por nada. Ver `lib_rotacion`.
     "rotacion": {"tipo": "rotar", "temporalidades": ("1d",), "posiciones": 2, "pares": lib_datos.UNIVERSO,
                  "dias_fuerza": 30, "media": 50, "margen": 1},
+    # Tendencia: BTC 60 % y ETH 40 %, cada una solo mientras su cierre diario está sobre su media de 50 días; bajo la media,
+    # esa parte espera en USDT. Fue la que mejor aguantó el estudio de 103 fórmulas (nov 2026, ver AGENTS.md): le ganó a
+    # comprar BTC en 2 de cada 3 ventanas de prueba, sobre todo porque sale antes de las caídas. Ver `lib_tendencia.pesos_cruce`.
+    "tendencia": {"tipo": "tendencia", "temporalidades": ("1d",), "reparto": {"BTCUSDT": 0.6, "ETHUSDT": 0.4},
+                  "pares": ("BTCUSDT", "ETHUSDT"), "media": 50, "umbral": 0.02},
 }
 #: Los que se ofrecen, en el orden de la pantalla. El resto está retirado (ver arriba).
 ORDEN = ("holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha",
          "indice_eeuu", "indice_semanal", "acciones_ocho",
-         "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "rotacion")
+         "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "tendencia", "rotacion")
 RETIRADOS = ("conservador", "equilibrado", "trader", "scalper")
 SUGERIDO = "holding"
 #: Las velas que no se guardan tal cual: se arman juntando velas de 1 m.

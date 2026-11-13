@@ -4,6 +4,7 @@
   simular.py estado <entrada.json {}>              <salida.json>   → {ok, datos}
   simular.py correr <entrada.json {monto, dias}>   <salida.json>   → {ok, datos}
   simular.py mapa   <entrada.json {}>              <salida.json>   → {ok, datos}   (el mapa de inicios)
+  simular.py probabilidades <entrada.json {dias}>  <salida.json>   → {ok, datos}   (qué tan seguido sale bien)
 
 `correr` devuelve además los cinco perfiles lado a lado (`lib_simulacion.comparar`), cada uno con sus movimientos.
 
@@ -58,5 +59,19 @@ def mapa(d, ahora_ms=None):
     return {"ok": True, "datos": lib_simulacion.mapa(100, com, ms)}
 
 
+def probabilidades(d, ahora_ms=None):
+    """Qué tan seguido salió bien cada perfil en todas las ventanas del pasado de `dias` (`lib_simulacion.probabilidades`)."""
+    d = d if isinstance(d, dict) else {}
+    try:
+        dias = int(d.get("dias"))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "sin_periodo"}
+    if not 30 <= dias <= 1095:
+        return {"ok": False, "error": "sin_periodo"}
+    ms = (ahora_ms or lib_datos.ahora_local_ms()) // lib_datos.DIA_MS * lib_datos.DIA_MS
+    com = lib_tamano.comisiones(lib_costos.comisiones())
+    return {"ok": True, "datos": lib_simulacion.probabilidades(dias, com, ms)}
+
+
 if __name__ == "__main__":
-    nucleo.script({"estado": estado, "correr": correr, "mapa": mapa}, __doc__)
+    nucleo.script({"estado": estado, "correr": correr, "mapa": mapa, "probabilidades": probabilidades}, __doc__)
