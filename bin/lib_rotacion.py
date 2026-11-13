@@ -19,6 +19,7 @@ Lo que no se negocia aquí:
 - **No hay stop por operación**: lo que la saca es salir del ranking, caer bajo su media o el filtro de BTC. Por eso puede
   caer más que los perfiles de señales antes de salir, y la pantalla lo dice.
 """
+import bisect
 import math
 
 import lib_estrategias
@@ -47,7 +48,20 @@ def fuerza(cierres, dias=30, media=50):
 
 def cerradas_antes(velas, ms):
     """Las velas diarias que ya cerraron antes de `ms`."""
-    return [v for v in velas if v[0] + DIA_MS <= ms]
+    i = bisect.bisect_right([v[0] for v in velas], ms - DIA_MS) if len(velas) < 64 else _corte(velas, ms - DIA_MS)
+    return velas[:i]
+
+
+def _corte(velas, hasta):
+    """Cuántas velas empiezan en `hasta` o antes (búsqueda binaria: las velas vienen ordenadas)."""
+    lo, hi = 0, len(velas)
+    while lo < hi:
+        m = (lo + hi) // 2
+        if velas[m][0] <= hasta:
+            lo = m + 1
+        else:
+            hi = m
+    return lo
 
 
 def ranking(diarias, ms, dias=30, media=50):

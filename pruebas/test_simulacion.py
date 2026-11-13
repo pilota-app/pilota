@@ -152,6 +152,31 @@ class Simular(unittest.TestCase):
 
 
 
+class Mezclas(unittest.TestCase):
+    """Las mezclas suman sus partes, y las acciones empiezan cuando llegaron a Binance."""
+    DIA = sim.lib_datos.DIA_MS
+    INICIO = 1_700_000_000_000 // DIA * DIA
+
+    def velas(self, n, desde=0, ritmo=0.002):
+        return [[self.INICIO + (desde + i) * self.DIA, 0, 0, 100 * (1 + ritmo) ** i, 100 * (1 + ritmo) ** i, 1]
+                for i in range(n)]
+
+    def test_la_mezcla_suma_sus_partes(self):
+        d = {"BTCUSDT": self.velas(400), "ETHUSDT": self.velas(400), "SPYBUSDT": self.velas(400), "QQQBUSDT": self.velas(400)}
+        hasta = self.INICIO + 399 * self.DIA
+        r = sim.mezcla("cripto_acciones", 100, self.INICIO, hasta, {"taker": 0.001}, d)
+        self.assertTrue(r["listo"])
+        self.assertAlmostEqual(r["saldo"], sum(x["saldo"] for x in r["partes"]), places=4)
+        self.assertEqual([x["peso"] for x in r["partes"]], [0.5, 0.5])
+        self.assertEqual({m["componente"] for m in r["movimientos"]}, {"compra_semanal", "indice_semanal"})
+
+    def test_las_acciones_empiezan_cuando_llegaron(self):
+        d = {"SPYBUSDT": self.velas(100, desde=300), "QQQBUSDT": self.velas(100, desde=300)}
+        hasta = self.INICIO + 399 * self.DIA
+        r = sim.holding_variante("indice_eeuu", 100, self.INICIO, hasta, {"taker": 0.001}, d)
+        self.assertEqual((r["recorte"], r["desde_ms"]), ("acciones", self.INICIO + 300 * self.DIA))
+
+
 class Perfiles(unittest.TestCase):
     def test_cada_compra_tiene_su_venta_en_los_movimientos(self):
         r = sim.cartera([op(0, 0.015), op(1, -0.01)], 1000.0, PARES, SIN_COSTOS)

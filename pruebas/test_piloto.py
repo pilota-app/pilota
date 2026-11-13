@@ -60,7 +60,10 @@ class Base(unittest.TestCase):
 
 class Perfiles(unittest.TestCase):
     def test_se_ofrecen_los_holding_y_la_rotacion(self):
-        self.assertEqual(perfiles.ORDEN, ("holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "rotacion"))
+        self.assertEqual(perfiles.ORDEN, ("holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha",
+                                          "indice_eeuu", "indice_semanal", "acciones_ocho",
+                                          "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "rotacion"))
+        self.assertEqual(perfiles.pares_de("cripto_acciones"), ("BTCUSDT", "ETHUSDT", "SPYBUSDT", "QQQBUSDT"))
         self.assertTrue(all(p in perfiles.PERFILES and p not in perfiles.ORDEN for p in perfiles.RETIRADOS))
         self.assertIn(perfiles.SUGERIDO, perfiles.PERFILES)
 
@@ -225,6 +228,21 @@ class HoldingsEnVivo(Base):
     def test_sin_precio_no_hace_nada(self):
         piloto.empezar("holding_ocho", 100, AHORA)
         self.assertEqual(self.vuelta(AHORA, {"BTCUSDT": 1.0})["decision"], "sin_datos")
+
+
+class MezclaEnVivo(HoldingsEnVivo):
+    def test_cada_parte_compra_con_su_parte_del_monto(self):
+        piloto.empezar("cripto_acciones", 200, AHORA)
+        p = {"BTCUSDT": 100_000.0, "ETHUSDT": 4_000.0, "SPYBUSDT": 600.0, "QQQBUSDT": 500.0}
+        self.vuelta(AHORA, p)
+        r = self.vuelta(AHORA + self.DIA, p, {"BTCUSDT": 98_000.0, "SPYBUSDT": 590.0})
+        self.assertEqual(r["decision"], "compra")
+        self.assertEqual(set(r["partes"]), {"compra_semanal", "indice_semanal"})
+        e = piloto.estado(AHORA + self.DIA, minutos={})
+        self.assertEqual([x["perfil"] for x in e["mezcla"]], ["compra_semanal", "indice_semanal"])
+        self.assertEqual(sorted(t["par"] for t in e["tenencias"]), ["BTCUSDT", "ETHUSDT", "QQQBUSDT", "SPYBUSDT"])
+        self.assertAlmostEqual(e["valor"], sum(x["valor"] for x in e["mezcla"]))
+        self.assertLess(e["valor"], 200, "las comisiones se pagan")
 
 
 class RotacionEnVivo(Base):

@@ -67,6 +67,7 @@ cuentas ni publicidad; nada personal en el código (Ana Pérez, Matías Soto). B
 | `bin/lib_universo.py` | Las ocho monedas del robot en prueba contra USDT (`lib_datos.UNIVERSO`: BTC, ETH, BNB, SOL, XRP, ADA, TRX y DOGE): sus mínimos de Binance (`filtros`, una vez al día en `mercado/universo.json`), sus velas (`preparar`: 3 años de 1 d, 4 h y 1 h y 3 días de 1 m) y sus costos (`comisiones_de`: contra USDT no hay conversión). Lo corre el flujo en vivo en segundo plano. No es una acción. |
 | `bin/lib_rotacion.py` | La rotación: la fuerza de cada moneda (`fuerza`: lo que subió en 30 días dividido por cuánto se movió), el ranking, a cuáles pasarse (`elegir`, con margen para no cambiar por nada) y la misma regla sobre el pasado (`simular`). Pura: no lee el disco. No es una acción. |
 | `bin/lib_holding.py` | Las formas de holdear: comprar por partes y guardar, con una variante cada una (`reparto`, `partes`, `descuento`, `rebalanceo`, `cosecha`). `paso` es un día y lo usan igual la comparación (`simular`) y el robot en vivo (`lib_piloto._vuelta_holding_v`). Puro. No es una acción. |
+| `bin/simular.py` | Las acciones de «Comparar»: `estado`, `correr` (todos los perfiles con un monto y un período) y `mapa` (el mapa de inicios, `simularMapa`). |
 | `bin/lib_tendencia.py` | Seguir la tendencia y ajustar el tamaño por volatilidad (`en_tendencia`, `volatilidad`, `tamano`, `pesos_tendencia`, `pesos_rotacion`) y su recorrido por el pasado día por día (`simular`). **No lo usa ningún perfil**: no pasó la prueba con datos reales (ver «Los perfiles y el robot en vivo»). Queda para probarlo de nuevo con datos nuevos. Puro. No es una acción. |
 | `bin/lib_candado.py` | Una sola cosa a la vez entre procesos: un solo trabajo de cada tipo (`unico`, `YaCorriendo`), una revisión a la vez (`candado`) y el trabajo que quedó sin app (`huerfano`). No es una acción. |
 | `ui/grafico.js` | El gráfico de velas en vivo en un `<canvas>` (`PilotaGrafico.crear`): 1 m, 5 m, 1 h y 4 h, Bollinger, medias, volumen y RSI con un botón, las flechas de compra y venta, las líneas de entrada, stop y objetivo, el precio que se mueve cada segundo y el destello de color de cada operación. |
@@ -634,7 +635,28 @@ con el mismo monto (`lib_simulacion.comparar`), y «Movimientos» cuenta todo lo
 | compra_semanal | 52 compras semanales de BTC y ETH, cada una un 1 % bajo el cierre; si al día siguiente no llega, compra igual |
 | rebalanceo | la mitad en BTC y ETH y la mitad en USDT; vende el sobrante sobre 60 % y compra lo que falta bajo 40 % |
 | cosecha | vende un cuarto cuando una moneda vale 30 % sobre su costo y lo recompra si cae 15 % desde esa venta |
+| indice_eeuu | 60 % S&P 500 (SPYB) y 40 % Nasdaq 100 (QQQB) en 12 partes semanales, y mantiene |
+| indice_semanal | lo mismo en 52 compras semanales, cada una un 1 % más abajo |
+| acciones_ocho | Apple, Microsoft, Nvidia, Amazon, Google, Meta, Tesla y Broadcom en partes iguales |
+| semanal_rotacion (mezcla) | 50 % compra_semanal y 50 % rotacion |
+| nucleo_satelite (mezcla) | 70 % holding_usdt (BTC y ETH contra USDT, no se ofrece solo) y 30 % rotacion |
+| cripto_acciones (mezcla) | 50 % compra_semanal y 50 % indice_semanal |
 | rotacion (experimento) | una vez al día tiene las 2 monedas más fuertes de las 8 contra USDT (`lib_rotacion`); puede caer tanto como BTC |
+
+**Las acciones** son los bStocks de Binance (`lib_datos.ACCIONES`, contra USDT): acciones de EE. UU. tokenizadas y respaldadas
+1:1 por la acción en un custodio. Se leen con la misma API pública y el mismo flujo que las monedas (`lib_datos.ACTIVOS`).
+Llegaron a Binance en junio de 2026: «Comparar» las mide desde que existen y lo dice (`recorte` = `acciones`, con
+`lib_simulacion.inicio_posible`), y el mapa de inicios no tiene casillas antes. Que la cuenta de la persona pueda comprarlas
+con dinero real depende de su país: el conector real todavía no las conoce.
+
+**Las mezclas** (`tipo` = `mezcla`, `componentes`) reparten el monto entre perfiles. Cada parte tiene su propio libro en
+`piloto.json` (`mezcla[perfil]`) y decide sola (`lib_piloto._vuelta_mezcla`); en el pasado se suman sus curvas día por día
+(`lib_simulacion.mezcla`). La pantalla muestra cuánto vale cada parte («Mi plan»).
+
+**El mapa de inicios** (`lib_simulacion.mapa`, acción `simularMapa`): si hubieras empezado cada 6 meses desde junio de 2018,
+cuánto tendrías hoy con cada perfil y con comprar BTC de una. Los holding se corren de nuevo desde cada inicio; la rotación
+y BTC se corren una vez y se miden desde cada inicio (sus reglas no dependen del día en que partiste, salvo la primera
+compra). Sirve para ver qué perfil aguanta un mal comienzo, no para elegir el momento: eso solo se sabe mirando atrás.
 
 Las variantes de holding (`variante` en `lib_perfiles`) se deciden una vez por día, al cerrar la vela diaria, con
 `lib_holding.paso`: el mismo paso que mide la comparación. En vivo compran y venden con el precio de 1 m de ahora y la orden

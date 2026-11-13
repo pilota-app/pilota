@@ -7,6 +7,12 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- Acciones de EE. UU.: Índice EE. UU. (S&P 500 y Nasdaq 100), Índice semanal y 8 acciones grandes, con las acciones
+  tokenizadas de Binance. Mezclas: Semanal + Rotación, Núcleo y satélite, y Cripto + Acciones. Y en «Comparar», el mapa de
+  inicios: cuánto tendrías hoy con cada perfil según cuándo empezabas desde 2018. *US stocks: US index (S&P 500 and Nasdaq
+  100), Weekly index and 8 big stocks, with Binance tokenized stocks. Mixes: Weekly + Rotation, Core and satellite, and
+  Crypto + Stocks. And in "Compare", the start map: how much you would have today with each profile depending on when you
+  started since 2018.*
 - Nuevos perfiles de comprar y guardar: Holding 8 monedas, Compra semanal (cada compra un 1 % más abajo), Rebalanceo (mitad en
   cripto, vende lo que sobra y compra lo que falta) y Cosecha (vende un cuarto cuando sube 30 % y recompra si cae 15 %). Cada
   uno dice su plan en «Mi plan», y se agrupan en «Comprar y guardar» y «Experimento». *New buy-and-keep profiles: Holding 8

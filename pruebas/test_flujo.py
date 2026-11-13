@@ -94,7 +94,7 @@ class VelaDe(unittest.TestCase):
 
     def test_la_ruta_solo_lleva_pares_y_velas_conocidos(self):
         self.assertEqual(lib_flujo.ruta_de(["BTCFDUSD"], ["1m"]), "/stream?streams=btcfdusd@kline_1m")
-        self.assertEqual(lib_flujo.ruta_de(lib_flujo.PARES).count("@kline_"), 20, "diez pares, de 1 s y de 1 m")
+        self.assertEqual(lib_flujo.ruta_de(lib_flujo.PARES).count("@kline_"), 2 * len(lib_flujo.PARES), "cada par, de 1 s y de 1 m")
         with self.assertRaises(ValueError):
             lib_flujo.ruta_de(["BTCFDUSD/../x"])
         with self.assertRaises(ValueError):

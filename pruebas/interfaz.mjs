@@ -91,7 +91,9 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.locator('.pestanas [role="tab"]').count(), 6, "seis pestañas");
   assert.equal(await cab.locator('.pestanas [role="tab"][aria-selected="true"]').getAttribute("id"), "tab-vivo", "parte en «En vivo»");
   // Se ofrecen la familia holding y la rotación, agrupados; los de señales quedaron retirados.
-  assert.equal(await cab.locator(".perfil").count(), 6, "cinco holding y la rotación");
+  assert.equal(await cab.locator(".perfil").count(), 12, "los holding, las acciones, las mezclas y la rotación");
+  assert.equal(await cab.locator(".perfiles-grupo").count(), 4, "en cuatro grupos");
+  assert.match(await cab.textContent('.perfil[data-perfil="indice_eeuu"]'), /S&P 500[\s\S]*SPY · QQQ/);
   assert.equal(await cab.locator('.perfiles-grupo[data-grupo="guardar"] .perfil').count(), 5, "la familia holding junta");
   assert.match(await cab.textContent('.perfil[data-perfil="holding_ocho"]'), /BTC · ETH · BNB · SOL · XRP · ADA · TRX · DOGE/);
   assert.equal(await cab.locator('.perfil[data-perfil="scalper"]').count(), 0, "el scalper ya no se ofrece");
@@ -164,9 +166,15 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.inputValue("#sim-monto"), "250", "lo escrito sigue ahí al volver a pintar");
   await cab.click("#sim-correr");
   await cab.waitForSelector(".comp-grilla");
-  assert.equal(await cab.locator(".comp-perfil").count(), 6, "los seis perfiles lado a lado");
+  assert.equal(await cab.locator(".comp-perfil").count(), 12, "todos los perfiles lado a lado");
   // Cada perfil dice si le ganó a quedarse en USDT y a comprar BTC.
-  assert.equal(await cab.locator(".comp-veredicto").count(), 6, "cada perfil con su veredicto");
+  assert.equal(await cab.locator(".comp-veredicto").count(), 12, "cada perfil con su veredicto");
+  assert.match(await cab.textContent('[data-comparar="indice_eeuu"]'), /las acciones llegaron a Binance en junio de 2026/);
+  // El mapa de inicios: cuánto tendrías hoy según cuándo empezaste, y qué perfil aguanta un mal comienzo.
+  await cab.click("#mapa-ver");
+  await cab.waitForSelector(".mapa-tabla");
+  assert.equal(await cab.locator(".mapa-tabla tbody tr").count(), 12, "once perfiles y comprar BTC");
+  assert.match(await cab.textContent(".mapa-tabla"), /Peor inicio:[\s\S]*le ganó a BTC en \d+ de \d+/);
   assert.match(await cab.textContent(".sim-resultado"), /365 días\) con 250 USDT[\s\S]*Quedarte en USDT[\s\S]*Comprar BTC y esperar/);
   // La película: tocar un perfil la pone a andar, movimiento por movimiento.
   await cab.click('[data-comparar="cosecha"]');

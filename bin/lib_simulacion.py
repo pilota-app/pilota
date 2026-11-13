@@ -252,11 +252,143 @@ def holding(monto, desde_ms, hasta_ms, com, series=None):
             "movimientos_total": len(movimientos), "tenencias": tenencias, "efectivo": efectivo}
 
 
-def holding_variante(perfil, monto, desde_ms, hasta_ms, com, diarias=None):
-    """Una variante de holding (`lib_holding`) sobre el pasado, con las velas diarias de sus monedas contra USDT."""
+def _diarias_de(pares):
+    return {par: lib_datos.leer_serie(par, "1d") for par in pares}
+
+
+def inicio_posible(perfil, desde_ms, diarias=None):
+    """Desde cuándo se puede mirar un perfil: las acciones están en Binance desde junio de 2026, así que un perfil con
+    acciones empieza el día en que todas sus partes ya tienen velas. Devuelve el inicio y si hubo que correrlo."""
+    pares = lib_perfiles.pares_de(perfil)
+    d = diarias if diarias is not None else _diarias_de(pares)
+    primeros = [d[par][0][0] for par in pares if d.get(par)]
+    if len(primeros) < len(pares):
+        return desde_ms, False
+    inicio = max([desde_ms] + primeros)
+    return inicio, inicio > desde_ms
+
+
+def _curva_de(perfil, monto, desde_ms, hasta_ms, com, diarias):
+    """La simulación cruda de un perfil holding o de la rotación (sin ralear), para sumarla en una mezcla."""
     p = lib_perfiles.de(perfil)
-    diarias = diarias if diarias is not None else {par: lib_datos.leer_serie(par, "1d") for par in p["reparto"]}
-    r = lib_holding.simular(monto, diarias, desde_ms, hasta_ms, p, com)
+    if p["tipo"] == "rotar":
+        btc = diarias.get(lib_indicadores_mercado.CONTEXTO_PAR) or lib_datos.leer_serie(lib_indicadores_mercado.CONTEXTO_PAR, "1d")
+        return lib_rotacion.simular(monto, {k: diarias[k] for k in p["pares"] if diarias.get(k)}, btc, desde_ms, hasta_ms,
+                                    lib_universo.comisiones_de("USDT", com), posiciones=p["posiciones"],
+                                    dias=p["dias_fuerza"], media=p["media"], margen=p["margen"])
+    return lib_holding.simular(monto, {k: diarias.get(k) or [] for k in p["reparto"]}, desde_ms, hasta_ms, p, com)
+
+
+def mezcla(perfil, monto, desde_ms, hasta_ms, com, diarias=None):
+    """Una mezcla: el monto repartido entre sus partes, cada una con su libro. La curva es la suma, día por día."""
+    p = lib_perfiles.de(perfil)
+    pares = lib_perfiles.pares_de(perfil) + (lib_indicadores_mercado.CONTEXTO_PAR,)
+    diarias = diarias if diarias is not None else _diarias_de(dict.fromkeys(pares))
+    inicio, recortado = inicio_posible(perfil, desde_ms, diarias)
+    partes = []
+    for comp, peso in p["componentes"]:
+        r = _curva_de(comp, monto * peso, inicio, hasta_ms, com, diarias)
+        if not r.get("listo"):
+            return {"listo": False, "motivo": r.get("motivo") or "sin_historial"}
+        partes.append((comp, r))
+    dias = sorted({t for _, r in partes for t, _ in r["curva"]})
+    valores = []
+    for _, r in partes:
+        punto, ultimo, serie = dict(r["curva"]), r["curva"][0][1], []
+        for t in dias:
+            ultimo = punto.get(t, ultimo)
+            serie.append(ultimo)
+        valores.append(serie)
+    curva = [[t, round(sum(v[i] for v in valores), 6)] for i, t in enumerate(dias)]
+    techo, caida = float(monto), 0.0
+    for _, v in curva:
+        techo = max(techo, v)
+        caida = max(caida, (techo - v) / techo if techo > 0 else 0.0)
+    # El saldo de cada movimiento es el de la mezcla entera ese día, no el de su parte.
+    valor_de = dict(curva)
+    movimientos = sorted((dict(m, componente=c, saldo=valor_de.get(m["ms"] // lib_datos.DIA_MS * lib_datos.DIA_MS,
+                                                                   m.get("saldo")))
+                          for c, r in partes for m in r["movimientos"]), key=lambda m: m["ms"])
+    saldo = curva[-1][1]
+    return {"listo": True, "motivo": "", "saldo": saldo, "ganancia": saldo - monto, "rendimiento": saldo / monto - 1,
+            "caida_maxima": caida, "curva": ralear(curva), "operaciones": len(movimientos), "ganadas": 0, "perdidas": 0,
+            "movimientos": movimientos[-MOVIMIENTOS:], "movimientos_total": len(movimientos),
+            "partes": [{"perfil": c, "peso": w, "saldo": r["saldo"]} for (c, w), (_, r) in zip(p["componentes"], partes)],
+            **({"desde_ms": inicio, "recorte": "acciones"} if recortado else {})}
+
+
+#: El mapa de inicios: desde cuándo y cada cuántos meses se prueba empezar, y el último inicio (que deje al menos medio año).
+MAPA_DESDE = (2018, 6)
+MAPA_CADA_MESES = 6
+MAPA_MINIMO_DIAS = 180
+
+
+def inicios_mapa(hasta_ms):
+    """Los inicios del mapa: el 1 de cada `MAPA_CADA_MESES` meses desde `MAPA_DESDE`, hasta medio año antes de hoy."""
+    import datetime
+    a, m, salida = MAPA_DESDE[0], MAPA_DESDE[1], []
+    while True:
+        ms = int(datetime.datetime(a, m, 1, tzinfo=datetime.timezone.utc).timestamp() * 1000)
+        if ms > hasta_ms - MAPA_MINIMO_DIAS * lib_datos.DIA_MS:
+            return salida
+        salida.append(ms)
+        m += MAPA_CADA_MESES
+        a, m = a + (m - 1) // 12, (m - 1) % 12 + 1
+
+
+def _proporcion(curva, desde_ms):
+    """Cuánto multiplicó una curva desde `desde_ms` hasta el final (para lo que no depende del día en que se empezó)."""
+    inicio = next((v for t, v in curva if t >= desde_ms), None)
+    return curva[-1][1] / inicio if inicio else None
+
+
+def mapa(monto, com, hasta_ms, diarias=None, perfiles=None):
+    """El mapa de inicios: si hubieras empezado en cada fecha de `inicios_mapa`, cuánto tendrías hoy con cada perfil
+    (rendimiento hasta hoy). Los holding se corren de nuevo desde cada inicio (sus compras dependen de cuándo empiezan); la
+    rotación y comprar BTC se corren una vez y se miden desde cada inicio (sus reglas no dependen del día en que partiste).
+    Un perfil con acciones no tiene casillas antes de junio de 2026: ahí no existían en Binance."""
+    perfiles = perfiles or [p for p in lib_perfiles.ORDEN if p != "holding"]
+    inicios = inicios_mapa(hasta_ms)
+    pares = dict.fromkeys(x for p in perfiles for x in lib_perfiles.pares_de(p))
+    pares[lib_indicadores_mercado.CONTEXTO_PAR] = None
+    diarias = diarias if diarias is not None else _diarias_de(pares)
+    btc = diarias.get(lib_indicadores_mercado.CONTEXTO_PAR) or []
+    referencia = [[v[0], v[4]] for v in btc if v[0] <= hasta_ms]
+    rot_curva = (_curva_de("rotacion", 100.0, inicios[0], hasta_ms, com, diarias).get("curva") or []) if inicios else []
+
+    def parte(perfil, peso, desde):
+        p = lib_perfiles.de(perfil)
+        if p["tipo"] == "rotar":
+            f = _proporcion(rot_curva, desde)
+            return None if f is None else peso * f
+        inicio, recortado = inicio_posible(perfil, desde, diarias)
+        if recortado:
+            return None
+        r = lib_holding.simular(1.0, {k: diarias.get(k) or [] for k in p["reparto"]}, desde, hasta_ms, p, com)
+        return peso * r["saldo"] if r.get("listo") else None
+
+    filas = []
+    for perfil in perfiles:
+        p = lib_perfiles.de(perfil)
+        valores = []
+        for desde in inicios:
+            comps = p["componentes"] if p["tipo"] == "mezcla" else ((perfil, 1.0),)
+            trozos = [parte(c, w, desde) for c, w in comps]
+            valores.append(None if any(x is None for x in trozos) else round(sum(trozos) - 1, 4))
+        filas.append({"perfil": perfil, "valores": valores})
+    btc_fila = [None if _proporcion(referencia, d) is None else round(_proporcion(referencia, d) - 1, 4) for d in inicios]
+    return {"formato": 1, "hasta_ms": hasta_ms, "inicios": inicios, "filas": filas, "btc": btc_fila, "monto": monto}
+
+
+def holding_variante(perfil, monto, desde_ms, hasta_ms, com, diarias=None):
+    """Una variante de holding (`lib_holding`) sobre el pasado, con las velas diarias de sus monedas contra USDT. Si sus
+    acciones todavía no estaban en Binance al inicio, empieza cuando llegan y lo dice (`recorte`)."""
+    p = lib_perfiles.de(perfil)
+    diarias = diarias if diarias is not None else _diarias_de(p["reparto"])
+    inicio, recortado = inicio_posible(perfil, desde_ms, diarias)
+    r = lib_holding.simular(monto, diarias, inicio, hasta_ms, p, com)
+    if r.get("listo") and recortado:
+        r.update(desde_ms=inicio, recorte="acciones")
     if r.get("listo"):
         r["curva"] = ralear(r["curva"])
         r["movimientos"] = r["movimientos"][-MOVIMIENTOS:]
@@ -324,9 +456,13 @@ def comparar(monto, dias, recorrido, minimo=None, rapidas=None):
     salida = []
     for perfil in lib_perfiles.ORDEN:
         p = lib_perfiles.de(perfil)
-        if p["tipo"] == "acumular":
-            r = holding_variante(perfil, monto, desde, hasta, com) if p.get("variante") else holding(monto, desde, hasta, com)
-            salida.append({"perfil": perfil, "desde_ms": desde, "hasta_ms": hasta, "recortado": False, **r})
+        if p["tipo"] in ("acumular", "mezcla"):
+            if p["tipo"] == "mezcla":
+                r = mezcla(perfil, monto, desde, hasta, com)
+            else:
+                r = holding_variante(perfil, monto, desde, hasta, com) if p.get("variante") else holding(monto, desde, hasta, com)
+            salida.append({"perfil": perfil, "desde_ms": desde, "hasta_ms": hasta, **r,
+                           "recortado": bool(r.get("recorte"))})
             continue
         if p["tipo"] == "rotar":
             r = rotacion(monto, desde, hasta, com)

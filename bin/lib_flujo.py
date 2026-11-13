@@ -38,7 +38,7 @@ TROZO = 1.0
 
 
 #: Los pares que escucha el flujo: los dos de siempre (contra FDUSD, los del dinero real) y las ocho monedas contra USDT.
-PARES = lib_datos.PARES_OPERADOS + tuple(p for p in lib_datos.UNIVERSO if p not in lib_datos.PARES_OPERADOS)
+PARES = lib_datos.PARES_OPERADOS + tuple(p for p in lib_datos.ACTIVOS if p not in lib_datos.PARES_OPERADOS)
 
 
 class Caido(Exception):

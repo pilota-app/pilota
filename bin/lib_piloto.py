@@ -260,10 +260,10 @@ def precio_fresco(par, ms):
     return _numero(velas[-1][4]) or None
 
 
-def _vuelta_rotacion(d, ms, f):
+def _vuelta_rotacion(d, ms, f, perfil=None):
     """Una vez por día, apenas cierra la vela diaria: ordena las ocho por fuerza, se queda con las mejores y cambia solo la
     que se cayó del grupo. Vende y compra a mercado, con la comisión taker y la diferencia de puntas."""
-    p = lib_perfiles.de(d["perfil"])
+    p = lib_perfiles.de(perfil or d["perfil"])
     r = d.setdefault("rotacion", {"efectivo": _numero(d.get("monto")), "tenencias": {}, "gastado": {}, "dia_ms": 0})
     dia = ms // lib_rotacion.DIA_MS * lib_rotacion.DIA_MS
     if int(r.get("dia_ms") or 0) >= dia:
@@ -325,10 +325,10 @@ def _bajo_de(par, dia_ms):
     return v[3] if v else None
 
 
-def _vuelta_holding_v(d, ms):
+def _vuelta_holding_v(d, ms, perfil=None):
     """Una variante de holding (`lib_holding.paso`): una vez por día, al cerrar la vela diaria, y la primera al empezar.
     Compra y vende con el precio de 1 m de ahora; la orden más abajo se llena con el mínimo del día que acaba de cerrar."""
-    p = lib_perfiles.de(d["perfil"])
+    p = lib_perfiles.de(perfil or d["perfil"])
     h = d.get("holding_v") or {**lib_holding.nuevo(d.get("monto") or 0), "dia_ms": 0}
     dia = ms // lib_holding.DIA_MS * lib_holding.DIA_MS
     if int(h.get("dia_ms") or 0) >= dia:
@@ -364,6 +364,20 @@ def _vuelta_holding_v(d, ms):
             "por": sorted({m["por"] for m in movs})}
 
 
+def _vuelta_mezcla(d, ms, f):
+    """Una mezcla: cada parte decide con su propio libro y su parte del monto, igual que si anduviera sola."""
+    p = lib_perfiles.de(d["perfil"])
+    partes = d.setdefault("mezcla", {})
+    salida = {}
+    for comp, peso in p["componentes"]:
+        sub = partes.setdefault(comp, {"monto": _numero(d.get("monto")) * peso, "peso": peso})
+        tipo = lib_perfiles.de(comp)["tipo"]
+        salida[comp] = _vuelta_rotacion(sub, ms, f, comp) if tipo == "rotar" else _vuelta_holding_v(sub, ms, comp)
+    decisiones = {v.get("decision") for v in salida.values()}
+    decision = next((x for x in ("rotacion", "venta", "compra", "sin_datos") if x in decisiones), "esperando")
+    return {"decision": decision, "partes": salida}
+
+
 def decidir(ctx=None, ahora_ms=None):
     """El gancho del motor. En prueba con un perfil puesto, opera el perfil; si no, deciden los tres modos de siempre."""
     c = ctx if isinstance(ctx, dict) else {}
@@ -374,7 +388,9 @@ def decidir(ctx=None, ahora_ms=None):
         return lib_modos.decidir(c, ahora_ms=ms)
     f = c.get("frenos") if isinstance(c.get("frenos"), dict) else lib_frenos.escribir(lib_frenos.revisar(ms))
     ej = c.get("ejecutor") if isinstance(c.get("ejecutor"), dict) else lib_ejecutor_prueba.guardado()
-    if lib_perfiles.de(d["perfil"])["tipo"] == "acumular" and lib_perfiles.de(d["perfil"]).get("variante"):
+    if lib_perfiles.de(d["perfil"])["tipo"] == "mezcla":
+        vuelta = _vuelta_mezcla(d, ms, f)
+    elif lib_perfiles.de(d["perfil"])["tipo"] == "acumular" and lib_perfiles.de(d["perfil"]).get("variante"):
         vuelta = _vuelta_holding_v(d, ms)
     elif lib_perfiles.de(d["perfil"])["tipo"] == "acumular":
         vuelta = _vuelta_holding(d, ms)
@@ -412,7 +428,27 @@ def estado(ahora_ms=None, minutos=None):
     perfil = lib_perfiles.de(d.get("perfil"))
     monto = _numero(d.get("monto"))
     posiciones, efectivo, tenencias = [], 0.0, []
-    if perfil and perfil["tipo"] == "acumular" and perfil.get("variante"):
+    mezcla = []
+    if perfil and perfil["tipo"] == "mezcla":
+        for comp, peso in perfil["componentes"]:
+            sub = (d.get("mezcla") or {}).get(comp) or {}
+            libro = sub.get("holding_v") or sub.get("rotacion") or {}
+            propias = []
+            for par, cantidad in sorted((libro.get("tenencias") or {}).items()):
+                gastado = _numero((libro.get("costo") or libro.get("gastado") or {}).get(par))
+                precio = ahora.get(par) or precio_fresco(par, ms)
+                ahora[par] = precio
+                propias.append({"par": par, "cantidad": _numero(cantidad), "gastado": gastado, "precio_ahora": precio,
+                                "valor": gastado if precio is None else _numero(cantidad) * precio,
+                                "precio_medio": gastado / _numero(cantidad) if _numero(cantidad) > 0 else None,
+                                "parte": comp})
+            caja = _numero(libro.get("efectivo")) if libro else _numero(d.get("monto")) * peso
+            efectivo += caja
+            tenencias += propias
+            mezcla.append({"perfil": comp, "peso": peso,
+                           "valor": caja + sum(_numero(x["valor"]) for x in propias)})
+        valor = efectivo + sum(_numero(x["valor"]) for x in tenencias)
+    elif perfil and perfil["tipo"] == "acumular" and perfil.get("variante"):
         h = d.get("holding_v") or {}
         efectivo = _numero(h.get("efectivo"))
         for par, cantidad in sorted((h.get("tenencias") or {}).items()):
@@ -461,7 +497,10 @@ def estado(ahora_ms=None, minutos=None):
             "posiciones": posiciones, "tenencias": tenencias, "precios": ahora,
             "holding": (d.get("holding_v") if perfil.get("variante") else d.get("holding"))
             if perfil and perfil["tipo"] == "acumular" else None,
-            "rotacion": d.get("rotacion") if perfil and perfil["tipo"] == "rotar" else None,
+            "rotacion": d.get("rotacion") if perfil and perfil["tipo"] == "rotar"
+            else next((x.get("rotacion") for x in (d.get("mezcla") or {}).values() if x.get("rotacion")), None),
+            "mezcla": mezcla,
+            "pares": list(lib_perfiles.pares_de(d.get("perfil"))) if perfil else [],
             # Las reglas del perfil puesto, para que la pantalla diga su plan con los mismos números.
             "reglas": {k: (list(x) if isinstance(x, tuple) else x) for k, x in (perfil or {}).items()},
             "ultima": d.get("ultima") or {}, "ultima_ms": int(d.get("ultima_ms") or 0),

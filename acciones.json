@@ -640,6 +640,17 @@
    "limite": 30,
    "pieza": "app"
   },
+  "simularMapa": {
+   "script": "simular.py",
+   "args": [
+    "mapa"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "mapaListo",
+   "limite": 600,
+   "pieza": "app"
+  },
   "tamanoEstado": {
    "script": "tamano.py",
    "args": [

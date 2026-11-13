@@ -36,7 +36,13 @@ PARES_OPERADOS = ("BTCFDUSD", "ETHFDUSD")
 #: siempre (1 h, 4 h, 1 d y 1 m), pero no entran en el estado de los datos ni en el historial de los 3 años: las prepara
 #: `lib_universo` y las mantiene al día el flujo en vivo.
 UNIVERSO = ("BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "TRXUSDT", "DOGEUSDT")
-CONOCIDOS = PARES + tuple(p for p in UNIVERSO if p not in PARES)
+#: Acciones y fondos de EE. UU. tokenizados en Binance (bStocks, contra USDT): cada uno respaldado 1:1 por la acción en un
+#: custodio. Están en Binance desde junio de 2026, así que su historia es corta. SPY es el S&P 500 y QQQ el Nasdaq 100.
+ACCIONES = ("SPYBUSDT", "QQQBUSDT", "AAPLBUSDT", "MSFTBUSDT", "NVDABUSDT", "AMZNBUSDT", "GOOGLBUSDT", "METABUSDT",
+            "TSLABUSDT", "AVGOBUSDT")
+#: Todo lo que mira el robot en prueba: las ocho monedas y las acciones.
+ACTIVOS = UNIVERSO + ACCIONES
+CONOCIDOS = PARES + tuple(p for p in ACTIVOS if p not in PARES)
 TEMPORALIDADES = ("1h", "4h", "1d")
 #: El minuto va aparte: solo de los pares que se operan y solo los últimos días (el ejecutor de prueba y reconciliar).
 MINUTO = "1m"
@@ -251,7 +257,7 @@ def carpeta_mercado():
 def serie_valida(par, temporalidad):
     """Las series que Pilota guarda: las 12 de siempre (4 pares × 1 h, 4 h, 1 d), la de 1 m de los pares que se operan, y las
     del universo del robot (1 h, 4 h, 1 d y 1 m)."""
-    if par in UNIVERSO:
+    if par in ACTIVOS:
         return temporalidad in TEMPORALIDADES or temporalidad == MINUTO
     return par in PARES and (temporalidad in TEMPORALIDADES or (temporalidad == MINUTO and par in PARES_OPERADOS))
 

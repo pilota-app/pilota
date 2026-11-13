@@ -1624,6 +1624,10 @@
       P.datos = null;
       pedirGrafico();
       pintar();
+    } else if (b.id === "mapa-ver") {
+      E.mapaCargando = true;
+      pintar();
+      host.enviar("simularMapa", {});
     } else if (b.dataset.grafSolo) {
       // Tocar el precio de una moneda la abre sola y en grande, con las velas que ya estaba mirando.
       const P = E.graf.paneles[0];
@@ -1950,7 +1954,7 @@
   }
   // Una compra o una venta que acaba de pasar, en una frase de color (verde compra o ganó, rojo perdió).
   function avisoEvento(l) {
-    const o = l.orden || {}, r = l.resultado || {}, moneda = String(l.par || "").replace(/(FDUSD|USDT)$/, "");
+    const o = l.orden || {}, r = l.resultado || {}, moneda = String(l.par || "").replace(/^(SPY|QQQ|AAPL|MSFT|NVDA|AMZN|GOOGL|META|TSLA|AVGO)BUSDT$/, "$1").replace(/(FDUSD|USDT)$/, "");
     if (["entrada_ruptura", "entrada_rebote", "compra_holding"].includes(l.razon) && (l.razon === "compra_holding" || o.estado === "llenada")) {
       return { tipo: "compra", texto: Tp("Compré {moneda} a {precio}", { moneda, precio: usdt(o.precio) }),
         marca: { par: l.par, ms: l.ms, tipo: "compra", precio: o.precio } };
@@ -2095,6 +2099,12 @@
         E.sim = { ...E.sim, ultima: r.datos.ultima, monto: r.datos.ultima.monto || E.sim.monto,
           dias: r.datos.ultima.dias || E.sim.dias };
       }
+      pintar();
+    },
+    mapaListo(r) {
+      E.mapaCargando = false;
+      if (r && r.ok && r.datos) E.mapa = r.datos;
+      else toast(Tp("No pude armar el mapa de inicios."), { error: true });
       pintar();
     },
     simularListo(r) {
@@ -2577,11 +2587,16 @@
   }
   // Los perfiles que se ofrecen, en la vista previa: números inventados, con la forma que devuelve lib_simulacion.comparar.
   function perfilesDemo(monto, desde, hasta) {
-    const ritmo = { holding: 0, holding_ocho: 0, compra_semanal: 0, rebalanceo: 0, cosecha: 0, rotacion: 8 };
+    const ritmo = { holding: 0, holding_ocho: 0, compra_semanal: 0, rebalanceo: 0, cosecha: 0, indice_eeuu: 0, indice_semanal: 0,
+      acciones_ocho: 0, semanal_rotacion: 0, nucleo_satelite: 0, cripto_acciones: 0, rotacion: 8 };
     // Cuánto deja cada holding en la vista previa, por semana de compra (números inventados, con la forma de los reales).
-    const RUMBO = { holding: 0.004, holding_ocho: 0.0034, compra_semanal: 0.0045, rebalanceo: 0.0028, cosecha: 0.0036 };
-    return ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "rotacion"].map((perfil, k) => {
-      const d0 = perfil === "scalper" ? Math.max(desde, hasta - 30 * 86400000) : desde;
+    const RUMBO = { holding: 0.004, holding_ocho: 0.0034, compra_semanal: 0.0045, rebalanceo: 0.0028, cosecha: 0.0036,
+      indice_eeuu: 0.003, indice_semanal: 0.0025, acciones_ocho: 0.0035, semanal_rotacion: 0.0042, nucleo_satelite: 0.0038,
+      cripto_acciones: 0.0033 };
+    const ACCIONES_DEMO = ["indice_eeuu", "indice_semanal", "acciones_ocho", "cripto_acciones"];
+    return Object.keys(ritmo).map((perfil, k) => {
+      // Las acciones llegaron a Binance en junio de 2026: su comparación empieza ahí (como en lib_simulacion.inicio_posible).
+      const d0 = ACCIONES_DEMO.includes(perfil) ? Math.max(desde, hasta - 150 * 86400000) : desde;
       let saldo = monto, techo = monto, caida = 0;
       const curva = [[d0, monto]], movimientos = [];
       const familia = perfil in RUMBO;
@@ -2612,7 +2627,7 @@
         curva.push([x, saldo]);
       }
       curva.push([hasta, saldo]);
-      return { perfil, listo: true, motivo: "", desde_ms: d0, hasta_ms: hasta, recortado: d0 > desde, saldo,
+      return { perfil, listo: true, motivo: "", desde_ms: d0, hasta_ms: hasta, recortado: d0 > desde, recorte: d0 > desde ? "acciones" : "", saldo,
         ganancia: saldo - monto, rendimiento: (saldo - monto) / monto, caida_maxima: caida, curva,
         operaciones: familia ? movimientos.length : n, movimientos, movimientos_total: movimientos.length };
     });
@@ -2712,7 +2727,8 @@
           linea(t0 + 60000, "rotacion_compra", "SOLUSDT", { precio: 166.1, monto: m / 2 }, { puesto: 1 }),
           linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m })], flujo, radar, jugadas: {} };
     }
-    const familia = ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha"].includes(v.perfil);
+    const familia = ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "indice_eeuu", "indice_semanal",
+      "acciones_ocho"].includes(v.perfil);
     const movs = familia
       ? [linea(t0 + 60000, "compra_holding", "BTCFDUSD", { precio: 97250, cantidad: m / 12 * 0.6 / 97250, monto: m / 12 * 0.6 }, {}),
         linea(t0 + 60000, "compra_holding", "ETHFDUSD", { precio: 3610, cantidad: m / 12 * 0.4 / 3610, monto: m / 12 * 0.4 }, {})]
@@ -2737,6 +2753,16 @@
       // Las reglas y el libro del holding (bin/lib_perfiles.py y bin/lib_holding.py), para «Mi plan».
       reglas: holding ? REGLAS_DEMO[v.perfil] : {}, holding: holding ? { partes: 1, ultima_ms: t0 + 60000, guardado: {},
         pendiente: v.perfil === "compra_semanal" ? { BTCUSDT: { limite: 71000, monto: m / 52 * 0.6 } } : {} } : null };
+  }
+  // El mapa de inicios de la vista previa: números inventados, con la forma de lib_simulacion.mapa.
+  function mapaDemo() {
+    const inicios = [], perfiles = ["holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "indice_eeuu", "indice_semanal",
+      "acciones_ocho", "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "rotacion"];
+    for (let a = 2018, m = 6; a < 2026 || (a === 2026 && m <= 1); m += 6) { if (m > 12) { m -= 12; a += 1; continue; } inicios.push(Date.UTC(a, m - 1, 1)); }
+    const r = azar(7), forma = (k, i) => (6 - i * 0.7) * (0.5 + 0.15 * Math.sin(i + k)) - 0.35 + r() * 0.2;
+    return { formato: 1, hasta_ms: Date.now(), inicios, monto: 100,
+      filas: perfiles.map((perfil, k) => ({ perfil, valores: inicios.map((_, i) => (/indice|acciones|cripto_acciones/.test(perfil) ? null : Number(forma(k, i).toFixed(3)))) })),
+      btc: inicios.map((_, i) => Number(((6 - i * 0.7) * 0.55 - 0.45).toFixed(3))) };
   }
   const REGLAS_DEMO = {
     holding: { tipo: "acumular", partes: 12, cada_ms: 604800000 },
@@ -2784,6 +2810,7 @@
         if (DEMO.vivo) DEMO.vivo.activo = false;
         c.responder("vivoListo", { ok: true, datos: vivoDemo() });
       });
+      case "simularMapa": return c.responder("mapaListo", { ok: true, datos: mapaDemo() });
       case "simularEstado": return c.responder("simularEstadoListo", { ok: true, datos: { ultima: DEMO.simulacion || {} } });
       case "simularCorrer": return c.luego(700, () => {
         DEMO.simulacion = simulacionDemo(Number(d.monto), Number(d.dias));

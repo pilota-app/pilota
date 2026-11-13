@@ -3,6 +3,7 @@
 
   simular.py estado <entrada.json {}>              <salida.json>   → {ok, datos}
   simular.py correr <entrada.json {monto, dias}>   <salida.json>   → {ok, datos}
+  simular.py mapa   <entrada.json {}>              <salida.json>   → {ok, datos}   (el mapa de inicios)
 
 `correr` devuelve además los cinco perfiles lado a lado (`lib_simulacion.comparar`), cada uno con sus movimientos.
 
@@ -14,6 +15,8 @@ import os
 
 import backtest
 import lib_datos
+import lib_costos
+import lib_tamano
 import lib_simulacion
 import nucleo
 
@@ -48,5 +51,12 @@ def correr(d, ahora_ms=None):
     return {"ok": True, "datos": {**lib_simulacion.parametros(), "ultima": escribir(r)}}
 
 
+def mapa(d, ahora_ms=None):
+    """El mapa de inicios (`lib_simulacion.mapa`): cuánto habría dejado cada perfil empezando en distintas fechas."""
+    ms = (ahora_ms or lib_datos.ahora_local_ms()) // lib_datos.DIA_MS * lib_datos.DIA_MS
+    com = lib_tamano.comisiones(lib_costos.comisiones())
+    return {"ok": True, "datos": lib_simulacion.mapa(100, com, ms)}
+
+
 if __name__ == "__main__":
-    nucleo.script({"estado": estado, "correr": correr}, __doc__)
+    nucleo.script({"estado": estado, "correr": correr, "mapa": mapa}, __doc__)

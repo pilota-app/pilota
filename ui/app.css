@@ -449,7 +449,7 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
   --graf-media50: light-dark(var(--graf-media50-claro), var(--graf-media50-oscuro)); }
 .grafico { padding: 16px 16px 10px; }
 .grafico-cabeza { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.grafico-pares { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; width: 100%; }
+.grafico-pares { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; width: 100%; }
 .graf-par { display: grid; gap: 0; min-width: 0; padding: 6px 10px; border: 1px solid var(--linea); border-radius: 10px;
   background: var(--fondo); color: var(--texto); text-align: left; font: inherit; cursor: pointer; }
 .graf-par[aria-selected="true"] { border-color: var(--acento); background: color-mix(in srgb, var(--acento) 8%, var(--fondo)); }
@@ -486,7 +486,6 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 @media (prefers-reduced-motion: reduce) {
   .graf-par-precio, .grafico-destello.anda, .conexion-punto { animation: none !important; }
 }
-@media (max-width: 900px) { .grafico-pares { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 520px) {
   .graf-par { min-width: 0; }
   .grafico-caja canvas { height: 300px; }
@@ -613,3 +612,19 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 .plan-lineas li[data-tipo="compra"] .plan-punto, .plan-lineas li[data-tipo="listo"] .plan-punto { background: var(--acento); }
 .plan-lineas li[data-tipo="espera"] .plan-punto { background: var(--espera); }
 .plan-lineas li[data-tipo="guardado"] .plan-punto { background: var(--gana); }
+
+/* El mapa de inicios: una fila por perfil, una columna por fecha de inicio, el color dice cómo le fue */
+.mapa { padding: 20px; margin-top: 16px; }
+.mapa-caja { overflow-x: auto; margin: 8px 0; }
+.mapa-tabla { border-collapse: separate; border-spacing: 2px; font-size: 12px; font-variant-numeric: tabular-nums; min-width: 100%; }
+.mapa-tabla th { text-align: left; font-weight: 600; color: var(--texto-suave); white-space: nowrap; padding: 4px 6px; }
+.mapa-tabla tbody th { color: var(--texto); position: sticky; left: 0; background: var(--fondo); }
+.mapa-tabla td { text-align: center; padding: 6px 4px; border-radius: 4px; white-space: nowrap; }
+.mapa-tabla td[data-tono="muy-bien"] { background: color-mix(in srgb, var(--gana) 45%, transparent); }
+.mapa-tabla td[data-tono="bien"] { background: color-mix(in srgb, var(--gana) 22%, transparent); }
+.mapa-tabla td[data-tono="igual"] { background: color-mix(in srgb, var(--linea) 60%, transparent); }
+.mapa-tabla td[data-tono="mal"] { background: color-mix(in srgb, var(--pierde) 22%, transparent); }
+.mapa-tabla td[data-tono="muy-mal"] { background: color-mix(in srgb, var(--pierde) 45%, transparent); }
+.mapa-tabla td[data-tono="nada"] { color: var(--texto-suave); }
+.mapa-tabla td.mapa-resumen { text-align: left; color: var(--texto-suave); padding-left: 10px; white-space: normal; min-width: 170px; }
+.mapa-btc th, .mapa-btc td { font-weight: 700; }

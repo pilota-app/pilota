@@ -494,6 +494,16 @@
    "responde": "simularEstadoListo",
    "limite": 30
   },
+  "simularMapa": {
+   "script": "simular.py",
+   "args": [
+    "mapa"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "mapaListo",
+   "limite": 600
+  },
   "simularCorrer": {
    "script": "simular.py",
    "args": [

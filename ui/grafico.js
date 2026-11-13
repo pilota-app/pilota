@@ -7,6 +7,9 @@ window.PilotaGrafico = (() => {
   "use strict";
 
   // Las ocho monedas que mira el robot, contra USDT (bin/lib_datos.py: UNIVERSO).
+  // Las acciones de EE. UU. (bStocks de Binance, bin/lib_datos.py: ACCIONES): el nombre corto va sin la «B» de Binance.
+  const ACCIONES = [["SPYBUSDT", "SPY"], ["QQQBUSDT", "QQQ"], ["AAPLBUSDT", "AAPL"], ["MSFTBUSDT", "MSFT"], ["NVDABUSDT", "NVDA"],
+    ["AMZNBUSDT", "AMZN"], ["GOOGLBUSDT", "GOOGL"], ["METABUSDT", "META"], ["TSLABUSDT", "TSLA"], ["AVGOBUSDT", "AVGO"]];
   const PARES = [["BTCUSDT", "BTC"], ["ETHUSDT", "ETH"], ["BNBUSDT", "BNB"], ["SOLUSDT", "SOL"], ["XRPUSDT", "XRP"],
     ["ADAUSDT", "ADA"], ["TRXUSDT", "TRX"], ["DOGEUSDT", "DOGE"]];
   // Los decimales de un precio según su tamaño: BTC con 2 y DOGE con 5, para que el cambio se vea.
@@ -71,7 +74,10 @@ window.PilotaGrafico = (() => {
       const v = (Eref || {}).vivo || {};
       // La rotación mira el día entero: sus gráficos son las 4 primeras del ranking, en velas de 4 horas.
       if (v.perfil === "rotacion") return (((v.rotacion || {}).ranking) || []).slice(0, 4).map((f) => ({ par: f.par, temporalidad: "4h" }));
-      return (v.radar || {}).filas || [];
+      const filas = (v.radar || {}).filas || [];
+      if (filas.length) return filas;
+      // Un holding o una mezcla: lo que compra, en velas de 1 hora (las acciones y monedas de su reparto).
+      return (v.pares || []).slice(0, 4).map((par) => ({ par, temporalidad: "1h" }));
     }
     function visibles(G) {
       if (G.layout !== "robot") return G.paneles.slice(0, G.layout);
@@ -85,9 +91,16 @@ window.PilotaGrafico = (() => {
     }
 
     // ── El HTML alrededor de los lienzos (los botones y los precios, traducibles) ──
+    // Los precios de arriba: lo que mira el perfil puesto si tiene acciones, y si no las ocho monedas.
+    function paresVista() {
+      const suyos = (((Eref || {}).vivo || {}).pares) || [];
+      const todos = [...PARES, ...ACCIONES];
+      if (!suyos.some((p) => ACCIONES.some(([a]) => a === p))) return PARES;
+      return todos.filter(([p]) => suyos.includes(p));
+    }
     function cabezaPanel(G, P, i) {
       return `<div class="graf-panel-cabeza">
-        <div class="chips chips-chicos" role="group" aria-label="Par">${PARES.map(([par, n]) => `
+        <div class="chips chips-chicos" role="group" aria-label="Par">${[...PARES, ...ACCIONES].filter(([par]) => paresVista().some(([x]) => x === par) || PARES.some(([x]) => x === par)).map(([par, n]) => `
           <button type="button" class="chip" data-graf-panel="${i}" data-graf-par="${par}" aria-pressed="${P.par === par}" data-sin-traducir>${n}</button>`).join("")}</div>
         <div class="chips chips-chicos grafico-tiempos" role="group" aria-label="Velas de">${TEMPORALIDADES.map(([t, n]) => `
           <button type="button" class="chip" data-graf-panel="${i}" data-graf-t="${t}" aria-pressed="${P.temporalidad === t}">${n}</button>`).join("")}</div></div>`;
@@ -106,7 +119,7 @@ window.PilotaGrafico = (() => {
       const paneles = visibles(G);
       return `<div class="tarjeta grafico">
         <div class="grafico-cabeza">
-          <div class="grafico-pares" role="group" aria-label="Precios en vivo">${PARES.map(([par, nombre]) => `
+          <div class="grafico-pares" role="group" aria-label="Precios en vivo">${paresVista().map(([par, nombre]) => `
             <button type="button" class="graf-par" data-graf-solo="${par}">
               <span class="graf-par-nombre" data-sin-traducir>${nombre}</span>
               <span class="graf-par-precio" id="precio-${par}" data-tic="${G.cambio[par] || ""}" data-sin-traducir>${esc(G.precios[par] ? numero(G.precios[par], DECIMALES(G.precios[par])) : "–")}</span></button>`).join("")}</div>
@@ -118,7 +131,7 @@ window.PilotaGrafico = (() => {
           <button type="button" class="chip chip-ind" data-graf-ind="${id}" aria-pressed="${!!G.ind[id]}">${n}</button>`).join("")}</div>
         <div class="grafico-grilla n-${paneles.length >= 3 ? 4 : paneles.length}">
           ${paneles.map((P, i) => `<div class="graf-panel">
-            ${enRobot ? `<p class="graf-panel-titulo"><strong data-sin-traducir>${esc(P.par.replace(/(FDUSD|USDT)$/, ""))}</strong>
+            ${enRobot ? `<p class="graf-panel-titulo"><strong data-sin-traducir>${esc(P.par.replace(/^(SPY|QQQ|AAPL|MSFT|NVDA|AMZN|GOOGL|META|TSLA|AVGO)BUSDT$/, "$1").replace(/(FDUSD|USDT)$/, ""))}</strong>
               <span class="suave">${frase("velas de {t}", { t: Tp(TIEMPO_CORTO[P.temporalidad] || P.temporalidad) })}</span></p>` : cabezaPanel(G, P, i)}
             <div class="grafico-caja${G.ind.rsi ? " con-rsi" : ""}">
               ${enRobot ? insignia(P) : ""}

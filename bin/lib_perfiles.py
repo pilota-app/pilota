@@ -56,6 +56,20 @@ PERFILES = {
     "cosecha": {"tipo": "acumular", "variante": True, "partes": 12, "cada_ms": 7 * DIA_MS,
                 "cosecha": {"sube": 0.3, "vende": 0.25, "recompra": 0.15},
                 "reparto": {"BTCUSDT": 0.6, "ETHUSDT": 0.4}, "pares": ("BTCUSDT", "ETHUSDT")},
+    # El holding de BTC y ETH contra USDT: no se ofrece solo (para eso está «holding»), es la parte de una mezcla.
+    "holding_usdt": {"tipo": "acumular", "variante": True, "partes": 12, "cada_ms": 7 * DIA_MS,
+                     "reparto": {"BTCUSDT": 0.6, "ETHUSDT": 0.4}, "pares": ("BTCUSDT", "ETHUSDT")},
+    # Acciones de EE. UU. (bStocks de Binance, `lib_datos.ACCIONES`): SPY es el S&P 500 y QQQ el Nasdaq 100.
+    "indice_eeuu": {"tipo": "acumular", "variante": True, "partes": 12, "cada_ms": 7 * DIA_MS,
+                    "reparto": {"SPYBUSDT": 0.6, "QQQBUSDT": 0.4}, "pares": ("SPYBUSDT", "QQQBUSDT")},
+    "indice_semanal": {"tipo": "acumular", "variante": True, "partes": 52, "cada_ms": 7 * DIA_MS, "descuento": 0.01,
+                       "reparto": {"SPYBUSDT": 0.6, "QQQBUSDT": 0.4}, "pares": ("SPYBUSDT", "QQQBUSDT")},
+    "acciones_ocho": {"tipo": "acumular", "variante": True, "partes": 12, "cada_ms": 7 * DIA_MS,
+                      "reparto": {p: 1 / 8 for p in lib_datos.ACCIONES[2:]}, "pares": lib_datos.ACCIONES[2:]},
+    # Las mezclas: el monto repartido entre perfiles, cada parte con su propio libro (`lib_piloto`, `lib_simulacion.mezcla`).
+    "semanal_rotacion": {"tipo": "mezcla", "componentes": (("compra_semanal", 0.5), ("rotacion", 0.5))},
+    "nucleo_satelite": {"tipo": "mezcla", "componentes": (("holding_usdt", 0.7), ("rotacion", 0.3))},
+    "cripto_acciones": {"tipo": "mezcla", "componentes": (("compra_semanal", 0.5), ("indice_semanal", 0.5))},
     # Rotación: cada día, las 2 monedas más fuertes de las 8 (fuerza = cuánto subieron en 30 días contra cuánto se movieron),
     # solo las que están sobre su media de 50 días y solo si BTC está sobre su media de 200. Cambia una cuando otra la pasa
     # con margen (`margen`), para no ir y venir por nada. Ver `lib_rotacion`.
@@ -63,7 +77,9 @@ PERFILES = {
                  "dias_fuerza": 30, "media": 50, "margen": 1},
 }
 #: Los que se ofrecen, en el orden de la pantalla. El resto está retirado (ver arriba).
-ORDEN = ("holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "rotacion")
+ORDEN = ("holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha",
+         "indice_eeuu", "indice_semanal", "acciones_ocho",
+         "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "rotacion")
 RETIRADOS = ("conservador", "equilibrado", "trader", "scalper")
 SUGERIDO = "holding"
 #: Las velas que no se guardan tal cual: se arman juntando velas de 1 m.
@@ -77,9 +93,12 @@ def de(perfil):
 
 
 def pares_de(perfil):
-    """Las monedas que mira un perfil (contra USDT). El holding compra las suyas aparte (`reparto`)."""
+    """Lo que mira un perfil (contra USDT): sus monedas y acciones, o las de sus partes si es una mezcla. El holding
+    clásico compra las suyas aparte (`reparto`, contra FDUSD)."""
     p = PERFILES.get(perfil) or {}
-    return tuple(x for x in p.get("pares", ()) if x in lib_datos.UNIVERSO)
+    if p.get("tipo") == "mezcla":
+        return tuple(dict.fromkeys(x for c, _ in p["componentes"] for x in pares_de(c)))
+    return tuple(x for x in p.get("pares", ()) if x in lib_datos.ACTIVOS)
 
 
 def relacion(s):

@@ -18,10 +18,11 @@ import lib_datos
 import minimo_viable
 import nucleo
 
-PARES = lib_datos.UNIVERSO
-MONEDA = {p: p[:-len("USDT")] for p in PARES}
+PARES = lib_datos.ACTIVOS
+#: El nombre corto: BTC para BTCUSDT y SPY para SPYBUSDT (las acciones llevan una «B» antes de USDT).
+MONEDA = {p: p[:-len("BUSDT")] if p in lib_datos.ACCIONES else p[:-len("USDT")] for p in PARES}
 #: Lo que se baja de cada una la primera vez: 3 años de 1 d, 4 h y 1 h, y 3 días de 1 m (después crece sola con el flujo).
-DIAS = {"1d": 1095, "4h": 1095, "1h": 1095, lib_datos.MINUTO: 3}
+DIAS = {"1d": 3300, "4h": 1095, "1h": 1095, lib_datos.MINUTO: 3}
 #: Cuántos días de 1 m se guardan como mucho (los mismos de los pares de siempre).
 DIAS_MINUTOS = lib_datos.DIAS_MINUTOS
 ORDEN_BAJADA = (lib_datos.MINUTO, "1d", "4h", "1h")
