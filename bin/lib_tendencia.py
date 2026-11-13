@@ -87,12 +87,7 @@ def sobre_media(cierres, media):
     return {"precio": cierres[-1], "media": _media(cierres[-media:]), "sobre": cierres[-1] > _media(cierres[-media:])}
 
 
-def golpe_en(cierres, golpe, dias):
-    """La peor caída de un día en los últimos `dias` cierres si fue de `golpe` o más (por ejemplo −0,07), o `None`."""
-    if not golpe or len(cierres) < 2:
-        return None
-    peor = min(cierres[i] / cierres[i - 1] - 1 for i in range(max(1, len(cierres) - dias), len(cierres)))
-    return peor if peor <= -golpe else None
+golpe_en = lib_rotacion.golpe_en
 
 
 def filas_cruce(tramos, reparto, media=50, actuales=(), golpe=None, dias_freno=5, noticias=None):

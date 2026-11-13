@@ -308,7 +308,8 @@ def _curva_de(perfil, monto, desde_ms, hasta_ms, com, diarias):
         btc = diarias.get(lib_indicadores_mercado.CONTEXTO_PAR) or lib_datos.leer_serie(lib_indicadores_mercado.CONTEXTO_PAR, "1d")
         return lib_rotacion.simular(monto, {k: diarias[k] for k in p["pares"] if diarias.get(k)}, btc, desde_ms, hasta_ms,
                                     lib_universo.comisiones_de("USDT", com), posiciones=p["posiciones"],
-                                    dias=p["dias_fuerza"], media=p["media"], margen=p["margen"])
+                                    dias=p["dias_fuerza"], media=p["media"], margen=p["margen"], golpe=p.get("golpe"),
+                                    dias_freno=p.get("dias_freno", 5), noticia=_noticia_btc(p))
     return lib_holding.simular(monto, {k: diarias.get(k) or [] for k in p["reparto"]}, desde_ms, hasta_ms, p, com)
 
 
@@ -543,6 +544,14 @@ def ops_rapidas(temporalidad="5m", com=None, minutos=None, pares=None):
     return ops_de(pares or lib_perfiles.pares_de("scalper"), temporalidad, com, minutos)
 
 
+def _noticia_btc(p):
+    """Si el perfil frena con noticias: una función que dice si hubo una mala noticia de BTC en los últimos días."""
+    if not p.get("noticias"):
+        return None
+    datos = lib_influencia.cargar()
+    return lambda ms: bool(lib_influencia.negativas(ms, ["BTCUSDT"], p.get("dias_freno", 5), datos))
+
+
 def rotacion(monto, desde, hasta, com, diarias=None, btc=None):
     """La rotación (`lib_rotacion`) sobre el pasado, con las 8 monedas del robot."""
     p = lib_perfiles.de("rotacion")
@@ -551,7 +560,8 @@ def rotacion(monto, desde, hasta, com, diarias=None, btc=None):
     btc = btc if btc is not None else lib_datos.leer_serie(lib_indicadores_mercado.CONTEXTO_PAR, "1d")
     r = lib_rotacion.simular(monto, {k: v for k, v in diarias.items() if v}, btc, desde, hasta,
                              lib_universo.comisiones_de("USDT", com), posiciones=p["posiciones"], dias=p["dias_fuerza"],
-                             media=p["media"], margen=p["margen"])
+                             media=p["media"], margen=p["margen"], golpe=p.get("golpe"), dias_freno=p.get("dias_freno", 5),
+                             noticia=_noticia_btc(p))
     if r.get("listo"):
         r["curva"] = ralear(r["curva"])
         r["movimientos"] = r["movimientos"][-MOVIMIENTOS:]

@@ -2769,7 +2769,8 @@
       return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
         ganancia_relativa: valor / m - 1, efectivo: m * 0.4, posiciones: [], tenencias, tendencia, noticias,
         ultima: { decision: "mantiene", tiene: ["BTCUSDT"] },
-        movimientos: [linea(t0 + 60000, "tendencia_compra", "BTCUSDT", { precio: 96100, monto: m * 0.6 }, {}),
+        movimientos: [linea(t0 + 120000, "tendencia_espera", "ETHUSDT", {}, { por: "noticia", motivo: "persona-de-ejemplo", fecha: "2026-11-02" }),
+          linea(t0 + 60000, "tendencia_compra", "BTCUSDT", { precio: 96100, monto: m * 0.6 }, { por: "sobre_media" }),
           linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m })], flujo, radar, jugadas: {} };
     }
     const familia = ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "indice_eeuu", "indice_semanal",

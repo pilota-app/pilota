@@ -330,6 +330,23 @@ class TendenciaEnVivo(Base):
         self.assertEqual(r["vende"], ["BTCUSDT"])
         self.assertEqual((self.razones().count("tendencia_compra"), self.razones().count("tendencia_venta")), (1, 1))
 
+    def test_una_mala_noticia_vende_y_queda_escrito_por_que(self):
+        piloto.empezar("tendencia", 200, AHORA)
+        self.vuelta(AHORA, {"BTCUSDT": 0.01, "ETHUSDT": 0.01})
+        noticia = {"BTCUSDT": {"persona": "Ana", "persona_id": "ana", "que": "x", "fecha": "2026-11-10", "dia": -0.04,
+                               "activo": "BTC"}}
+        with mock.patch.object(piloto.lib_influencia, "negativas", return_value=noticia):
+            r = self.vuelta(AHORA + self.DIA, {"BTCUSDT": 0.01, "ETHUSDT": 0.01})
+            self.vuelta(AHORA + 2 * self.DIA, {"BTCUSDT": 0.01, "ETHUSDT": 0.01})
+        self.assertEqual(r["vende"], ["BTCUSDT"])
+        filas, _ = lib_registro.ultimas(lib_estado.PRUEBA, 100)
+        venta = next(x for x in filas if x["razon"] == "tendencia_venta")
+        self.assertEqual((venta["resultado"]["por"], venta["resultado"]["motivo"], venta["resultado"]["fecha"]),
+                         ("noticia", "ana", "2026-11-10"))
+        self.assertEqual(self.razones().count("tendencia_espera"), 1, "la espera se anota una vez, cuando empieza")
+        compra = next(x for x in filas if x["razon"] == "tendencia_compra")
+        self.assertEqual(compra["resultado"]["por"], "sobre_media")
+
     def test_sin_la_vela_de_ayer_no_decide(self):
         piloto.empezar("tendencia", 200, AHORA)
         series = self.diarias(AHORA - 3 * self.DIA, {})

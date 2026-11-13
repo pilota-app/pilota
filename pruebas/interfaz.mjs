@@ -99,6 +99,7 @@ await page.waitForSelector("#descargar");
   assert.match(await ten.textContent(".pronostico"), /Las 1\.?630 veces que estuvo sobre su promedio, a los 20 días había subido 54 de cada 100 veces[\s\S]*en 26 de cada 100 cayó más de 10 %/);
   assert.match(await ten.textContent(".noticias"), /Persona de ejemplo[\s\S]*BTC \+3,1 %[\s\S]*Datos al 2026-11-13/);
   assert.match(await ten.textContent(".noticias"), /Quién mueve más el precio hoy[\s\S]*14 noticias medidas/);
+  assert.match(await ten.textContent("#pestana-vivo"), /No compré ETH: hubo una mala noticia de Persona De Ejemplo \(2026-11-02\)/);
   assert.match(await ten.textContent(".como-decido"), /Mala noticia de una persona influyente[\s\S]*Las tres juntas[\s\S]*67 de cada 100/);
   assert.match(await ten.textContent("#pestana-vivo"), /BTCUSDT|BTC cerró sobre su promedio de 50 días: compré/);
   await ten.close();

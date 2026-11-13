@@ -280,7 +280,12 @@ def _vuelta_rotacion(d, ms, f, perfil=None):
     pasa = bool(filtro_en(ms).get("pasa")) if filtro_en else False
     puerta = lib_frenos.permite_entrada(f)
     actuales = [par for par, q in (r.get("tenencias") or {}).items() if _numero(q) > 0]
-    quiero = lib_rotacion.elegir(filas, actuales, p["posiciones"], p["margen"], pasa and puerta["puede"])
+    # Los frenos de la tendencia: una mala noticia de BTC saca todo a USDT y un golpe reciente no deja entrar a esa moneda.
+    noticia = lib_influencia.negativas(ms, ["BTCUSDT"], p.get("dias_freno", 5)).get("BTCUSDT") if p.get("noticias") else None
+    golpes = lib_rotacion.golpeadas(diarias, ms, p.get("golpe"), p.get("dias_freno", 5))
+    quiero = lib_rotacion.elegir(filas, actuales, p["posiciones"], p["margen"], pasa and puerta["puede"] and not noticia,
+                                 golpes)
+    r["noticia"], r["golpes"] = noticia, golpes
     salen = [par for par in actuales if par not in quiero]
     entran = [par for par in quiero if par not in actuales]
     precio = {par: precio_fresco(par, ms) for par in salen + entran}
@@ -296,7 +301,10 @@ def _vuelta_rotacion(d, ms, f, perfil=None):
         lib_registro.anotar(AMBIENTE, "rotacion_venta", par=par, ms=ms,
                             orden={"lado": "venta", "tipo": "mercado", "precio": precio[par], "cantidad": cantidad,
                                    "monto": recibe, "estado": "llenada"},
-                            resultado={"precio": precio[par], "neto": recibe - costo, "comision": cantidad * precio[par] * taker})
+                            resultado={"precio": precio[par], "neto": recibe - costo, "comision": cantidad * precio[par] * taker,
+                                       "por": ("freno" if not puerta["puede"] else "noticia" if noticia
+                                               else "btc" if not pasa else "ranking"),
+                                       "motivo": (noticia or {}).get("persona_id"), "fecha": (noticia or {}).get("fecha")})
     for i, par in enumerate(entran):
         gasto = _numero(r.get("efectivo")) / (len(entran) - i)
         if gasto <= 0:
@@ -347,17 +355,41 @@ def _vuelta_tendencia(d, ms, f, perfil=None):
         return {"decision": "sin_datos", "faltan": [par for par, x in hoy.items() if not x]}
     taker = lib_tamano.comisiones(lib_costos.comisiones())["taker"]
     movs = lib_tendencia.paso(t, ms, hoy, objetivo, taker, lib_tendencia.SPREAD, p["umbral"])
+    # Cada movimiento dice por qué: la regla que lo movió (`por`), y si fue una noticia, de quién y de qué día.
+    por_fila = {x["par"]: x for x in filas}
+
+    def porque(par, que):
+        x = por_fila.get(par) or {}
+        if not puerta["puede"]:
+            return {"por": "freno"}
+        if que == "venta" and x.get("parte", 0) == 0:
+            n = x.get("noticia") or {}
+            return {"por": x.get("motivo") or "bajo_media", "motivo": n.get("persona_id"), "fecha": n.get("fecha")}
+        return {"por": "ajuste" if par in actuales else "sobre_media"}
     for m in movs:
         if m["que"] == "compra":
             lib_registro.anotar(AMBIENTE, "tendencia_compra", par=m["par"], ms=ms,
                                 orden={"lado": "compra", "tipo": "mercado", "precio": m["precio"], "cantidad": m["cantidad"],
                                        "monto": m["monto"], "estado": "llenada"},
-                                resultado={"comision": m["comision"]})
+                                resultado={"comision": m["comision"], **porque(m["par"], "compra")})
         else:
             lib_registro.anotar(AMBIENTE, "tendencia_venta", par=m["par"], ms=ms,
                                 orden={"lado": "venta", "tipo": "mercado", "precio": m["precio"], "cantidad": m["cantidad"],
                                        "monto": m["monto"], "estado": "llenada"},
-                                resultado={"precio": m["precio"], "neto": m["ganancia"], "comision": m["comision"]})
+                                resultado={"precio": m["precio"], "neto": m["ganancia"], "comision": m["comision"],
+                                           **porque(m["par"], "venta")})
+    # Los días en que un freno no la dejó comprar quedan escritos una vez, cuando empieza (no cada día que dura).
+    antes = t.get("esperas") or {}
+    ahora = {}
+    for x in filas:
+        if x["sobre"] and x["motivo"] in ("golpe", "noticia") and x["par"] not in actuales and puerta["puede"]:
+            ahora[x["par"]] = x["motivo"]
+            if antes.get(x["par"]) != x["motivo"]:
+                n = x.get("noticia") or {}
+                lib_registro.anotar(AMBIENTE, "tendencia_espera", par=x["par"], ms=ms,
+                                    resultado={"por": x["motivo"], "motivo": n.get("persona_id"), "fecha": n.get("fecha"),
+                                               "caida": x.get("golpe")})
+    t["esperas"] = ahora
     t["dia_ms"] = dia
     t["filas"] = [{**{k: x[k] for k in ("par", "precio", "media", "sobre", "parte", "reparto", "motivo", "golpe", "noticia")},
                    "historia": historia.get(x["par"])}
@@ -468,7 +500,7 @@ def decidir(ctx=None, ahora_ms=None):
 # ── Lo que lee la pantalla ───────────────────────────────────────────────────────────────────────────────────────────
 
 MOVIMIENTOS = ("perfil_empezado", "perfil_detenido", "compra_holding", "venta_holding", "rotacion_compra", "rotacion_venta",
-               "tendencia_compra", "tendencia_venta", "entrada_ruptura", "entrada_rebote", "objetivo",
+               "tendencia_compra", "tendencia_venta", "tendencia_espera", "entrada_ruptura", "entrada_rebote", "objetivo",
                "stop", "stop_movil", "cierre_manual", "propuesta_vencida", "rechazo", "freno_diario", "freno_racha",
                "freno_piso", "freno_piso_absoluto", "saldo_reiniciado")
 

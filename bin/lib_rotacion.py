@@ -77,8 +77,30 @@ def ranking(diarias, ms, dias=30, media=50):
     return filas
 
 
-def elegir(filas, actuales, posiciones=2, margen=1, filtro_pasa=True):
-    """Qué monedas tener ahora. Sin el permiso de BTC, ninguna."""
+def golpe_en(cierres, golpe, dias):
+    """La peor caída de un día en los últimos `dias` cierres si fue de `golpe` o más (por ejemplo −0,07), o `None`."""
+    if not golpe or len(cierres) < 2:
+        return None
+    peor = min(cierres[i] / cierres[i - 1] - 1 for i in range(max(1, len(cierres) - dias), len(cierres)))
+    return peor if peor <= -golpe else None
+
+
+def golpeadas(diarias, ms, golpe, dias):
+    """Las monedas que tuvieron un día de `golpe` o peor en los últimos `dias` días cerrados antes de `ms`."""
+    if not golpe:
+        return {}
+    salida = {}
+    for par, velas in diarias.items():
+        cerradas = cerradas_antes(velas, ms)[-dias - 1:]
+        caida = golpe_en([v[4] for v in cerradas], golpe, dias)
+        if caida is not None:
+            salida[par] = caida
+    return salida
+
+
+def elegir(filas, actuales, posiciones=2, margen=1, filtro_pasa=True, bloqueadas=()):
+    """Qué monedas tener ahora. Sin el permiso de BTC, ninguna. Las `bloqueadas` (un golpe reciente) no entran, pero si ya
+    se tienen, se mantienen."""
     if not filtro_pasa:
         return []
     puesto = {f["par"]: f for f in filas}
@@ -86,13 +108,16 @@ def elegir(filas, actuales, posiciones=2, margen=1, filtro_pasa=True):
     for f in filas:
         if len(quedan) >= posiciones:
             break
-        if f["elegible"] and f["par"] not in quedan:
+        if f["elegible"] and f["par"] not in quedan and f["par"] not in bloqueadas:
             quedan.append(f["par"])
     return quedan[:posiciones]
 
 
-def simular(monto, diarias, btc, desde_ms, hasta_ms, com, spread=0.0005, posiciones=2, dias=30, media=50, margen=1):
-    """La rotación sobre el pasado, día por día: el saldo, la curva y cada compra y venta. Pura (no lee el disco)."""
+def simular(monto, diarias, btc, desde_ms, hasta_ms, com, spread=0.0005, posiciones=2, dias=30, media=50, margen=1,
+            golpe=None, dias_freno=5, noticia=None):
+    """La rotación sobre el pasado, día por día: el saldo, la curva y cada compra y venta. Pura (no lee el disco).
+    Los frenos de la tendencia (estudio de nov 2026): no entra a una moneda con un día de `golpe` o peor en los últimos
+    `dias_freno`, y si `noticia(ms)` dice que hubo una mala noticia de BTC, todo a USDT (como el filtro de BTC)."""
     filtro = lib_estrategias.filtro_en(btc)
     taker = (com or {}).get("taker", 0.001)
     dias_ms = sorted({v[0] for velas in diarias.values() for v in velas if desde_ms <= v[0] <= hasta_ms})
@@ -102,7 +127,8 @@ def simular(monto, diarias, btc, desde_ms, hasta_ms, com, spread=0.0005, posicio
     for d in dias_ms:
         ms = d + DIA_MS                     # se decide con la vela de este día ya cerrada
         filas = ranking(diarias, ms, dias, media)
-        objetivo = elegir(filas, list(tenencias), posiciones, margen, filtro(ms).get("pasa"))
+        pasa = filtro(ms).get("pasa") and not (noticia and noticia(ms))
+        objetivo = elegir(filas, list(tenencias), posiciones, margen, pasa, golpeadas(diarias, ms, golpe, dias_freno))
         for par in [p for p in tenencias if p not in objetivo]:
             p = precio[par].get(d)
             if not p:

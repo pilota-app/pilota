@@ -38,7 +38,8 @@ def cargar(ruta=RUTA):
             continue
         mov = e.get("movimiento") if isinstance(e.get("movimiento"), dict) else {}
         eventos.append({"ms": _ms(e["fecha"]), "fecha": e["fecha"], "activo": e["activo"],
-                        "persona": personas.get(e.get("persona")), "que": str(e.get("que") or "")[:160],
+                        "persona": personas.get(e.get("persona")),
+                        "persona_id": e.get("persona") if e.get("persona") in personas else None, "que": str(e.get("que") or "")[:160],
                         "dia": _numero(mov.get("dia")), "d20": _numero(mov.get("d20"))})
     eventos.sort(key=lambda e: e["ms"])
     ranking = []
@@ -73,7 +74,7 @@ def negativas(ms, pares, dias=5, datos=None):
         for e in reversed(d["eventos"]):
             if (e["persona"] and e["activo"] in (moneda, "BTC") and e["dia"] is not None and e["dia"] < 0
                     and e["ms"] < ms <= e["ms"] + dias * DIA_MS):
-                salida[par] = {"persona": e["persona"], "que": e["que"], "fecha": e["fecha"], "dia": e["dia"],
-                               "activo": e["activo"]}
+                salida[par] = {"persona": e["persona"], "persona_id": e["persona_id"], "que": e["que"],
+                               "fecha": e["fecha"], "dia": e["dia"], "activo": e["activo"]}
                 break
     return salida

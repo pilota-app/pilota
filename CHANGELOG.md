@@ -7,6 +7,10 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- «Movimientos» ahora dice por qué compró, vendió o esperó cada perfil de tendencia y rotación (por ejemplo, una mala
+  noticia de una persona influyente), y la rotación también frena con caídas fuertes y malas noticias. *"Movements" now
+  says why each trend and rotation profile bought, sold or waited (for example, bad news from an influential person), and
+  rotation also pauses after sharp drops and bad news.*
 - Tendencia ahora usa las noticias para decidir: no compra después de una caída fuerte ni después de una mala noticia de
   una persona influyente, y te muestra cómo pesa cada cosa y quién mueve más el precio. *Trend now uses news to decide: it
   doesn't buy after a sharp drop or after bad news from an influential person, and it shows how much each thing weighs and

@@ -75,7 +75,10 @@ PERFILES = {
     # solo las que están sobre su media de 50 días y solo si BTC está sobre su media de 200. Cambia una cuando otra la pasa
     # con margen (`margen`), para no ir y venir por nada. Ver `lib_rotacion`.
     "rotacion": {"tipo": "rotar", "temporalidades": ("1d",), "posiciones": 2, "pares": lib_datos.UNIVERSO,
-                 "dias_fuerza": 30, "media": 50, "margen": 1},
+                 "dias_fuerza": 30, "media": 50, "margen": 1,
+                 # Los frenos de la tendencia también aquí (estudio de nov 2026): con ellos le ganó a BTC en más ventanas y su
+                 # peor ventana de 1 año bajó mucho, a cambio de una ganancia típica un poco menor en el tramo de prueba.
+                 "golpe": 0.05, "dias_freno": 5, "noticias": True},
     # Tendencia: BTC 60 % y ETH 40 %, cada una solo mientras su cierre diario está sobre su media de 50 días; bajo la media,
     # esa parte espera en USDT. Fue la que mejor aguantó el estudio de 103 fórmulas (nov 2026, ver AGENTS.md): le ganó a
     # comprar BTC en 2 de cada 3 ventanas de prueba, sobre todo porque sale antes de las caídas. Ver `lib_tendencia.pesos_cruce`.

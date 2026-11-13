@@ -157,6 +157,8 @@ window.PilotaVivo = (() => {
 
     // ── Los movimientos en palabras ──
     // Una línea del registro de prueba (bin/lib_registro.py), como la cuenta el robot.
+    // El nombre de una persona desde su id del registro («donald-trump» → «Donald Trump»): el registro solo guarda códigos.
+    const persona = (id) => esc(String(id || "").split("-").filter(Boolean).map((p) => p[0].toUpperCase() + p.slice(1)).join(" ") || Tp("una persona influyente"));
     function textoLinea(l) {
       const o = l.orden || {}, r = l.resultado || {}, m = moneda(l.par);
       switch (l.razon) {
@@ -171,13 +173,25 @@ window.PilotaVivo = (() => {
           ? frase("Rebalanceo: vendí {monto} de {moneda} a {precio} porque cripto pasó de su parte.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto) })
           : frase("Coseché {moneda}: vendí {monto} a {precio} y gané {neto}. Guardo esa plata para recomprar si baja.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto), neto: usdt(r.neto || 0) });
         case "rotacion_compra": return frase("Pasé a {moneda}: compré {monto} a {precio}. Es la número {puesto} de las 8 en fuerza.", { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio), puesto: numero(r.puesto || 0, 0) });
-        case "rotacion_venta": return (r.neto || 0) >= 0
-          ? frase("Salí de {moneda}: se cayó del grupo de las más fuertes. Vendí a {precio} y gané {neto}.", { moneda: m, precio: usdt(o.precio), neto: usdt(r.neto || 0) })
-          : frase("Salí de {moneda}: se cayó del grupo de las más fuertes. Vendí a {precio} y perdí {neto}.", { moneda: m, precio: usdt(o.precio), neto: usdt(Math.abs(r.neto || 0)) });
-        case "tendencia_compra": return frase("{moneda} cerró sobre su promedio de 50 días: compré {monto} a {precio}.", { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio) });
-        case "tendencia_venta": return (r.neto || 0) >= 0
-          ? frase("Vendí {monto} de {moneda} a {precio} y gané {neto}.", { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio), neto: usdt(r.neto || 0) })
-          : frase("Vendí {monto} de {moneda} a {precio} y perdí {neto}.", { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio), neto: usdt(Math.abs(r.neto || 0)) });
+        case "rotacion_venta": {
+          const gano = (r.neto || 0) >= 0, neto = usdt(Math.abs(r.neto || 0)), d = { moneda: m, precio: usdt(o.precio), neto, persona: persona(r.motivo), fecha: esc(r.fecha || "") };
+          if (r.por === "noticia") return gano ? frase("Salí de {moneda} por una mala noticia de {persona} sobre BTC ({fecha}). Vendí a {precio} y gané {neto}.", d) : frase("Salí de {moneda} por una mala noticia de {persona} sobre BTC ({fecha}). Vendí a {precio} y perdí {neto}.", d);
+          if (r.por === "btc") return gano ? frase("Salí de {moneda}: BTC viene cayendo. Vendí a {precio} y gané {neto}.", d) : frase("Salí de {moneda}: BTC viene cayendo. Vendí a {precio} y perdí {neto}.", d);
+          return gano ? frase("Salí de {moneda}: se cayó del grupo de las más fuertes. Vendí a {precio} y gané {neto}.", d)
+            : frase("Salí de {moneda}: se cayó del grupo de las más fuertes. Vendí a {precio} y perdí {neto}.", d);
+        }
+        case "tendencia_compra": return r.por === "ajuste"
+          ? frase("Ajusté {moneda} a su parte: compré {monto} a {precio}.", { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio) })
+          : frase("{moneda} cerró sobre su promedio de 50 días: compré {monto} a {precio}.", { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio) });
+        case "tendencia_venta": {
+          const d = { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio), neto: usdt(Math.abs(r.neto || 0)), persona: persona(r.motivo), fecha: esc(r.fecha || "") };
+          const porque = { bajo_media: "{moneda} cerró bajo su promedio de 50 días.", noticia: "Mala noticia de {persona} ({fecha}).",
+            ajuste: "Ajusté {moneda} a su parte.", freno: "Hay un freno de la cuenta." }[r.por] || "";
+          return `${porque ? frase(porque, d) + " " : ""}${(r.neto || 0) >= 0 ? frase("Vendí {monto} de {moneda} a {precio} y gané {neto}.", d) : frase("Vendí {monto} de {moneda} a {precio} y perdí {neto}.", d)}`;
+        }
+        case "tendencia_espera": return r.por === "noticia"
+          ? frase("No compré {moneda}: hubo una mala noticia de {persona} ({fecha}). Espero en USDT unos días.", { moneda: m, persona: persona(r.motivo), fecha: esc(r.fecha || "") })
+          : frase("No compré {moneda}: cayó {caida} en un día esta semana. Espero unos días.", { moneda: m, caida: porcentaje(Math.abs(r.caida || 0), 1) });
         case "entrada_ruptura": case "entrada_rebote":
           if (J[o.id] && o.estado !== "llenada") {
             return `${frase("Dejé una compra de {moneda} esperando en {precio} ({monto}), con stop en {stop} y objetivo en {objetivo}.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto), stop: usdt(o.stop), objetivo: usdt(o.objetivo) })}
@@ -200,7 +214,7 @@ window.PilotaVivo = (() => {
       }
     }
     const claseLinea = (l) => ({ objetivo: "gana", stop: "pierde", stop_movil: (l.resultado || {}).neto > 0 ? "gana" : "pierde",
-      compra_holding: "compra", venta_holding: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", rotacion_compra: "compra", rotacion_venta: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", tendencia_compra: "compra", tendencia_venta: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", entrada_ruptura: "compra", entrada_rebote: "compra", rechazo: "nada", propuesta_vencida: "nada" })[l.razon] || "info";
+      compra_holding: "compra", venta_holding: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", rotacion_compra: "compra", rotacion_venta: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", tendencia_compra: "compra", tendencia_venta: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", tendencia_espera: "espera", entrada_ruptura: "compra", entrada_rebote: "compra", rechazo: "nada", propuesta_vencida: "nada" })[l.razon] || "info";
     function filaLinea(l) {
       return `<li class="mov" data-tipo="${claseLinea(l)}"><span class="mov-punto" aria-hidden="true"></span>
         <span class="mov-cuando" data-sin-traducir>${esc(fechaHora(l.fecha))}</span>
@@ -398,6 +412,8 @@ window.PilotaVivo = (() => {
       }
       const maximo = Math.max(...filas.map((f) => Math.abs(f.fuerza || 0)), 0.0001);
       return `<div class="tarjeta ranking"><h3>Ranking de fuerza</h3>
+        ${r.noticia ? `<p class="freno-texto">${frase("Mala noticia de {persona} sobre BTC ({fecha}): no tengo ninguna moneda y espero en USDT unos días.", { persona: esc(r.noticia.persona || ""), fecha: esc(r.noticia.fecha || "") })}</p>` : ""}
+        ${Object.keys(r.golpes || {}).length ? `<p class="suave">${frase("No compro {monedas} por unos días: cayeron 5 % o más en un día esta semana.", { monedas: esc(Object.keys(r.golpes).map(moneda).join(", ")) })}</p>` : ""}
         ${r.pasa_btc === false ? `<p class="freno-texto">${frase("BTC viene cayendo: no tengo ninguna moneda y espero en USDT.", {})}</p>`
           : `<p class="suave">${frase("Tengo las 2 primeras que están sobre su promedio. Vuelvo a comparar cuando cierra la vela del día, a las {hora}.", { hora: hora((r.dia_ms || 0) + 86400000) })}</p>`}
         <ol class="ranking-filas">${filas.map((f) => {

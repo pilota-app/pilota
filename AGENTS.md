@@ -643,7 +643,7 @@ con el mismo monto (`lib_simulacion.comparar`), y «Movimientos» cuenta todo lo
 | nucleo_satelite (mezcla) | 70 % holding_usdt (BTC y ETH contra USDT, no se ofrece solo) y 30 % rotacion |
 | cripto_acciones (mezcla) | 50 % compra_semanal y 50 % indice_semanal |
 | tendencia (experimento) | BTC 60 % y ETH 40 %, cada una solo mientras su cierre diario está sobre su media de 50 días (`lib_tendencia.pesos_cruce`); bajo la media, esa parte espera en USDT. No compra 5 días después de un día de −5 % o peor (`golpe`) y espera en USDT 5 días después de una mala noticia de una persona influyente (`noticias`, `lib_influencia.negativas`) |
-| rotacion (experimento) | una vez al día tiene las 2 monedas más fuertes de las 8 contra USDT (`lib_rotacion`); puede caer tanto como BTC |
+| rotacion (experimento) | una vez al día tiene las 2 monedas más fuertes de las 8 contra USDT (`lib_rotacion`); no entra a una moneda con un día de −5 % o peor en la semana (`golpeadas`) y con una mala noticia de BTC espera todo en USDT 5 días; puede caer tanto como BTC |
 
 **Las acciones** son los bStocks de Binance (`lib_datos.ACCIONES`, contra USDT): acciones de EE. UU. tokenizadas y respaldadas
 1:1 por la acción en un custodio. Se leen con la misma API pública y el mismo flujo que las monedas (`lib_datos.ACTIVOS`).
@@ -676,6 +676,11 @@ para adivinar la dirección (una regresión logística sobre 15 indicadores y la
 cada 100 veces; a 20 y 60 días, menos que decir siempre el promedio), pero los dos frenos (golpe y noticia) mejoraron la
 regla en los dos tramos: al elegir, ganancia típica +42 % contra +32 %; al probar, le ganó a BTC en 67 % de las ventanas
 contra 64 %, y la peor ventana de 1 año fue −6 % contra −8 %. La pantalla lo muestra en «Cómo decido».
+Cada movimiento queda en el registro con su motivo (`resultado.por`: `sobre_media`, `bajo_media`, `ajuste`, `noticia`,
+`golpe`, `freno`; con una noticia, `motivo` es el id de la persona y `fecha` el día). Los días en que un freno no la deja
+comprar quedan como `tendencia_espera`, una vez cuando empieza. La rotación usa los mismos dos frenos (`lib_rotacion.simular`,
+`golpe` y `noticia`) y sus ventas dicen `por` (`ranking`, `btc`, `noticia`, `freno`): con ellos, en ventanas de 1 año desde
+2018, le ganó a BTC en 48 de cada 100 contra 36 y su caso malo pasó de −25 % a −19 %; la compra semanal no cambió y no los usa.
 
 Las variantes de holding (`variante` en `lib_perfiles`) se deciden una vez por día, al cerrar la vela diaria, con
 `lib_holding.paso`: el mismo paso que mide la comparación. En vivo compran y venden con el precio de 1 m de ahora y la orden
