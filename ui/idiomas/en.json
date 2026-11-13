@@ -1365,6 +1365,17 @@
   "Una vez al día, cuando cierra la vela diaria, ordena las 8 monedas por fuerza: cuánto subieron en 30 días, dividido por cuánto se movieron en el camino. Tiene las 2 primeras que estén sobre su promedio de 50 días, mitad y mitad. Cambia una solo cuando sale del grupo de las 3 mejores: cada cambio paga comisión. No pone stop: sale cuando la moneda pierde fuerza.": "Once a day, when the daily candle closes, it ranks the 8 coins by strength: how much they rose in 30 days, divided by how much they moved along the way. It holds the top 2 that are above their 50-day average, half and half. It switches one only when it leaves the top 3: every switch pays a fee. It sets no stop: it exits when the coin loses strength.",
   "Mira velas de 4 horas. Compra solo si la operación puede ganar al menos 2 veces lo que arriesga, arriesga el 1 % del saldo y tiene como máximo 1 posición abierta.": "It watches 4-hour candles. It buys only if the trade can gain at least 2 times what it risks, risks 1 % of the balance and has at most 1 open position.",
   "Monedas que mira: {monedas}. Todas contra USDT.": "Coins it watches: {monedas}. All against USDT.",
-  "Siempre: si BTC viene cayendo, vende todo y espera en USDT. Los frenos de la cuenta (5 % al día, el piso) también la cortan.": "Always: if BTC is falling, it sells everything and waits in USDT. The account brakes (5 % a day, the floor) also stop it."
+  "Siempre: si BTC viene cayendo, vende todo y espera en USDT. Los frenos de la cuenta (5 % al día, el piso) también la cortan.": "Always: if BTC is falling, it sells everything and waits in USDT. The account brakes (5 % a day, the floor) also stop it.",
+  "Perdió {pct} en {periodo}: te habría ido mejor quedándote en USDT.": "It lost {pct} in {periodo}: staying in USDT would have been better.",
+  "Ganó, pero menos que comprar BTC y esperar.": "It gained, but less than buying BTC and waiting.",
+  "Le ganó a quedarte en USDT y a comprar BTC.": "It beat staying in USDT and buying BTC.",
+  "Perdió {pct} en {periodo}": "Lost {pct} in {periodo}",
+  "Perfiles que perdieron en el pasado ({n}): solo para experimentar": "Profiles that lost in the past ({n}): only to experiment",
+  "En la última comparación perdieron plata con sus reglas de hoy. Puedes probarlos con dinero ficticio para ver cómo operan, pero no son una buena opción para tu plata.": "In the last comparison they lost money with their current rules. You can try them with play money to see how they trade, but they are not a good option for your money.",
+  "Ojo: {perfil} perdió {pct} en la última comparación. Úsalo solo para ver cómo opera.": "Careful: {perfil} lost {pct} in the last comparison. Use it only to see how it trades.",
+  "Perfiles que perdieron": "Profiles that lost",
+  "{n} años": "{n} years",
+  "{n} meses": "{n} months",
+  "{n} días": "{n} days"
  }
 }

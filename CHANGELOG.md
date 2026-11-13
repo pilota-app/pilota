@@ -7,6 +7,10 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- «Comparar» dice de cada perfil si le ganó a quedarte en USDT y a comprar BTC, o cuánto perdió. En «En vivo», los perfiles
+  que perdieron quedan aparte, plegados y marcados «solo para experimentar», y el perfil de partida es el que mejor le fue.
+  *"Compare" now says for each profile whether it beat staying in USDT and buying BTC, or how much it lost. In "Live", the
+  profiles that lost are set apart, folded and marked "only to experiment", and the starting profile is the one that did best.*
 - El robot de prueba ahora mira 8 monedas contra USDT: BTC, ETH, BNB, SOL, XRP, ADA, TRX y DOGE. Cada perfil opera las suyas
   y lo dice en su tarjeta. Arriba del gráfico ves el precio de las 8 en vivo; toca una para abrirla en grande. *The test robot
   now watches 8 coins against USDT: BTC, ETH, BNB, SOL, XRP, ADA, TRX and DOGE. Each profile trades its own and shows them on

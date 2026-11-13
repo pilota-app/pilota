@@ -157,17 +157,64 @@ window.PilotaVivo = (() => {
     const claseMov = (v) => (v.que === "compra" ? "compra" : (v.ganancia > 0 ? "gana" : "pierde"));
 
     // ── Elegir perfil y monto ──
-    function selector(E, opciones = {}) {
-      const elegido = E.vivoPerfil || "equilibrado";
-      const monto = E.campos["vivo-monto"] || E.vivoMonto || 100;
-      return `<div class="tarjeta vivo-elegir">
-        <h3>${opciones.titulo || "Elige cómo quieres que opere"}</h3>
-        <div class="perfiles" role="radiogroup" aria-label="Perfil">${ORDEN.map((p) => `
-          <button type="button" class="perfil" role="radio" data-perfil="${p}" aria-checked="${p === elegido}">
+    // ── Qué dijo el pasado de cada perfil (la última comparación): si le ganó a quedarse en USDT y a comprar BTC ──
+    const diasDe = (p) => Math.max(1, Math.round(((p.hasta_ms || 0) - (p.desde_ms || 0)) / 86400000));
+    // El período en palabras: «3 años» se entiende mejor que «1095 días».
+    const periodo = (p) => {
+      const d = diasDe(p), anos = Math.round(d / 365);
+      if (d >= 330) return anos === 1 ? Tp("1 año") : Tp("{n} años", { n: numero(anos, 0) });
+      if (d >= 58) return Tp("{n} meses", { n: numero(Math.round(d / 30), 0) });
+      return Tp("{n} días", { n: numero(d, 0) });
+    };
+    function veredicto(p, r) {
+      if (!p || p.listo === false || typeof p.rendimiento !== "number") return null;
+      const btc = (r || {}).btc || {};
+      // Contra BTC solo se compara en el mismo período: el scalper mira menos días y ahí no sería justo.
+      const conBtc = !p.recortado && typeof btc.rendimiento === "number";
+      if (p.rendimiento <= 0) return "pierde";
+      return conBtc && p.rendimiento < btc.rendimiento ? "gana_usdt" : "gana_todo";
+    }
+    function textoVeredicto(v, p) {
+      if (v === "pierde") return frase("Perdió {pct} en {periodo}: te habría ido mejor quedándote en USDT.", { pct: porcentaje(Math.abs(p.rendimiento), 1), periodo: periodo(p) });
+      if (v === "gana_usdt") return frase("Ganó, pero menos que comprar BTC y esperar.", {});
+      return frase("Le ganó a quedarte en USDT y a comprar BTC.", {});
+    }
+    // Los perfiles que perdieron en la última comparación: no se ofrecen como uno más, quedan aparte para experimentar.
+    function perdedores(E) {
+      const r = (E.sim || {}).ultima || {};
+      return Object.fromEntries((r.perfiles || []).filter((p) => veredicto(p, r) === "pierde").map((p) => [p.perfil, p]));
+    }
+    // Sin elegir nada todavía, el perfil de partida es el que mejor le fue entre los que no perdieron.
+    function perfilDePartida(E) {
+      const fuera = perdedores(E);
+      if (E.vivoPerfilTocado || !fuera[E.vivoPerfil]) return E.vivoPerfil || "equilibrado";
+      const r = (E.sim || {}).ultima || {};
+      const mejor = (r.perfiles || []).filter((p) => !fuera[p.perfil] && typeof p.rendimiento === "number")
+        .sort((a, b) => b.rendimiento - a.rendimiento)[0];
+      if (mejor) E.vivoPerfil = mejor.perfil;
+      return E.vivoPerfil;
+    }
+    function botonPerfil(p, elegido, perdio) {
+      return `<button type="button" class="perfil" role="radio" data-perfil="${p}" aria-checked="${p === elegido}"${perdio ? ` data-perdio="1"` : ""}>
             <span class="perfil-nombre">${PERFILES[p].nombre}</span>
             <span class="perfil-ritmo">${PERFILES[p].ritmo}</span>
             <span class="perfil-que">${PERFILES[p].que}</span>
-            <span class="perfil-monedas" data-sin-traducir>${esc(MONEDAS[p].join(" · "))}</span></button>`).join("")}</div>
+            <span class="perfil-monedas" data-sin-traducir>${esc(MONEDAS[p].join(" · "))}</span>
+            ${perdio ? `<span class="perfil-perdio">${frase("Perdió {pct} en {periodo}", { pct: porcentaje(Math.abs(perdio.rendimiento), 1), periodo: periodo(perdio) })}</span>` : ""}</button>`;
+    }
+    function selector(E, opciones = {}) {
+      const elegido = perfilDePartida(E);
+      const fuera = perdedores(E);
+      const buenos = ORDEN.filter((p) => !fuera[p]), malos = ORDEN.filter((p) => fuera[p]);
+      const monto = E.campos["vivo-monto"] || E.vivoMonto || 100;
+      return `<div class="tarjeta vivo-elegir">
+        <h3>${opciones.titulo || "Elige cómo quieres que opere"}</h3>
+        <div class="perfiles" role="radiogroup" aria-label="Perfil">${buenos.map((p) => botonPerfil(p, elegido)).join("")}</div>
+        ${malos.length ? `<details class="perfiles-perdedores"${fuera[elegido] ? " open" : ""}>
+          <summary>${frase("Perfiles que perdieron en el pasado ({n}): solo para experimentar", { n: numero(malos.length, 0) })}</summary>
+          <p class="ayuda">En la última comparación perdieron plata con sus reglas de hoy. Puedes probarlos con dinero ficticio para ver cómo operan, pero no son una buena opción para tu plata.</p>
+          <div class="perfiles" role="radiogroup" aria-label="Perfiles que perdieron">${malos.map((p) => botonPerfil(p, elegido, fuera[p])).join("")}</div></details>` : ""}
+        ${fuera[elegido] ? `<p class="freno-texto">${frase("Ojo: {perfil} perdió {pct} en la última comparación. Úsalo solo para ver cómo opera.", { perfil: Tp(nombre(elegido)), pct: porcentaje(Math.abs(fuera[elegido].rendimiento), 1) })}</p>` : ""}
         <label class="campo-monto"><span>¿Con cuánto dinero ficticio?</span>
           <span class="campo-monto-caja"><input id="vivo-monto" type="number" inputmode="decimal" min="10" max="1000000" step="1" value="${esc(monto)}"><span data-sin-traducir>USDT</span></span></label>
         <div class="chips" role="group" aria-label="Montos sugeridos">${MONTOS.map((m) => `<button type="button" class="chip" data-vivo-monto="${m}" aria-pressed="${Number(monto) === m}" data-sin-traducir>${esc(numero(m, 0))}</button>`).join("")}</div>
@@ -446,7 +493,7 @@ window.PilotaVivo = (() => {
     }
 
     // ── Comparar los perfiles en el pasado ──
-    function tarjetaPerfil(p, monto, elegido) {
+    function tarjetaPerfil(p, monto, elegido, r) {
       const listo = p.listo !== false && typeof p.saldo === "number";
       return `<button type="button" class="tarjeta comp-perfil" data-comparar="${p.perfil}" aria-pressed="${p.perfil === elegido}" data-signo="${signo(p.rendimiento)}">
         <span class="comp-nombre">${PERFILES[p.perfil].nombre}</span>
@@ -456,6 +503,7 @@ window.PilotaVivo = (() => {
         <span class="comp-detalle">${listo
           ? frase("{n} movimientos · peor caída {caida}", { n: numero(p.movimientos_total || p.operaciones || 0, 0), caida: porcentaje(p.caida_maxima || 0, 1) })
           : Tp(MOTIVOS_SIM[p.motivo] || "Sin datos.")}</span>
+        ${veredicto(p, r) ? `<span class="comp-veredicto" data-veredicto="${veredicto(p, r)}">${textoVeredicto(veredicto(p, r), p)}</span>` : ""}
         ${p.recortado ? `<span class="comp-nota">${frase("Solo los últimos {n} días: es lo que hay de velas de 1 minuto.", { n: numero(Math.round((p.hasta_ms - p.desde_ms) / 86400000), 0) })}</span>` : ""}</button>`;
     }
     function pelicula(E) {
@@ -497,7 +545,7 @@ window.PilotaVivo = (() => {
       else {
         cuerpo = `<div class="sim-resultado">
           <p class="sim-periodo">${frase("Del {desde} al {hasta} ({dias} días) con {monto}", { desde: dia(r.desde_ms), hasta: dia(r.hasta_ms), dias: numero(r.dias_reales, 0), monto: usdt(r.monto) })}</p>
-          <div class="comp-grilla">${r.perfiles.map((p) => tarjetaPerfil(p, r.monto, (E.peli || {}).perfil)).join("")}</div>
+          <div class="comp-grilla">${r.perfiles.map((p) => tarjetaPerfil(p, r.monto, (E.peli || {}).perfil, r)).join("")}</div>
           <div class="comp-referencias">
             <p><span>Quedarte en USDT</span> <strong data-sin-traducir>${esc(usdt(r.monto))}</strong></p>
             <p><span>Comprar BTC y esperar</span> <strong data-sin-traducir>${esc(typeof (r.btc || {}).saldo === "number" ? `${usdt(r.btc.saldo)} (${conSigno(r.btc.rendimiento, (x) => porcentaje(x, 1))})` : "–")}</strong></p></div>

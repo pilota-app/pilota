@@ -1641,6 +1641,7 @@
     }
     else if (b.dataset.perfil) {
       E.vivoPerfil = b.dataset.perfil;
+      E.vivoPerfilTocado = true;
       pintar();
     } else if (b.dataset.vivoMonto) {
       E.vivoMonto = Number(b.dataset.vivoMonto);
@@ -1682,6 +1683,7 @@
       pintarPeli();
     } else if (b.dataset.usarPerfil) {
       E.vivoPerfil = b.dataset.usarPerfil;
+      E.vivoPerfilTocado = true;
       E.vivoMonto = Math.round(Number(E.campos["sim-monto"] ?? E.sim.monto)) || E.vivoMonto;
       delete E.campos["vivo-monto"];
       E.vivoElegir = true;
@@ -2593,7 +2595,9 @@
           movimientos.push({ ms: x, que: "compra", par, precio, monto: monto / 12, estrategia: "holding", temporalidad: "1d" });
           saldo = monto * (1 + Math.sin(i / 2) * 0.03 + i * 0.004);
         } else {
-          const r = Math.sin(i * (1.3 + k / 5)) * 0.012 + 0.0015, nocional = saldo * 0.3;
+          // Como en la realidad: los perfiles de señales rápidas pierden de a poco (comisiones y jugadas que ganan poco).
+          const sesgo = { equilibrado: -0.006, trader: -0.005, scalper: -0.004 }[perfil] || 0.0015;
+          const r = Math.sin(i * (1.3 + k / 5)) * 0.012 + sesgo, nocional = saldo * 0.3;
           movimientos.push({ ms: x - 3600000, que: "compra", par, precio, monto: nocional, stop: precio * 0.99, objetivo: precio * 1.015, estrategia: "rebote", temporalidad: "1h" });
           saldo += nocional * r;
           movimientos.push({ ms: x, que: "venta", par, precio: precio * (r > 0 ? 1.015 : 0.99), monto: nocional, por: r > 0 ? "objetivo" : "stop", ganancia: nocional * r, saldo });

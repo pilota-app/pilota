@@ -158,6 +158,10 @@ await page.waitForSelector("#descargar");
   await cab.click("#sim-correr");
   await cab.waitForSelector(".comp-grilla");
   assert.equal(await cab.locator(".comp-perfil").count(), 6, "los seis perfiles lado a lado");
+  // Cada perfil dice si le ganó a quedarse en USDT y a comprar BTC; los que perdieron quedan aparte en «En vivo».
+  assert.equal(await cab.locator(".comp-veredicto").count(), 6, "cada perfil con su veredicto");
+  assert.equal(await cab.locator('.comp-veredicto[data-veredicto="pierde"]').count(), 3);
+  assert.match(await cab.textContent('[data-comparar="scalper"] .comp-veredicto'), /Perdió [\d,]+ % en 30 días/);
   assert.match(await cab.textContent(".sim-resultado"), /365 días\) con 250 USDT[\s\S]*Quedarte en USDT[\s\S]*Comprar BTC y esperar/);
   assert.match(await cab.textContent('.comp-perfil[data-comparar="scalper"]'), /últimos 30 días/, "el scalper dice que mira menos");
   // La película: tocar un perfil la pone a andar, movimiento por movimiento.
@@ -179,6 +183,8 @@ await page.waitForSelector("#descargar");
   // La rotación: en vez de esperar un precio, ordena las 8 monedas por fuerza y dice cuáles tiene.
   await cab.click("#tab-vivo");
   if (await cab.locator("#vivo-cambiar").count()) await cab.click("#vivo-cambiar");
+  assert.equal(await cab.locator('.perfiles-perdedores .perfil').count(), 3, "los que perdieron, aparte y plegados");
+  assert.equal(await cab.locator('.perfiles-perdedores[open]').count(), 0);
   await cab.click('[data-perfil="rotacion"]');
   await cab.click("#vivo-empezar");
   await cab.waitForSelector("[role=alertdialog]");

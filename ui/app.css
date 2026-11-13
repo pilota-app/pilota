@@ -587,3 +587,13 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 .radar-resto summary { cursor: pointer; color: var(--acento); font-weight: 600; padding: 6px 0; }
 @media (max-width: 520px) { .ranking-fila { grid-template-columns: 18px 44px 1fr 62px; } .ranking-fila .radar-estado { grid-column: 2 / -1; justify-self: start; } }
 .ranking-fila .radar-estado { justify-self: end; }
+
+/* Lo que dijo el pasado: el veredicto de cada perfil y los que perdieron, aparte */
+.comp-veredicto { font-size: 12px; font-weight: 600; }
+.comp-veredicto[data-veredicto="pierde"] { color: var(--pierde); }
+.comp-veredicto[data-veredicto="gana_usdt"] { color: var(--espera); }
+.comp-veredicto[data-veredicto="gana_todo"] { color: var(--gana); }
+.perfiles-perdedores { margin: 12px 0; }
+.perfiles-perdedores summary { cursor: pointer; font-weight: 600; color: var(--texto-suave); padding: 6px 0; }
+.perfil[data-perdio="1"] { opacity: .85; }
+.perfil-perdio { font-size: 12px; font-weight: 700; color: var(--pierde); }
