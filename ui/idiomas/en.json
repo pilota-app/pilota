@@ -1298,6 +1298,14 @@
   "Gana por cada 1 que arriesga": "Wins per 1 risked",
   "Ganó en el pasado": "Won in the past",
   "de {n} veces": "of {n} times",
-  "Sin jugada": "No play"
+  "Sin jugada": "No play",
+  "Lo que ve el robot": "What the robot sees",
+  "Comprado. Stop {stop} · objetivo {objetivo}.": "Bought. Stop {stop} · target {objetivo}.",
+  "Compra puesta en {precio}: espero que llegue.": "Buy placed at {precio}: waiting for it to fill.",
+  "En pausa: BTC viene cayendo.": "Paused: BTC is falling.",
+  "Mirando: aquí no hay jugada por ahora.": "Watching: no play here for now.",
+  "Espero que se calme para comprar en {precio}.": "Waiting for it to calm down to buy at {precio}.",
+  "¡Casi casi! Compro si cierra en {precio}.": "Almost there! I buy if it closes at {precio}.",
+  "Esperando: compro en {precio} (falta {falta}).": "Waiting: I buy at {precio} ({falta} to go)."
  }
 }

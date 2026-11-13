@@ -13,6 +13,11 @@ versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». --
   operación (entrada, stop, objetivo y cuánto gana por cada 1 que arriesga) y cuántas veces ganó esa jugada en el pasado.
   *New: "What I'm waiting for". The robot says at what price it would buy each coin, how far it is ("Almost there!"), what the
   trade would look like (entry, stop, target and how much it wins for every 1 it risks) and how often that play won in the past.*
+- Nuevo: «Lo que ve el robot». Un gráfico por cada moneda y vela que está mirando, con su carita encima diciendo qué espera
+  ahí («¡Casi casi!», «Esperando», «En pausa», «Comprado»). *New: "What the robot sees". One chart per coin and candle it is
+  watching, with its face on top saying what it is waiting for there ("Almost there!", "Waiting", "Paused", "Bought").*
+- Arreglado: en la app de Mac los precios en vivo no se veían en el gráfico. *Fixed: live prices didn't show on the chart in the
+  Mac app.*
 - Nuevo: ver 1, 2 o 4 gráficos a la vez, cada uno con su moneda y sus velas, y la línea de «compro aquí» dibujada. *New: view 1,
   2 or 4 charts at once, each with its own coin and candles, with the "I buy here" line drawn.*
 - Nuevo: «Cómo decide el perfil», con sus reglas en palabras. *New: "How the profile decides", with its rules in plain words.*

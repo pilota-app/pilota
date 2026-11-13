@@ -249,6 +249,25 @@ window.PilotaVivo = (() => {
         }).join("")}</ul>
         <p class="ayuda">Decido solo con velas cerradas: cuando una cierra donde dice arriba, compro en ese mismo segundo. La historia es el pasado, no una promesa.</p></div>`;
     }
+    // Lo que el robot dice sobre un gráfico: comprado, casi casi, esperando, en pausa o sin jugada (la insignia del gráfico).
+    function estadoFila(E, par, t) {
+      const v = E.vivo || {}, R = v.radar || {};
+      const f = (R.filas || []).find((x) => x.par === par && x.temporalidad === t);
+      const abierta = (v.posiciones || []).find((p) => p.par === par && p.estado === "abierta");
+      if (abierta) {
+        return { estado: "comprado", animo: "operando", texto: frase("Comprado. Stop {stop} · objetivo {objetivo}.", { stop: usdt(abierta.stop), objetivo: usdt(abierta.objetivo) }) };
+      }
+      const puesta = (v.posiciones || []).find((p) => p.par === par && p.estado === "puesta");
+      if (puesta) return { estado: "casi", animo: "operando", texto: frase("Compra puesta en {precio}: espero que llegue.", { precio: usdt(puesta.precio) }) };
+      if (!f) return null;
+      if (R.filtro && !R.filtro.pasa) return { estado: "pausa", animo: "frenado", texto: frase("En pausa: BTC viene cayendo.", {}) };
+      const e = (f.estrategias || []).find((x) => x.estrategia === f.espera);
+      if (!e) return { estado: "nada", animo: "dudando", texto: frase("Mirando: aquí no hay jugada por ahora.", {}) };
+      if (f.condicion === "con_rumbo") return { estado: "espera", animo: "dudando", texto: frase("Espero que se calme para comprar en {precio}.", { precio: usdt(e.gatillo) }) };
+      return f.cerca
+        ? { estado: "casi", animo: "atento", texto: frase("¡Casi casi! Compro si cierra en {precio}.", { precio: usdt(e.gatillo) }) }
+        : { estado: "espera", animo: "atento", texto: frase("Esperando: compro en {precio} (falta {falta}).", { precio: usdt(e.gatillo), falta: porcentaje(Math.max(0, e.distancia || 0), 2) }) };
+    }
     // La frase del robot: lo más cerca que está de comprar, o lo último que hizo.
     function narra(v) {
       const filas = ((v.radar || {}).filas || []).filter((f) => f.espera);
@@ -441,7 +460,7 @@ window.PilotaVivo = (() => {
         <details class="que-es" id="registro-completo"><summary>El registro completo (técnico)</summary>${registro}</details></div>`;
     }
 
-    return { vivo, comparar, pelicula, movimientos, textoLinea, ERRORES_VIVO, ORDEN, narra };
+    return { vivo, comparar, pelicula, movimientos, textoLinea, ERRORES_VIVO, ORDEN, narra, estadoFila };
   }
   return { crear };
 })();

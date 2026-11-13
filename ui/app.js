@@ -1413,13 +1413,18 @@
   });
   // ── «Cómo pienso»: cada pieza por separado, con sus números (la pestaña de lo técnico) ──
   const centroUI = PilotaCentro.crear({ i18n, esc, numero, usdt, porcentaje, fechaHora });
-  const graficoUI = PilotaGrafico.crear({ i18n, esc, numero, usdt });
+  const graficoUI = PilotaGrafico.crear({ i18n, esc, numero, usdt, robot: panelUI.robot,
+    estadoDe: (par, t) => vivoUI.estadoFila(E, par, t) });
+  // Si «Lo que ve el robot» sumó un gráfico nuevo (cambió lo que mira), se piden sus velas.
+  function graficosAlDia() {
+    if (graficoUI.visibles(E.graf).some((P) => !P.datos && !P.cargando)) pedirGrafico();
+  }
   E.graf = graficoUI.estadoInicial();
   const vivoUI = PilotaVivo.crear({ i18n, esc, numero, usdt, porcentaje, fechaHora, robot: panelUI.robot,
     motivoCorto: (c) => MOTIVO_CORTO[c] || "otro motivo", grafico: () => graficoUI.html(E) });
   // Pide las velas del gráfico (las cerradas, las marcas y las líneas de lo abierto) del par y la temporalidad elegidos.
   function pedirGrafico() {
-    for (const P of E.graf.paneles.slice(0, E.graf.layout)) { P.cargando = !P.datos; P.minutos = {}; }
+    for (const P of graficoUI.visibles(E.graf)) { P.cargando = !P.datos; P.minutos = {}; }
     for (const q of graficoUI.pedidos(E)) host.enviar("vivoGrafico", q);
   }
   function comoPienso() {
@@ -1581,7 +1586,7 @@
       pedirGrafico();
       pintar();
     } else if (b.dataset.grafLayout) {
-      E.graf.layout = Number(b.dataset.grafLayout);
+      E.graf.layout = b.dataset.grafLayout === "robot" ? "robot" : Number(b.dataset.grafLayout);
       pedirGrafico();
       pintar();
     } else if (b.dataset.grafInd) {
@@ -1863,6 +1868,12 @@
     }
   }, 1000);
 
+  // El avance de un trabajo. La app de escritorio junta las líneas de progreso en {eventos: […]}; la vista previa manda una
+  // sola. Devuelve los avances en orden, del más viejo al más nuevo.
+  function avances(e) {
+    const lista = e && Array.isArray(e.eventos) ? e.eventos : [e];
+    return lista.map((x) => x && x.trabajo && x.trabajo.avance).filter(Boolean);
+  }
   // ── Lo que Pilota prepara sola al abrir ──
   // La persona no tiene que saber qué es el muestreo, el historial o el capital mínimo: si falta, se pide solo, una vez
   // por sesión. En la vista previa no (ahí cada botón se prueba a mano), salvo con ?auto.
@@ -1975,6 +1986,7 @@
       E.vivoOcupado = false;
       if (r && r.datos) E.vivo = r.datos;
       if (r && r.datos && r.datos.flujo) E.flujo = { ...(E.flujo || {}), ...r.datos.flujo };
+      graficosAlDia();
       if (r && r.ok === false) toast(Tp(vivoUI.ERRORES_VIVO[r.error] || "No se pudo."), { error: true });
       else if (E.vivo && E.vivo.activo && !(antes && antes.activo && antes.desde_ms === E.vivo.desde_ms)) {
         if (antes !== null) {
@@ -1992,13 +2004,16 @@
     },
     // El flujo en vivo: cada segundo, la vela en curso; al cerrar una vela, la revisión y lo que pasó.
     vivoProgreso(e) {
-      const a = e && e.trabajo && e.trabajo.avance;
-      if (!a) return;
+      // Pueden llegar varios avances juntos: los eventos de todos y, para el precio, el último.
+      const lista = avances(e);
+      if (!lista.length) return;
+      const a = { ...lista[lista.length - 1], eventos: lista.flatMap((x) => x.eventos || []),
+        vivo: [...lista].reverse().find((x) => x.vivo)?.vivo };
       const antes = E.flujo || {};
       E.flujo = { ...antes, corriendo: true, conectado: !!a.conectado, error: a.error || "", revision_ms: a.revision_ms };
       for (const [par, v] of Object.entries(a.velas || {})) graficoUI.vela(E, par, v);
       let repintar = antes.conectado !== E.flujo.conectado;
-      if (a.vivo) { E.vivo = a.vivo; repintar = true; }
+      if (a.vivo) { E.vivo = a.vivo; repintar = true; graficosAlDia(); }
       for (const l of a.eventos || []) {
         const aviso = avisoEvento(l);
         if (!aviso) continue;
@@ -2110,7 +2125,7 @@
       pintar();
     },
     historialProgreso(e) {
-      const avance = e && e.trabajo && e.trabajo.avance;
+      const avance = avances(e).pop();
       if (!avance) return;                 // los otros eventos del trabajo no dicen nada de la descarga
       E.historial = avance;
       E.bajando = false;
@@ -2135,7 +2150,7 @@
       pintar();
     },
     muestreoProgreso(e) {
-      const avance = e && e.trabajo && e.trabajo.avance;
+      const avance = avances(e).pop();
       if (!avance) return;
       E.muestreo = avance;
       E.muestreando = false;
@@ -2275,7 +2290,7 @@
       pintar();
     },
     motorProgreso(e) {
-      const avance = e && e.trabajo && e.trabajo.avance;
+      const avance = avances(e).pop();
       if (!avance) return;
       E.motor = avance;
       E.encendiendoMotor = false;

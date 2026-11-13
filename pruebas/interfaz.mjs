@@ -108,7 +108,11 @@ await page.waitForSelector("#descargar");
   assert.match(await cab.textContent("#pestana-vivo .conexion"), /En vivo: conectado a Binance/);
   assert.equal(await cab.getAttribute('[data-graf-ind="bb"]', "aria-pressed"), "true", "Bollinger viene prendido");
   await cab.click('[data-graf-ind="rsi"]');
-  assert.equal(await cab.locator(".grafico-caja.con-rsi").count(), 1, "el RSI suma su panel");
+  assert.ok(await cab.locator(".grafico-caja.con-rsi").count() >= 1, "el RSI suma su panel");
+  // «Lo que ve el robot» viene primero: un gráfico por cada cosa que mira, con su carita y lo que espera ahí.
+  assert.equal(await cab.getAttribute('[data-graf-layout="robot"]', "aria-pressed"), "true");
+  assert.ok(await cab.locator(".graf-robot").count() >= 1, "la carita del robot sobre el gráfico");
+  assert.match(await cab.textContent(".graf-robot"), /Casi casi|Esperando|En pausa|Comprado|Mirando/);
   await cab.click('[data-graf-layout="4"]');
   assert.equal(await cab.locator(".grafico-lienzo").count(), 4, "cuatro gráficos a la vez");
   await cab.click('[data-graf-layout="1"]');

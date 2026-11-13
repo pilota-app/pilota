@@ -48,8 +48,8 @@ window.PilotaGrafico = (() => {
     return out;
   }
 
-  function crear({ i18n, esc, numero, usdt }) {
-    const { Tp } = i18n;
+  function crear({ i18n, esc, numero, usdt, robot, estadoDe }) {
+    const { Tp, frase } = i18n;
     const TIEMPO_CORTO = Object.fromEntries(TEMPORALIDADES);
     let Eref = null, pedido = false;
     const sobre = {};                // dónde está el mouse en cada lienzo
@@ -58,11 +58,24 @@ window.PilotaGrafico = (() => {
       return { par, temporalidad, datos: null, cargando: false, minutos: {} };
     }
     function estadoInicial() {
-      return { layout: 1, ancho: 9, precios: {}, cambio: {},
+      return { layout: "robot", ancho: 9, precios: {}, cambio: {}, robot: {},
         ind: Object.fromEntries(INDICADORES.map(([id, , si]) => [id, si])),
         paneles: [panel("BTCFDUSD", "1m"), panel("ETHFDUSD", "1m"), panel("BTCFDUSD", "5m"), panel("ETHFDUSD", "5m")] };
     }
-    const visibles = (G) => G.paneles.slice(0, G.layout);
+    // Los gráficos a la vista. «Lo que ve el robot»: uno por cada par y vela que el perfil está mirando (las filas del radar).
+    function filasRobot() {
+      return ((((Eref || {}).vivo || {}).radar || {}).filas || []);
+    }
+    function visibles(G) {
+      if (G.layout !== "robot") return G.paneles.slice(0, G.layout);
+      const filas = filasRobot();
+      if (!filas.length) return G.paneles.slice(0, 2);
+      return filas.slice(0, 4).map((f) => {
+        const k = `${f.par}|${f.temporalidad}`;
+        G.robot[k] = G.robot[k] || panel(f.par, f.temporalidad);
+        return G.robot[k];
+      });
+    }
 
     // ── El HTML alrededor de los lienzos (los botones y los precios, traducibles) ──
     function cabezaPanel(G, P, i) {
@@ -72,22 +85,35 @@ window.PilotaGrafico = (() => {
         <div class="chips chips-chicos grafico-tiempos" role="group" aria-label="Velas de">${TEMPORALIDADES.map(([t, n]) => `
           <button type="button" class="chip" data-graf-panel="${i}" data-graf-t="${t}" aria-pressed="${P.temporalidad === t}">${n}</button>`).join("")}</div></div>`;
     }
+    // La carita del robot sobre cada gráfico: qué está esperando ahí, en una línea.
+    function insignia(P) {
+      if (!estadoDe) return "";
+      const e = estadoDe(P.par, P.temporalidad);
+      if (!e) return "";
+      return `<div class="graf-robot" data-estado="${esc(e.estado)}">${robot ? robot(e.animo || "atento") : ""}<span>${e.texto}</span></div>`;
+    }
     function html(E) {
+      Eref = E;
       const G = E.graf;
+      const enRobot = G.layout === "robot";
+      const paneles = visibles(G);
       return `<div class="tarjeta grafico">
         <div class="grafico-cabeza">
           <div class="grafico-pares">${PARES.map(([par, nombre]) => `
             <div class="graf-par"><span class="graf-par-nombre" data-sin-traducir>${nombre}</span>
               <span class="graf-par-precio" id="precio-${par}" data-tic="${G.cambio[par] || ""}" data-sin-traducir>${esc(G.precios[par] ? numero(G.precios[par], 2) : "–")}</span></div>`).join("")}</div>
-          <div class="chips grafico-layout" role="group" aria-label="Gráficos a la vez">${[1, 2, 4].map((n) => `
+          <div class="chips grafico-layout" role="group" aria-label="Gráficos a la vez">
+            <button type="button" class="chip chip-robot" data-graf-layout="robot" aria-pressed="${enRobot}">Lo que ve el robot</button>${[1, 2, 4].map((n) => `
             <button type="button" class="chip" data-graf-layout="${n}" aria-pressed="${G.layout === n}">${n === 1 ? "1 gráfico" : (n === 2 ? "2 gráficos" : "4 gráficos")}</button>`).join("")}</div>
         </div>
         <div class="chips grafico-indicadores" role="group" aria-label="Indicadores">${INDICADORES.map(([id, n]) => `
           <button type="button" class="chip chip-ind" data-graf-ind="${id}" aria-pressed="${!!G.ind[id]}">${n}</button>`).join("")}</div>
-        <div class="grafico-grilla n-${G.layout}">
-          ${visibles(G).map((P, i) => `<div class="graf-panel">
-            ${cabezaPanel(G, P, i)}
+        <div class="grafico-grilla n-${paneles.length >= 3 ? 4 : paneles.length}">
+          ${paneles.map((P, i) => `<div class="graf-panel">
+            ${enRobot ? `<p class="graf-panel-titulo"><strong data-sin-traducir>${esc(P.par.replace(/(FDUSD|USDT)$/, ""))}</strong>
+              <span class="suave">${frase("velas de {t}", { t: Tp(TIEMPO_CORTO[P.temporalidad] || P.temporalidad) })}</span></p>` : cabezaPanel(G, P, i)}
             <div class="grafico-caja${G.ind.rsi ? " con-rsi" : ""}">
+              ${enRobot ? insignia(P) : ""}
               <canvas id="grafico-lienzo-${i}" class="grafico-lienzo" data-panel="${i}" role="img" aria-label="Gráfico de velas en vivo"></canvas>
               ${!P.datos ? `<p class="grafico-vacio suave">${P.cargando ? "Cargando velas…" : "Todavía no hay velas para mostrar."}</p>` : ""}
             </div></div>`).join("")}
@@ -416,7 +442,7 @@ window.PilotaGrafico = (() => {
         o: numero(v[1], 2), h: numero(v[2], 2), l: numero(v[3], 2), c: numero(v[4], 2) });
     }
 
-    return { html, montar, dibujar, vela, destello, marca, datos, pedidos, estadoInicial, PARES, TEMPORALIDADES, PASO, INDICADORES };
+    return { html, montar, dibujar, vela, destello, marca, datos, pedidos, estadoInicial, visibles, PARES, TEMPORALIDADES, PASO, INDICADORES };
   }
   return { crear };
 })();
