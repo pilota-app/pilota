@@ -115,7 +115,7 @@ await page.waitForSelector("#descargar");
   // Qué está esperando: el gatillo, la operación posible y lo que dice la historia.
   assert.ok(await cab.locator(".radar-fila").count() >= 1, "el radar dice qué espera");
   assert.match(await cab.textContent(".radar"), /Compro (BTC|ETH) por (rebote|ruptura)/);
-  assert.match(await cab.textContent(".radar"), /En el pasado ganó \d+ de \d+ veces/);
+  assert.match(await cab.textContent(".radar"), /Ganó en el pasado\s*\d+ %\s*de \d+ veces/);
   await cab.click('[data-graf-panel="0"][data-graf-t="1h"]');
   assert.equal(await cab.getAttribute('[data-graf-panel="0"][data-graf-t="1h"]', "aria-pressed"), "true");
   await cab.waitForFunction(() => {           // el gráfico de 1 h se dibujó (llega un momento después)

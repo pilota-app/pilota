@@ -181,6 +181,21 @@ window.PilotaVivo = (() => {
           return "";
       }
     }
+    // La operación posible en cinco cifras que se leen de un vistazo: entrada, stop, objetivo, ganancia por riesgo e historia.
+    function cifras(e) {
+      if (!(e.entrada > 0)) return "";
+      const h = e.historia;
+      const tono = !h || !h.n ? "igual" : (h.neto_medio > 0 ? "sube" : "baja");
+      const celda = (titulo, valor, extra = "", clase = "") => `<div class="cifra ${clase}"><dt>${titulo}</dt><dd data-sin-traducir>${esc(valor)}</dd>${extra}</div>`;
+      return `<dl class="radar-cifras">
+        ${celda("Entraría en", usdt(e.entrada))}
+        ${celda("Stop", usdt(e.stop), `<span class="cifra-nota baja" data-sin-traducir>${esc(porcentaje((e.stop - e.entrada) / e.entrada, 2))}</span>`)}
+        ${celda("Objetivo", usdt(e.objetivo), `<span class="cifra-nota sube" data-sin-traducir>${esc(`+${porcentaje((e.objetivo - e.entrada) / e.entrada, 2)}`)}</span>`)}
+        ${celda("Gana por cada 1 que arriesga", numero(e.rr || 0, 1))}
+        ${celda("Ganó en el pasado", h && h.n ? porcentaje(h.gana, 0) : "–",
+          h && h.n ? `<span class="cifra-nota">${frase("de {n} veces", { n: numero(h.n, 0) })}</span>` : "", `tono-${tono}`)}
+      </dl>`;
+    }
     function plan(e) {
       if (!(e.entrada > 0)) return "";
       return frase("Entraría en {entrada} · stop {stop} ({pierde}) · objetivo {objetivo} ({gana}) · gano {rr} por cada 1 que arriesgo.", {
@@ -223,12 +238,12 @@ window.PilotaVivo = (() => {
             <div class="radar-cabeza"><strong data-sin-traducir>${esc(moneda(f.par))}</strong>
               <span class="suave">${frase("velas de {t}", { t: Tp(TIEMPO[f.temporalidad] || f.temporalidad) })}</span>
               <span class="suave" data-sin-traducir>${esc(f.precio ? usdt(f.precio) : "")}</span>
-              ${f.cerca ? `<span class="radar-casi">Casi casi</span>` : ""}</div>
-            ${espera ? `${cercania(espera)}<p class="radar-gatillo">${gatillo(espera, f)}</p>
-              <p class="radar-plan">${plan(espera)}</p><p class="radar-historia suave">${historia(espera.historia)}</p>`
+              <span class="radar-estado" data-estado="${f.cerca ? "casi" : (frena ? "pausa" : (f.espera ? "espera" : "nada"))}">${
+                f.cerca ? "Casi casi" : (frena ? "En pausa" : (f.espera ? "Esperando" : "Sin jugada"))}</span></div>
+            ${espera ? `${cercania(espera)}<p class="radar-gatillo">${gatillo(espera, f)}</p>${cifras(espera)}`
               : (frena && rebote(f)
                 ? `<p class="radar-gatillo">${frase("En pausa por BTC. Si no estuviera cayendo, compraría {moneda} por rebote si una vela cierra en {precio} o menos (falta {falta}).", { moneda: moneda(f.par), precio: usdt(rebote(f).gatillo), falta: porcentaje(Math.max(0, rebote(f).distancia || 0), 2) })}</p>
-                  <p class="radar-plan">${plan(rebote(f))}</p><p class="radar-historia suave">${historia(rebote(f).historia)}</p>`
+                  ${cifras(rebote(f))}`
                 : `<p class="radar-gatillo">${frase("Nada que esperar en {moneda} por ahora: ninguna de mis dos jugadas sirve aquí.", { moneda: moneda(f.par) })}</p>`)}
             ${otras.length ? `<p class="radar-no suave">${otras.join(" ")}</p>` : ""}</li>`;
         }).join("")}</ul>
@@ -312,8 +327,8 @@ window.PilotaVivo = (() => {
               apagado: "Sin conexión con Binance: el robot no está mirando. Solo opera con Pilota abierta.",
             }[conexion]}</p>
           </div></div>
-        ${grafico ? grafico() : ""}
         ${radar(E)}
+        ${grafico ? grafico() : ""}
         <div class="tarjeta vivo-saldo" data-signo="${signo(v.ganancia)}">
           <p class="vivo-saldo-titulo">Cuánto vale ahora</p>
           <p class="vivo-saldo-monto" data-sin-traducir>${esc(v.valor == null ? "–" : usdt(v.valor))}</p>

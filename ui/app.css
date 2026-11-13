@@ -525,3 +525,18 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
   .grafico-grilla.n-2, .grafico-grilla.n-4 { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .radar-casi { animation: none; } }
+/* El radar, de un vistazo */
+.radar-estado { margin-left: auto; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--panel-2); color: var(--texto-suave); }
+.radar-estado[data-estado="casi"] { background: var(--prueba-fondo); color: var(--prueba-texto); animation: latido 1.2s ease-in-out infinite; }
+.radar-estado[data-estado="espera"] { background: color-mix(in srgb, var(--acento) 14%, transparent); color: var(--acento); }
+.radar-estado[data-estado="pausa"] { background: color-mix(in srgb, var(--pierde) 12%, transparent); color: var(--pierde); }
+.radar-cifras { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 10px 0 4px; }
+.cifra { display: grid; align-content: start; gap: 1px; margin: 0; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); }
+.cifra dt { color: var(--texto-suave); font-size: 11px; font-weight: 600; }
+.cifra dd { margin: 0; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cifra-nota { color: var(--texto-suave); font-size: 11px; font-variant-numeric: tabular-nums; }
+.cifra-nota.sube, .cifra.tono-sube dd { color: var(--gana); }
+.cifra-nota.baja, .cifra.tono-baja dd { color: var(--pierde); }
+@media (max-width: 760px) { .radar-cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .radar-estado { animation: none; } }

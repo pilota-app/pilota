@@ -1293,6 +1293,11 @@
   "Siempre: si BTC viene cayendo, no compro nada. Cada compra lleva su stop y su objetivo desde el principio, el 40 % queda en USDT y los frenos (5 % al día, 4 pérdidas seguidas, el piso) cortan todo.": "Always: if BTC is falling, I buy nothing. Every buy has its stop and target from the start, 40% stays in USDT and the brakes (5% a day, 4 losses in a row, the floor) stop everything.",
   "Cuando el precio se calme (fuerza {adx} ahora; pido {max} o menos), compro {moneda} si una vela cierra en {precio} o menos.": "When the price calms down (strength {adx} now; I need {max} or less), I buy {moneda} if a candle closes at {precio} or lower.",
   "BTC viene cayendo, así que no compro nada: espero a que se calme. Cuando pase, te digo a qué precio compraría.": "BTC is falling, so I'm not buying anything: I'm waiting for it to calm down. When it does, I'll tell you at what price I'd buy.",
-  "En pausa por BTC. Si no estuviera cayendo, compraría {moneda} por rebote si una vela cierra en {precio} o menos (falta {falta}).": "Paused because of BTC. If it weren't falling, I'd buy {moneda} on a bounce if a candle closes at {precio} or lower ({falta} to go)."
+  "En pausa por BTC. Si no estuviera cayendo, compraría {moneda} por rebote si una vela cierra en {precio} o menos (falta {falta}).": "Paused because of BTC. If it weren't falling, I'd buy {moneda} on a bounce if a candle closes at {precio} or lower ({falta} to go).",
+  "Entraría en": "I'd enter at",
+  "Gana por cada 1 que arriesga": "Wins per 1 risked",
+  "Ganó en el pasado": "Won in the past",
+  "de {n} veces": "of {n} times",
+  "Sin jugada": "No play"
  }
 }
