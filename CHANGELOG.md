@@ -7,6 +7,9 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- Ahora puedes conectar una llave gratis de Alpaca en Ajustes para que Pilota lea las noticias de BTC y ETH con su hora
+  exacta. La llave queda en el llavero de tu Mac. *You can now connect a free Alpaca key in Settings so Pilota reads BTC
+  and ETH news with their exact time. The key stays in your Mac keychain.*
 - «Movimientos» ahora dice por qué compró, vendió o esperó cada perfil de tendencia y rotación (por ejemplo, una mala
   noticia de una persona influyente), y la rotación también frena con caídas fuertes y malas noticias. *"Movements" now
   says why each trend and rotation profile bought, sold or waited (for example, bad news from an influential person), and

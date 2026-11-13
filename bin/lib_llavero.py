@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""lib_llavero — la llave de Binance en el llavero del sistema, nunca en un archivo. Solo biblioteca estándar. No es una
+"""lib_llavero — las llaves (Binance y, para las noticias, Alpaca) en el llavero del sistema, nunca en un archivo. Solo biblioteca estándar. No es una
 acción.
 
 Hoy solo en Mac: usa el comando `security` del sistema (el llavero de inicio de sesión de la persona).
@@ -39,51 +39,54 @@ def disponible():
     return sys.platform == "darwin" and shutil.which("security") is not None
 
 
-def valida(texto):
-    return isinstance(texto, str) and bool(FORMATO.match(texto))
+def valida(texto, formato=None):
+    return isinstance(texto, str) and bool((formato or FORMATO).match(texto))
 
 
-def guardar(llave, secreto):
-    """Guarda (o reemplaza) la llave y el secreto. Devuelve `True` o lanza `Llavero`."""
-    if not (valida(llave) and valida(secreto)):
+def guardar(llave, secreto, servicio=SERVICIO, formatos=None):
+    """Guarda (o reemplaza) la llave y el secreto. Devuelve `True` o lanza `Llavero`. `formatos` = (de la llave, del
+    secreto); por omisión, el de Binance. Siempre solo letras y números: nada que escapar."""
+    f_llave, f_secreto = formatos or (FORMATO, FORMATO)
+    if not (valida(llave, f_llave) and valida(secreto, f_secreto)):
         raise Llavero("formato")
     if not disponible():
         raise Llavero("sin_llavero")
-    ordenes = "".join(f"add-generic-password -U -s {SERVICIO} -a {cuenta} -w {valor}\n"
+    ordenes = "".join(f"add-generic-password -U -s {servicio} -a {cuenta} -w {valor}\n"
                       for cuenta, valor in ((CUENTA_LLAVE, llave), (CUENTA_SECRETO, secreto)))
     r = correr(["security", "-i"], ordenes)
     if r.returncode != 0:
         raise Llavero("no_guardo")
-    if leer() != (llave, secreto):
+    if leer(servicio, formatos) != (llave, secreto):
         raise Llavero("no_guardo")
     return True
 
 
-def _leer_uno(cuenta):
-    r = correr(["security", "find-generic-password", "-s", SERVICIO, "-a", cuenta, "-w"])
+def _leer_uno(cuenta, servicio=SERVICIO, formato=None):
+    r = correr(["security", "find-generic-password", "-s", servicio, "-a", cuenta, "-w"])
     if r.returncode != 0:
         return None
     valor = (r.stdout or "").strip()
-    return valor if valida(valor) else None
+    return valor if valida(valor, formato) else None
 
 
-def leer():
+def leer(servicio=SERVICIO, formatos=None):
     """La llave y el secreto, o `None` si no hay (o si no son de la forma esperada)."""
     if not disponible():
         return None
-    llave, secreto = _leer_uno(CUENTA_LLAVE), _leer_uno(CUENTA_SECRETO)
+    f_llave, f_secreto = formatos or (FORMATO, FORMATO)
+    llave, secreto = _leer_uno(CUENTA_LLAVE, servicio, f_llave), _leer_uno(CUENTA_SECRETO, servicio, f_secreto)
     return (llave, secreto) if llave and secreto else None
 
 
-def borrar():
+def borrar(servicio=SERVICIO, formatos=None):
     """Borra la llave y el secreto del llavero. No falla si ya no estaban."""
     if not disponible():
         return False
     for cuenta in (CUENTA_LLAVE, CUENTA_SECRETO):
-        correr(["security", "delete-generic-password", "-s", SERVICIO, "-a", cuenta])
-    return leer() is None
+        correr(["security", "delete-generic-password", "-s", servicio, "-a", cuenta])
+    return leer(servicio, formatos) is None
 
 
-def pista(llave):
+def pista(llave, formato=None):
     """Cómo se muestra una llave: los primeros 4 y los últimos 4. Nunca el secreto."""
-    return f"{llave[:4]}…{llave[-4:]}" if valida(llave) else ""
+    return f"{llave[:4]}…{llave[-4:]}" if valida(llave, formato) else ""

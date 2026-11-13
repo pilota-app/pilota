@@ -70,6 +70,8 @@ cuentas ni publicidad; nada personal en el código (Ana Pérez, Matías Soto). B
 | `bin/simular.py` | Las acciones de «Comparar»: `estado`, `correr` (todos los perfiles con un monto y un período), `mapa` (el mapa de inicios, `simularMapa`) y `probabilidades` (qué tan seguido sale bien, `simularProbabilidades`). |
 | `bin/lib_tendencia.py` | Seguir la tendencia y ajustar el tamaño por volatilidad (`en_tendencia`, `volatilidad`, `tamano`, `pesos_tendencia`, `pesos_rotacion`), la regla del perfil tendencia (`pesos_cruce`, `filas_cruce`), un día (`paso`, el mismo en la comparación y en vivo) y su recorrido por el pasado día por día (`simular`). Puro. No es una acción. |
 | `bin/lib_influencia.py` | Las noticias de las personas que mueven el precio (`cargar`, `recientes`), leídas de `bin/influencia.json`: la copia del repo [pilota-app/influencia](https://github.com/pilota-app/influencia) que viaja en la app (se pone al día con `herramientas/traer_influencia.py`, a mano, antes de una versión). No toca la red y no decide nada: es contexto. No es una acción. |
+| `bin/lib_alpaca.py` | Las noticias de Alpaca (Benzinga) con la llave de la persona: un solo destino y una sola ruta (`DOMINIO`, `RUTA`), la llave en el llavero (`SERVICIO`, probada antes de guardarla), las noticias revisadas (`noticias`) y los fallos como códigos (`MOTIVOS`). Solo lee. No es una acción. |
+| `bin/noticias.py` | Las acciones de la llave de Alpaca (Ajustes → «Noticias al minuto»): `estado`, `conectar`, `revisar` y `desconectar`. |
 | `bin/lib_candado.py` | Una sola cosa a la vez entre procesos: un solo trabajo de cada tipo (`unico`, `YaCorriendo`), una revisión a la vez (`candado`) y el trabajo que quedó sin app (`huerfano`). No es una acción. |
 | `ui/grafico.js` | El gráfico de velas en vivo en un `<canvas>` (`PilotaGrafico.crear`): 1 m, 5 m, 1 h y 4 h, Bollinger, medias, volumen y RSI con un botón, las flechas de compra y venta, las líneas de entrada, stop y objetivo, el precio que se mueve cada segundo y el destello de color de cada operación. |
 | `bin/lib_simulacion.py` | «Si hubiera puesto X»: el historial como una cartera con tamaño y frenos (`cartera`, con `perfil` y sus `movimientos`), comprar BTC y esperar, el holding por partes (`holding`), las señales sobre 5 m (`ops_rapidas`), la rotación (`rotacion`) y los perfiles que se ofrecen lado a lado (`comparar`). No es una acción (la corre `bin/simular.py`). |
@@ -108,7 +110,8 @@ Reglas que no se cambian sin pensarlo dos veces (`bin/lib_datos.py`):
 - **La red solo va a `api.binance.com` por https**, solo a las rutas de `RUTAS`, sin redirecciones y sin los proxies del entorno.
   Mientras Pilota no tenga la pieza «Red», el candado vive en `pedir_api`. La única otra salida es el flujo público de velas en
   vivo (`bin/lib_flujo.py`): `stream.binance.com:9443` por TLS, solo la ruta de velas de los pares conocidos (`lib_flujo.PARES`: los dos contra FDUSD y
-  las ocho contra USDT), solo lectura.
+  las ocho contra USDT), solo lectura. Y, solo si la persona conecta su llave en Ajustes, las noticias de Alpaca
+  (`bin/lib_alpaca.py`): `https://data.alpaca.markets/v1beta1/news`, solo esa ruta, sin redirecciones ni proxies, solo lectura.
 - **Los límites de la API se respetan**: ante 429 o 418 se espera lo que pide Binance (`Retry-After`, tope `ESPERA_MAXIMA`) y se
   reintenta hasta `INTENTOS` veces; igual ante un 5xx o un corte de red.
 - **Continuidad antes de calcular**: `huecos()` revisa paso por paso (hora por hora en `1h`). Una serie con hoyos, corta o

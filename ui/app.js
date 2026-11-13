@@ -36,7 +36,7 @@
     auto: {} };
   // La llave y el secreto mientras se escriben: solo en memoria, nunca en E (que se puede mirar en las pruebas) ni en
   // el HTML. Se borran apenas se mandan.
-  const secretos = { "real-llave": "", "real-secreto": "" };
+  const secretos = { "real-llave": "", "real-secreto": "", "alpaca-llave": "", "alpaca-secreto": "" };
   const raiz = document.getElementById("app");
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => "&#" + c.charCodeAt(0) + ";");
 
@@ -1576,11 +1576,46 @@
       <h3>Apariencia</h3>${tema.selectorHTML()}
       <h3>Tu IA</h3>${ui.filasIA({ ias: E.ias, elegida: E.config.ia })}
       ${mcpUI.html()}
+      ${noticiasAjustes()}
       <h3>Actualizaciones</h3>${ui.filaActualizacion()}
       <h3>Acerca de</h3>${ui.acercaDe({ version: E.version, enlaces: ENLACES })}`;
   }
+  // Las noticias con su hora exacta (bin/noticias.py, Alpaca). La llave queda en el llavero del Mac; acá solo su pista.
+  const ERRORES_NOTICIAS = {
+    formato: "Revisa la llave: la Key ID son letras mayúsculas y números, y la Secret Key, letras y números.",
+    sin_llavero: "En este equipo no puedo guardar la llave de forma segura. Por ahora, solo en Mac.",
+    rechazada: "Alpaca no aceptó esa llave. Revisa que copiaste las dos partes completas.",
+    sin_red: "No pude hablar con Alpaca. Revisa tu conexión y vuelve a intentar.",
+    respuesta: "Alpaca respondió algo que no entiendo. Vuelve a intentar en un rato.",
+    no_guardo: "No pude guardar la llave en el llavero del Mac.",
+  };
+  function noticiasAjustes() {
+    const N = E.noticias || {};
+    const intro = `<h3>Noticias al minuto</h3>
+      <p class="ayuda">Con una llave de Alpaca (gratis), Pilota lee las noticias de BTC y ETH con su hora exacta. Sirve para medir qué noticias mueven el precio y, si se prueba que sirven, para frenar antes. La llave solo lee: no compra ni vende.</p>`;
+    if (N.conectado) {
+      const ultima = (N.ultimas || [])[0];
+      return `${intro}<div class="llave-conectada">
+        <p><strong>Llave conectada</strong> <span class="pista" data-sin-traducir>${esc(N.pista || "")}</span></p>
+        ${ultima ? `<p class="suave">${frase("Última noticia: {hora}", { hora: esc(new Date(ultima.ms).toLocaleString(i18n.idioma)) })} · <span data-sin-traducir>${esc(ultima.titular)}</span></p>` : ""}
+        ${N.motivo ? `<p class="freno-texto">${Tp(ERRORES_NOTICIAS[N.motivo] || ERRORES_NOTICIAS.respuesta)}</p>` : ""}
+        <div class="pz-pie"><button type="button" class="pz-boton" id="alpaca-desconectar"${E.noticiasOcupado ? " disabled" : ""}>Desconectar la llave</button></div></div>`;
+    }
+    return `${intro}
+      <details class="guia-llave" id="guia-alpaca"><summary>Cómo sacar la llave en Alpaca</summary>
+        <ol class="guia-pasos"><li>Crea una cuenta en alpaca.markets. Basta la cuenta de práctica («Paper»), sin depositar nada.</li>
+          <li>En el panel, busca «API Keys» y genera una llave.</li>
+          <li>Copia la «Key ID» y la «Secret Key» aquí abajo. La Secret Key se muestra una sola vez.</li></ol></details>
+      <div class="campos-llave">
+        <label class="pz-campo"><span>Key ID</span><input id="alpaca-llave" type="text" autocomplete="off" spellcheck="false" maxlength="64"></label>
+        <label class="pz-campo"><span>Secret Key</span><input id="alpaca-secreto" type="password" autocomplete="off" spellcheck="false" maxlength="128"></label>
+        ${N.motivo ? `<p class="freno-texto">${Tp(ERRORES_NOTICIAS[N.motivo] || ERRORES_NOTICIAS.respuesta)}</p>` : ""}
+        <p class="ayuda">Se guardan en el llavero de tu Mac. Pilota no las escribe en ningún archivo ni las manda a ningún lado que no sea Alpaca.</p>
+        <button type="button" class="pz-boton pz-principal" id="alpaca-conectar"${E.noticiasOcupado ? " disabled" : ""}>${E.noticiasOcupado ? "Probando la llave…" : "Conectar y probar"}</button></div>`;
+  }
   function abrirAjustes() {
     E.ajustes = true;
+    host.enviar("noticiasRevisar", {});
     mcpUI.pedirEstado();   // qué IA hay en este computador y cuáles ya pueden consultar a Pilota
     pintar();
   }
@@ -1727,6 +1762,23 @@
       secretos["real-secreto"] = "";
       pintar();
       host.enviar("realConectar", { llave, secreto });
+    } else if (b.id === "alpaca-conectar") {
+      const llave = (secretos["alpaca-llave"] || "").trim(), secreto = (secretos["alpaca-secreto"] || "").trim();
+      if (!/^[A-Z0-9]{16,64}$/.test(llave) || !/^[A-Za-z0-9]{20,128}$/.test(secreto)) {
+        toast(Tp(ERRORES_NOTICIAS.formato), { error: true });
+        return;
+      }
+      E.noticiasOcupado = true;
+      secretos["alpaca-llave"] = "";
+      secretos["alpaca-secreto"] = "";
+      pintar();
+      host.enviar("noticiasConectar", { llave, secreto });
+    } else if (b.id === "alpaca-desconectar") {
+      const si = await ui.confirmar({ titulo: "¿Desconectar la llave de Alpaca?", texto: "Borro la llave del llavero de este equipo. Pilota deja de leer noticias al minuto.", si: "Desconectar", peligro: true });
+      if (!si) return;
+      E.noticiasOcupado = true;
+      pintar();
+      host.enviar("noticiasDesconectar", {});
     } else if (b.id === "real-revisar") {
       E.realOcupado = true;
       pintar();
@@ -2131,6 +2183,12 @@
     },
     probabilidadesListo(r) {
       E.prob = { ...(E.prob || {}), cargando: false, datos: r && r.ok ? r.datos : null, error: !(r && r.ok) };
+      pintar();
+    },
+    noticiasListo(r) {
+      E.noticiasOcupado = false;
+      E.noticias = r && r.datos ? r.datos : { motivo: "respuesta" };
+      if (r && r.ok && E.noticias.conectado && E.noticias.ultimas) toast(Tp("Llave de Alpaca conectada y probada."));
       pintar();
     },
     realEstadoListo(r) {
@@ -2801,6 +2859,7 @@
         pendiente: v.perfil === "compra_semanal" ? { BTCUSDT: { limite: 71000, monto: m / 52 * 0.6 } } : {} } : null };
   }
   // El mapa de inicios de la vista previa: números inventados, con la forma de lib_simulacion.mapa.
+  let alpacaDemo = null;   // la pista de la llave de Alpaca en la vista previa
   // Las probabilidades de la vista previa: números inventados, con la forma de lib_simulacion.probabilidades.
   function probDemo(dias) {
     const r = azar(dias), acciones = /indice|acciones/;
@@ -2878,6 +2937,13 @@
         c.responder("simularListo", { ok: true, datos: { ultima: DEMO.simulacion } });
       });
       case "realEstado": return c.responder("realEstadoListo", { ok: true, datos: realDemo() });
+      case "noticiasRevisar": return c.responder("noticiasListo", { ok: true, datos: { llavero: true, conectado: !!alpacaDemo, pista: alpacaDemo || "" } });
+      case "noticiasConectar": return c.luego(300, () => {
+        alpacaDemo = `${String(d.llave).slice(0, 4)}…${String(d.llave).slice(-4)}`;
+        c.responder("noticiasListo", { ok: true, datos: { llavero: true, conectado: true, pista: alpacaDemo,
+          ultimas: [{ id: 1, ms: Date.now() - 600000, titular: "Titular inventado para la vista previa", simbolos: ["BTCUSD"] }] } });
+      });
+      case "noticiasDesconectar": alpacaDemo = null; return c.responder("noticiasListo", { ok: true, datos: { llavero: true, conectado: false, pista: "" } });
       case "realConectar": case "realRevisar": return c.luego(500, () => {
         DEMO.real.conectado = true;
         DEMO.real.pista = "dEmO…a1b2";

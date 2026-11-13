@@ -541,6 +541,47 @@
    "responde": "simularListo",
    "limite": 600
   },
+  "noticiasConectar": {
+   "script": "noticias.py",
+   "args": [
+    "conectar"
+   ],
+   "entrada": "archivo",
+   "datos": {
+    "llave": {
+     "tipo": "texto",
+     "max": 64,
+     "patron": "^[A-Z0-9]{16,64}$"
+    },
+    "secreto": {
+     "tipo": "texto",
+     "max": 128,
+     "patron": "^[A-Za-z0-9]{20,128}$"
+    }
+   },
+   "responde": "noticiasListo",
+   "limite": 60
+  },
+  "noticiasRevisar": {
+   "script": "noticias.py",
+   "args": [
+    "revisar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "noticiasListo",
+   "limite": 60
+  },
+  "noticiasDesconectar": {
+   "script": "noticias.py",
+   "args": [
+    "desconectar"
+   ],
+   "entrada": "archivo",
+   "datos": {},
+   "responde": "noticiasListo",
+   "limite": 30
+  },
   "realEstado": {
    "script": "real.py",
    "args": [

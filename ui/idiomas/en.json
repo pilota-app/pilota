@@ -1529,6 +1529,26 @@
   "No compré {moneda}: hubo una mala noticia de {persona} ({fecha}). Espero en USDT unos días.": "I didn't buy {moneda}: there was bad news from {persona} ({fecha}). I'll wait in USDT for a few days.",
   "No compré {moneda}: cayó {caida} en un día esta semana. Espero unos días.": "I didn't buy {moneda}: it fell {caida} in one day this week. I'll wait a few days.",
   "Mala noticia de {persona} sobre BTC ({fecha}): no tengo ninguna moneda y espero en USDT unos días.": "Bad news from {persona} about BTC ({fecha}): I hold no coins and wait in USDT for a few days.",
-  "No compro {monedas} por unos días: cayeron 5 % o más en un día esta semana.": "I won't buy {monedas} for a few days: they fell 5% or more in one day this week."
+  "No compro {monedas} por unos días: cayeron 5 % o más en un día esta semana.": "I won't buy {monedas} for a few days: they fell 5% or more in one day this week.",
+  "Revisa la llave: la Key ID son letras mayúsculas y números, y la Secret Key, letras y números.": "Check the key: the Key ID is capital letters and numbers, and the Secret Key is letters and numbers.",
+  "En este equipo no puedo guardar la llave de forma segura. Por ahora, solo en Mac.": "I can't store the key safely on this computer. For now, Mac only.",
+  "Alpaca no aceptó esa llave. Revisa que copiaste las dos partes completas.": "Alpaca didn't accept that key. Check that you copied both parts in full.",
+  "No pude hablar con Alpaca. Revisa tu conexión y vuelve a intentar.": "I couldn't reach Alpaca. Check your connection and try again.",
+  "Alpaca respondió algo que no entiendo. Vuelve a intentar en un rato.": "Alpaca answered something I don't understand. Try again in a while.",
+  "No pude guardar la llave en el llavero del Mac.": "I couldn't save the key in the Mac keychain.",
+  "Noticias al minuto": "News to the minute",
+  "Con una llave de Alpaca (gratis), Pilota lee las noticias de BTC y ETH con su hora exacta. Sirve para medir qué noticias mueven el precio y, si se prueba que sirven, para frenar antes. La llave solo lee: no compra ni vende.": "With an Alpaca key (free), Pilota reads BTC and ETH news with their exact time. It's used to measure which news moves the price and, if they prove useful, to pause sooner. The key only reads: it doesn't buy or sell.",
+  "Última noticia: {hora}": "Latest news: {hora}",
+  "Cómo sacar la llave en Alpaca": "How to get the key in Alpaca",
+  "Crea una cuenta en alpaca.markets. Basta la cuenta de práctica («Paper»), sin depositar nada.": "Create an account at alpaca.markets. The practice (“Paper”) account is enough, with no deposit.",
+  "En el panel, busca «API Keys» y genera una llave.": "In the dashboard, find “API Keys” and generate a key.",
+  "Copia la «Key ID» y la «Secret Key» aquí abajo. La Secret Key se muestra una sola vez.": "Copy the “Key ID” and the “Secret Key” below. The Secret Key is shown only once.",
+  "Key ID": "Key ID",
+  "Se guardan en el llavero de tu Mac. Pilota no las escribe en ningún archivo ni las manda a ningún lado que no sea Alpaca.": "They are stored in your Mac keychain. Pilota doesn't write them to any file or send them anywhere but Alpaca.",
+  "Probando la llave…": "Testing the key…",
+  "Conectar y probar": "Connect and test",
+  "¿Desconectar la llave de Alpaca?": "Disconnect the Alpaca key?",
+  "Borro la llave del llavero de este equipo. Pilota deja de leer noticias al minuto.": "I'll delete the key from this computer's keychain. Pilota stops reading news to the minute.",
+  "Llave de Alpaca conectada y probada.": "Alpaca key connected and tested."
  }
 }

@@ -902,6 +902,13 @@ await capturar(page, "19-trabajos-390");
 await page.click("#abrir-ajustes");
 await page.waitForSelector("[role=dialog]");
 await sinDesborde(page, "Ajustes a 390 px");
+// La llave de Alpaca para las noticias: se prueba, queda en el llavero y en pantalla solo su pista.
+await page.fill("#alpaca-llave", "PKAAAA1111BBBB2222CC");
+await page.fill("#alpaca-secreto", "secretoInventado1234567890");
+await page.click("#alpaca-conectar");
+await page.waitForFunction(() => /Llave conectada/.test(document.querySelector("[role=dialog]")?.textContent || ""));
+assert.match(await page.textContent("[role=dialog]"), /PKAA…22CC[\s\S]*Titular inventado/);
+assert.doesNotMatch(await page.content(), /secretoInventado/, "el secreto no queda en la pantalla");
 await capturar(page, "20-ajustes-390");
 
 await navegador.close();
