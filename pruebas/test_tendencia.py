@@ -89,6 +89,19 @@ class Cruce(unittest.TestCase):
         self.assertEqual(libro["cantidad"], {})
         self.assertLess(movs[0]["ganancia"], 0, "vendió más barato de lo que compró, con costos")
 
+    def test_tras_un_golpe_no_compra_pero_lo_que_tiene_lo_mantiene(self):
+        sube = subida(60)
+        golpe = sube[:-3] + [sube[-3] * 0.93, sube[-3] * 0.95, sube[-3] * 0.97]
+        filas = T.filas_cruce({"BTCUSDT": golpe}, {"BTCUSDT": 1.0}, 20, actuales=(), golpe=0.05)
+        self.assertEqual((filas[0]["parte"], filas[0]["motivo"]), (0.0, "golpe"))
+        filas = T.filas_cruce({"BTCUSDT": golpe}, {"BTCUSDT": 1.0}, 20, actuales=("BTCUSDT",), golpe=0.05)
+        self.assertEqual(filas[0]["parte"], 1.0, "si ya la tiene, no la vende por el golpe")
+
+    def test_una_mala_noticia_deja_esa_parte_en_usdt(self):
+        noticia = {"persona": "Alguien", "que": "x", "fecha": "2026-11-10", "dia": -0.04, "activo": "BTC"}
+        p = T.pesos_cruce({"BTCUSDT": subida(60), "ETHUSDT": subida(60)}, self.REPARTO, 50, noticias={"BTCUSDT": noticia})
+        self.assertEqual(p, {"ETHUSDT": 0.4})
+
     def test_la_historia_cuenta_los_dias_del_mismo_lado_de_la_media(self):
         cierres = [100 * (1.002 ** i) for i in range(400)]
         h = T.historia_cruce(cierres, 50, 20)

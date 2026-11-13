@@ -23,6 +23,7 @@ Lo que no se negocia aquí:
 - **Es puro**: no lee el disco ni la red. Recibe las velas y devuelve números.
 """
 import bisect
+import inspect
 import math
 
 import lib_rotacion
@@ -86,15 +87,38 @@ def sobre_media(cierres, media):
     return {"precio": cierres[-1], "media": _media(cierres[-media:]), "sobre": cierres[-1] > _media(cierres[-media:])}
 
 
-def filas_cruce(tramos, reparto, media=50):
+def golpe_en(cierres, golpe, dias):
+    """La peor caída de un día en los últimos `dias` cierres si fue de `golpe` o más (por ejemplo −0,07), o `None`."""
+    if not golpe or len(cierres) < 2:
+        return None
+    peor = min(cierres[i] / cierres[i - 1] - 1 for i in range(max(1, len(cierres) - dias), len(cierres)))
+    return peor if peor <= -golpe else None
+
+
+def filas_cruce(tramos, reparto, media=50, actuales=(), golpe=None, dias_freno=5, noticias=None):
     """Cada moneda del reparto con su precio, su media y la parte que le toca: la suya si cierra sobre la media y nada si
-    cierra bajo. `None` si a alguna le falta historia (no se decide con media regla)."""
+    cierra bajo. Dos frenos más, medidos en el estudio de nov 2026 (ver AGENTS.md):
+    - `golpe`: si en los últimos `dias_freno` días hubo un día que cayó `golpe` o más, no compra (lo que ya tiene, lo
+      mantiene). Es la huella de una mala noticia en el precio.
+    - `noticias`: {par: noticia} de personas influyentes que bajaron el precio en los últimos días: esa parte espera en USDT.
+    `motivo` dice por qué una parte quedó en cero. `None` si a alguna le falta historia (no se decide con media regla)."""
     filas = []
     for par, peso in reparto.items():
         m = sobre_media(tramos.get(par) or [], media)
         if m is None:
             return None
-        filas.append({"par": par, **m, "parte": peso if m["sobre"] else 0.0, "reparto": peso})
+        caida = golpe_en(tramos.get(par) or [], golpe, dias_freno)
+        noticia = (noticias or {}).get(par)
+        if not m["sobre"]:
+            parte, motivo = 0.0, "bajo_media"
+        elif noticia:
+            parte, motivo = 0.0, "noticia"
+        elif caida is not None and par not in actuales:
+            parte, motivo = 0.0, "golpe"
+        else:
+            parte, motivo = peso, None
+        filas.append({"par": par, **m, "parte": parte, "reparto": peso, "motivo": motivo, "golpe": caida,
+                      "noticia": noticia})
     return filas
 
 
@@ -125,10 +149,10 @@ def historia_cruce(cierres, media=50, horizonte=20, caida=0.10):
             "cae": cae / n, "caida": caida}
 
 
-def pesos_cruce(tramos, reparto, media=50):
+def pesos_cruce(tramos, reparto, media=50, actuales=(), golpe=None, dias_freno=5, noticias=None):
     """La regla del perfil tendencia: cada moneda con su parte del reparto mientras cierra sobre su media de `media` días;
-    bajo la media, esa parte espera en USDT."""
-    filas = filas_cruce(tramos, reparto, media)
+    bajo la media, tras un golpe o tras una mala noticia, esa parte espera en USDT (ver `filas_cruce`)."""
+    filas = filas_cruce(tramos, reparto, media, actuales, golpe, dias_freno, noticias)
     return {f["par"]: f["parte"] for f in filas or [] if f["parte"] > 0}
 
 
@@ -229,6 +253,7 @@ def simular(monto, diarias, desde_ms, hasta_ms, com, regla, spread=SPREAD, umbra
     series = _series(diarias)
     precio = {par: dict(zip(ts, cierres)) for par, (ts, cierres) in series.items()}
     dias_ms = sorted({t for ts, _ in series.values() for t in ts if desde_ms <= t <= hasta_ms})
+    usa_ms = "ms" in inspect.signature(regla).parameters     # la regla puede pedir el día (las noticias tienen fecha)
     libro = nuevo(monto)
     movimientos, curva, techo, caida, invertido = [], [], float(monto), 0.0, []
     for d in dias_ms:
@@ -237,7 +262,7 @@ def simular(monto, diarias, desde_ms, hasta_ms, com, regla, spread=SPREAD, umbra
         pasa = filtro(ms).get("pasa") if filtro else True
         tramos = tramos_en(series, ms, largo)
         actuales = [p for p, q in libro["cantidad"].items() if q > 0]
-        objetivo = regla(tramos, actuales, pasa) if valor(libro, hoy) > 0 else {}
+        objetivo = (regla(tramos, actuales, pasa, ms=ms) if usa_ms else regla(tramos, actuales, pasa)) if valor(libro, hoy) > 0 else {}
         movimientos += paso(libro, ms, hoy, objetivo, taker, spread, umbral)
         v = valor(libro, hoy)
         for m in movimientos:

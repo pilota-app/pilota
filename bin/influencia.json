@@ -428,5 +428,31 @@
     "d60": null
    }
   }
+ ],
+ "ranking": [
+  {
+   "puesto": 1,
+   "id": "donald-trump",
+   "puntaje": 3.88,
+   "eventos": 14,
+   "ultimo_evento": "2026-04-14",
+   "duro_20d": 0.429
+  },
+  {
+   "puesto": 2,
+   "id": "elon-musk",
+   "puntaje": 0.64,
+   "eventos": 4,
+   "ultimo_evento": "2026-02-03",
+   "duro_20d": 1.0
+  },
+  {
+   "puesto": 3,
+   "id": "sam-bankman-fried",
+   "puntaje": 0.2,
+   "eventos": 1,
+   "ultimo_evento": "2022-11-08",
+   "duro_20d": 1.0
+  }
  ]
 }

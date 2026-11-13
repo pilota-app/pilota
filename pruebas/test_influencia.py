@@ -34,6 +34,18 @@ class Influencia(unittest.TestCase):
         r = I.recientes(I._ms("2026-11-13"), ["BTC"], 30, datos=d)
         self.assertEqual(len(r["eventos"]), 1)
 
+    def test_una_mala_noticia_frena_cinco_dias_y_la_de_btc_frena_a_todas(self):
+        ruta = self.archivo({"personas": [{"id": "a", "nombre": "Ana"}], "eventos": [
+            {"persona": "a", "fecha": "2026-11-10", "que": "baja", "activo": "BTC", "movimiento": {"dia": -0.05}},
+            {"persona": "a", "fecha": "2026-11-01", "que": "sube", "activo": "ETH", "movimiento": {"dia": 0.05}},
+            {"persona": None, "fecha": "2026-11-11", "que": "mercado", "activo": "ETH", "movimiento": {"dia": -0.1}}]})
+        d = I.cargar(ruta)
+        dia = I.DIA_MS
+        r = I.negativas(I._ms("2026-11-12"), ["BTCUSDT", "ETHUSDT"], 5, datos=d)
+        self.assertEqual(set(r), {"BTCUSDT", "ETHUSDT"})
+        self.assertEqual(I.negativas(I._ms("2026-11-10"), ["BTCUSDT"], 5, datos=d), {}, "antes del cierre del día, no")
+        self.assertEqual(I.negativas(I._ms("2026-11-10") + 6 * dia, ["BTCUSDT"], 5, datos=d), {}, "pasados 5 días, no")
+
     def test_sin_archivo_no_hay_noticias(self):
         self.assertEqual(I.cargar("/no/existe.json")["eventos"], [])
 

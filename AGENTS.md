@@ -642,7 +642,7 @@ con el mismo monto (`lib_simulacion.comparar`), y «Movimientos» cuenta todo lo
 | semanal_rotacion (mezcla) | 50 % compra_semanal y 50 % rotacion |
 | nucleo_satelite (mezcla) | 70 % holding_usdt (BTC y ETH contra USDT, no se ofrece solo) y 30 % rotacion |
 | cripto_acciones (mezcla) | 50 % compra_semanal y 50 % indice_semanal |
-| tendencia (experimento) | BTC 60 % y ETH 40 %, cada una solo mientras su cierre diario está sobre su media de 50 días (`lib_tendencia.pesos_cruce`); bajo la media, esa parte espera en USDT |
+| tendencia (experimento) | BTC 60 % y ETH 40 %, cada una solo mientras su cierre diario está sobre su media de 50 días (`lib_tendencia.pesos_cruce`); bajo la media, esa parte espera en USDT. No compra 5 días después de un día de −5 % o peor (`golpe`) y espera en USDT 5 días después de una mala noticia de una persona influyente (`noticias`, `lib_influencia.negativas`) |
 | rotacion (experimento) | una vez al día tiene las 2 monedas más fuertes de las 8 contra USDT (`lib_rotacion`); puede caer tanto como BTC |
 
 **Las acciones** son los bStocks de Binance (`lib_datos.ACCIONES`, contra USDT): acciones de EE. UU. tokenizadas y respaldadas
@@ -670,9 +670,12 @@ fresco, lleva el libro a `lib_tendencia.pesos_cruce` con `lib_tendencia.paso`. C
 `tendencia_venta`. Sin la vela de ayer no decide (`sin_datos`) y con un freno de la cuenta vende todo. Cada día deja
 también lo que pasó antes en un día como hoy (`lib_tendencia.historia_cruce`: del mismo lado de la media, en cuántos días
 subió a los 20 días, cuánto en promedio y en cuántos cayó más de 10 % en el camino), y `estado` suma las noticias de
-influencia de los últimos 30 días (`lib_influencia.recientes`). Las noticias no entran en la decisión: en el estudio no
-cambiaron la probabilidad de subir (una regresión logística sobre 15 indicadores y las noticias acertó si BTC subía en 7
-días 54 de cada 100 veces; a 20 y 60 días, menos que decir siempre el promedio).
+influencia de los últimos 30 días y el ranking (`lib_influencia.recientes`). Las noticias **sí** entran en la decisión, como
+freno: una mala noticia de una persona de la lista sobre esa moneda o sobre BTC deja esa parte en USDT 5 días. No sirven
+para adivinar la dirección (una regresión logística sobre 15 indicadores y las noticias acertó si BTC subía en 7 días 54 de
+cada 100 veces; a 20 y 60 días, menos que decir siempre el promedio), pero los dos frenos (golpe y noticia) mejoraron la
+regla en los dos tramos: al elegir, ganancia típica +42 % contra +32 %; al probar, le ganó a BTC en 67 % de las ventanas
+contra 64 %, y la peor ventana de 1 año fue −6 % contra −8 %. La pantalla lo muestra en «Cómo decido».
 
 Las variantes de holding (`variante` en `lib_perfiles`) se deciden una vez por día, al cerrar la vela diaria, con
 `lib_holding.paso`: el mismo paso que mide la comparación. En vivo compran y venden con el precio de 1 m de ahora y la orden

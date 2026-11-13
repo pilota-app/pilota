@@ -23,7 +23,7 @@ window.PilotaVivo = (() => {
     semanal_rotacion: { nombre: "Semanal + Rotación", que: "La mitad en Compra semanal y la mitad en Rotación. Cada mitad sigue sus reglas por su lado.", ritmo: "Lento" },
     nucleo_satelite: { nombre: "Núcleo y satélite", que: "70 % guardado en BTC y ETH (el núcleo) y 30 % en Rotación (el satélite): lo grande no se mueve, lo chico prueba.", ritmo: "Lento" },
     cripto_acciones: { nombre: "Cripto + Acciones", que: "La mitad en Compra semanal de BTC y ETH y la mitad en Índice semanal de EE. UU. Dos mercados distintos que no siempre caen juntos.", ritmo: "Muy lento" },
-    tendencia: { nombre: "Tendencia", que: "Experimento: BTC y ETH solo mientras su precio está sobre su promedio de 50 días. Cuando cae bajo el promedio, esa parte espera en USDT. Sale antes de las caídas grandes y entra tarde en las subidas.", ritmo: "Lento" },
+    tendencia: { nombre: "Tendencia", que: "Experimento: BTC y ETH solo mientras su precio está sobre su promedio de 50 días, sin caídas fuertes en la semana y sin malas noticias de personas influyentes. Si no, esa parte espera en USDT. Sale antes de las caídas grandes y entra tarde en las subidas.", ritmo: "Lento" },
     rotacion: { nombre: "Rotación", que: "Experimento: tiene las 2 monedas que vienen más fuertes de las 8 y cambia a la que pasa adelante. Se parece a comprar BTC: a veces gana y a veces pierde, y puede caer tanto como BTC.", ritmo: "Lento" },
   };
   // Los que se ofrecen (bin/lib_perfiles.py: ORDEN). Los otros cuatro quedaron retirados: perdieron con datos reales. Sus
@@ -428,12 +428,30 @@ window.PilotaVivo = (() => {
         <ol class="ranking-filas">${filas.map((f) => `<li class="ranking-fila" data-estado="${f.sobre ? "tengo" : "no"}">
             <span class="ranking-moneda" data-sin-traducir>${esc(moneda(f.par))}</span>
             <span class="ranking-cambio" data-signo="${signo(f.precio / f.media - 1)}" data-sin-traducir>${esc(conSigno(f.precio / f.media - 1, (x) => porcentaje(x, 1)))}</span>
-            <span class="radar-estado" data-estado="${f.sobre ? "casi" : "nada"}">${f.sobre
-              ? frase("Sobre su promedio ({media}): tengo {pct}", { media: usdt(f.media), pct: porcentaje(f.reparto, 0) })
-              : frase("Bajo su promedio ({media}): su {pct} espera en USDT", { media: usdt(f.media), pct: porcentaje(f.reparto, 0) })}</span></li>`).join("")}</ol>
+            <span class="radar-estado" data-estado="${f.parte > 0 ? "casi" : "nada"}">${!f.sobre
+              ? frase("Bajo su promedio ({media}): su {pct} espera en USDT", { media: usdt(f.media), pct: porcentaje(f.reparto, 0) })
+              : f.motivo === "noticia" && f.noticia
+                ? frase("Sobre su promedio, pero hubo una mala noticia de {persona} el {fecha}: su {pct} espera en USDT unos días", { persona: esc(f.noticia.persona), fecha: esc(f.noticia.fecha), pct: porcentaje(f.reparto, 0) })
+                : f.motivo === "golpe"
+                  ? frase("Sobre su promedio, pero esta semana cayó {caida} en un día: no compro su {pct} por unos días", { caida: porcentaje(Math.abs(f.golpe || 0), 1), pct: porcentaje(f.reparto, 0) })
+                  : frase("Sobre su promedio ({media}): tengo {pct}", { media: usdt(f.media), pct: porcentaje(f.reparto, 0) })}</span></li>`).join("")}</ol>
         <p class="ayuda">El número es cuánto está el precio sobre o bajo su promedio de los últimos 50 días. Cuando pasa de un lado al otro, compro o vendo esa parte.</p></div>
+        ${comoDecido()}
         ${quePaso(filas)}
         ${noticias(v.noticias)}`;
+    }
+    // Cómo pesa cada cosa en la decisión, con lo que mejoró en el estudio de nov 2026 (AGENTS.md: «Los perfiles y el robot
+    // en vivo»). Los números son de las ventanas de prueba (desde nov 2023), las que nadie miró al elegir las reglas.
+    function comoDecido() {
+      const filas = [
+        ["Precio sobre su promedio de 50 días", "Si está sobre, compro su parte; si está bajo, espera en USDT.", "Base: le ganó a BTC en 64 de cada 100 ventanas"],
+        ["Un día de −5 % o peor en la semana", "No compro por 5 días; lo que ya tengo, lo mantengo.", "Ganancia típica: +28 % contra +24 %"],
+        ["Mala noticia de una persona influyente", "Esa parte espera en USDT 5 días.", "Peor ventana de 1 año: −5 % contra −8 %"],
+        ["Las tres juntas (lo que hago)", "", "Le ganó a BTC en 67 de cada 100 ventanas; ganancia típica +30 %"]];
+      return `<div class="tarjeta como-decido"><h3>Cómo decido</h3>
+        <div class="mapa-caja"><table class="mapa-tabla"><thead><tr><th scope="col">Qué miro</th><th scope="col">Qué hago</th><th scope="col">Qué cambió en las pruebas</th></tr></thead>
+          <tbody>${filas.map(([a, b, c]) => `<tr><th scope="row">${Tp(a)}</th><td>${b ? Tp(b) : ""}</td><td>${Tp(c)}</td></tr>`).join("")}</tbody></table></div>
+        <p class="ayuda">Probé 6.000 mezclas de indicadores con pesos y ninguna superó a estas reglas simples. Acertar si sube o baja sigue siendo 51 a 58 de cada 100 veces: la ventaja está en perder menos en las caídas.</p></div>`;
     }
     // Lo que pasó antes cuando cada moneda estaba del mismo lado de su promedio que hoy (lib_tendencia.historia_cruce).
     function quePaso(filas) {
@@ -457,7 +475,9 @@ window.PilotaVivo = (() => {
             <strong data-sin-traducir>${esc(e.persona || "")}</strong> <span data-sin-traducir>${esc(e.que)}</span>
             ${e.dia == null ? "" : `<span class="ranking-cambio" data-signo="${signo(e.dia)}" data-sin-traducir>${esc(e.activo)} ${esc(conSigno(e.dia, (x) => porcentaje(x, 1)))}</span>`}</li>`).join("")}</ul>`
           : `<p class="suave">${frase("Ninguna con fecha y fuente en los últimos {n} días.", { n: numero(N.dias || 30, 0) })}</p>`}
-        <p class="ayuda">${frase("Son contexto, no una señal: el salto de un post pasa en minutos y muchas veces se borra el mismo día. Datos al {fecha}.", { fecha: esc(N.al || "–") })}</p></div>`;
+        ${(N.ranking || []).length ? `<h4>Quién mueve más el precio hoy</h4><ol class="noticias-filas">${N.ranking.map((r) => `<li><strong data-sin-traducir>${esc(r.nombre)}</strong>
+            <span class="suave">${frase("{n} noticias medidas, la última el {fecha}", { n: numero(r.eventos, 0), fecha: esc(r.ultimo || "–") })}</span></li>`).join("")}</ol>` : ""}
+        <p class="ayuda">${frase("Una mala noticia de estas personas frena la compra de esa moneda por 5 días. El salto de un post pasa en minutos y muchas veces se borra el mismo día: por eso no compro por una buena noticia. Datos al {fecha}.", { fecha: esc(N.al || "–") })}</p></div>`;
     }
     function radar(E) {
       const v = E.vivo || {};
@@ -614,7 +634,7 @@ window.PilotaVivo = (() => {
       semanal_rotacion: "Mitad del monto en Compra semanal (BTC y ETH, 52 semanas) y mitad en Rotación (las 2 más fuertes de las 8). Cada mitad tiene su propia plata y sus propias reglas.",
       nucleo_satelite: "70 % compra BTC y ETH en 12 partes y los guarda; 30 % va a Rotación. Si la rotación falla, lo grande sigue guardado.",
       cripto_acciones: "Mitad en Compra semanal de BTC y ETH y mitad en Índice semanal de EE. UU. Si cripto cae fuerte, las acciones no siempre caen igual.",
-      tendencia: "Una vez al día, cuando cierra la vela diaria, mira si BTC y ETH cerraron sobre su promedio de los últimos 50 días. La que está sobre su promedio se tiene con su parte (BTC 60 %, ETH 40 %); la que está bajo, esa parte espera en USDT. Si una parte se aleja más de 2 % de lo que le toca, la ajusta. No pone stop: sale cuando el precio cruza el promedio para abajo. Con un freno de la cuenta, vende todo.",
+      tendencia: "Una vez al día, cuando cierra la vela diaria, mira si BTC y ETH cerraron sobre su promedio de los últimos 50 días. La que está sobre su promedio se tiene con su parte (BTC 60 %, ETH 40 %); la que está bajo, esa parte espera en USDT. Si esa semana hubo un día de −5 % o peor, no compra por 5 días. Si una persona influyente dio una mala noticia sobre esa moneda o sobre BTC, esa parte espera en USDT 5 días. Si una parte se aleja más de 2 % de lo que le toca, la ajusta. Con un freno de la cuenta, vende todo.",
       rotacion: "Una vez al día, cuando cierra la vela diaria, ordena las 8 monedas por fuerza: cuánto subieron en 30 días, dividido por cuánto se movieron en el camino. Tiene las 2 primeras que estén sobre su promedio de 50 días, mitad y mitad. Cambia una solo cuando sale del grupo de las 3 mejores: cada cambio paga comisión. No pone stop: sale cuando la moneda pierde fuerza.",
     };
     function reglas(perfil) {

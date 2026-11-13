@@ -16,9 +16,12 @@ if __name__ == "__main__":
     origen = sys.argv[1]
     personas = json.load(open(os.path.join(origen, "personas.json"), encoding="utf-8"))
     eventos = json.load(open(os.path.join(origen, "eventos.json"), encoding="utf-8"))
+    ranking = json.load(open(os.path.join(origen, "ranking.json"), encoding="utf-8"))["ranking"]
     salida = {"formato": 1, "al": datetime.date.today().isoformat(), "fuente": "https://github.com/pilota-app/influencia",
               "personas": [{"id": p["id"], "nombre": p["nombre"]} for p in personas],
-              "eventos": [{k: e[k] for k in ("persona", "fecha", "que", "activo", "movimiento")} for e in eventos]}
+              "eventos": [{k: e[k] for k in ("persona", "fecha", "que", "activo", "movimiento")} for e in eventos],
+              "ranking": [{k: r.get(k) for k in ("puesto", "id", "puntaje", "eventos", "ultimo_evento", "duro_20d")}
+                          for r in ranking if r.get("puntaje") is not None]}
     with open(os.path.join(RAIZ, "bin", "influencia.json"), "w", encoding="utf-8") as f:
         json.dump(salida, f, indent=1, ensure_ascii=False)
     print(len(personas), "personas,", len(eventos), "eventos")

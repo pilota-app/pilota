@@ -80,7 +80,10 @@ PERFILES = {
     # esa parte espera en USDT. Fue la que mejor aguantó el estudio de 103 fórmulas (nov 2026, ver AGENTS.md): le ganó a
     # comprar BTC en 2 de cada 3 ventanas de prueba, sobre todo porque sale antes de las caídas. Ver `lib_tendencia.pesos_cruce`.
     "tendencia": {"tipo": "tendencia", "temporalidades": ("1d",), "reparto": {"BTCUSDT": 0.6, "ETHUSDT": 0.4},
-                  "pares": ("BTCUSDT", "ETHUSDT"), "media": 50, "umbral": 0.02},
+                  "pares": ("BTCUSDT", "ETHUSDT"), "media": 50, "umbral": 0.02,
+                  # Dos frenos más (estudio de nov 2026): no compra 5 días después de un día de −5 % o peor, y espera en
+                  # USDT 5 días después de una mala noticia de una persona influyente (`lib_influencia.negativas`).
+                  "golpe": 0.05, "dias_freno": 5, "noticias": True},
 }
 #: Los que se ofrecen, en el orden de la pantalla. El resto está retirado (ver arriba).
 ORDEN = ("holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha",

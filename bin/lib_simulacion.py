@@ -37,6 +37,7 @@ import lib_holding
 import lib_indicadores_mercado
 import lib_perfiles
 import lib_rotacion
+import lib_influencia
 import lib_tendencia
 import lib_tamano
 import lib_universo
@@ -270,12 +271,22 @@ def inicio_posible(perfil, desde_ms, diarias=None):
     return inicio, inicio > desde_ms
 
 
+def _regla_tendencia(p):
+    """La regla del perfil tendencia con sus frenos (golpe y noticias), la misma que usa el robot en vivo."""
+    datos = lib_influencia.cargar() if p.get("noticias") else None
+
+    def regla(tramos, actuales, pasa, ms):
+        noticias = lib_influencia.negativas(ms, p["reparto"], p["dias_freno"], datos) if datos else None
+        return lib_tendencia.pesos_cruce(tramos, p["reparto"], p["media"], actuales, p.get("golpe"), p["dias_freno"], noticias)
+    return regla
+
+
 def _tendencia(perfil, monto, desde_ms, hasta_ms, com, diarias):
     """El perfil tendencia (`lib_tendencia.pesos_cruce`) sobre el pasado, con el mismo paso que usa el robot en vivo."""
     p = lib_perfiles.de(perfil)
     return lib_tendencia.simular(monto, {k: diarias.get(k) or [] for k in p["reparto"]}, desde_ms, hasta_ms,
                                  lib_universo.comisiones_de("USDT", com),
-                                 lambda tramos, actuales, pasa: lib_tendencia.pesos_cruce(tramos, p["reparto"], p["media"]),
+                                 _regla_tendencia(p),
                                  spread=lib_tendencia.SPREAD, umbral=p["umbral"])
 
 

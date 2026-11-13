@@ -335,11 +335,13 @@ def _vuelta_tendencia(d, ms, f, perfil=None):
             return {"decision": "sin_datos", "faltan": [par]}
         tramos[par] = [v[4] for v in velas[-p["media"] - 5:]]
         historia[par] = lib_tendencia.historia_cruce([v[4] for v in velas], p["media"])
-    filas = lib_tendencia.filas_cruce(tramos, p["reparto"], p["media"])
+    actuales = [par for par, q in (t.get("cantidad") or {}).items() if q > 0]
+    noticias = lib_influencia.negativas(ms, p["reparto"], p["dias_freno"]) if p.get("noticias") else None
+    filas = lib_tendencia.filas_cruce(tramos, p["reparto"], p["media"], actuales, p.get("golpe"), p["dias_freno"], noticias)
     if filas is None:
         return {"decision": "sin_datos"}
     puerta = lib_frenos.permite_entrada(f)
-    objetivo = lib_tendencia.pesos_cruce(tramos, p["reparto"], p["media"]) if puerta["puede"] else {}
+    objetivo = {x["par"]: x["parte"] for x in filas if x["parte"] > 0} if puerta["puede"] else {}
     hoy = {par: precio_fresco(par, ms) for par in set(objetivo) | set(t.get("cantidad") or {})}
     if any(not x for x in hoy.values()):
         return {"decision": "sin_datos", "faltan": [par for par, x in hoy.items() if not x]}
@@ -357,7 +359,8 @@ def _vuelta_tendencia(d, ms, f, perfil=None):
                                        "monto": m["monto"], "estado": "llenada"},
                                 resultado={"precio": m["precio"], "neto": m["ganancia"], "comision": m["comision"]})
     t["dia_ms"] = dia
-    t["filas"] = [{**{k: x[k] for k in ("par", "precio", "media", "sobre", "parte", "reparto")}, "historia": historia.get(x["par"])}
+    t["filas"] = [{**{k: x[k] for k in ("par", "precio", "media", "sobre", "parte", "reparto", "motivo", "golpe", "noticia")},
+                   "historia": historia.get(x["par"])}
                   for x in filas]
     t["frenado"] = not puerta["puede"]
     d["tendencia"] = t

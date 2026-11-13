@@ -29,7 +29,7 @@ def cargar(ruta=RUTA):
         with open(ruta, encoding="utf-8") as f:
             d = json.load(f)
     except (OSError, ValueError):
-        return {"eventos": [], "personas": {}, "al": None}
+        return {"eventos": [], "personas": {}, "ranking": [], "al": None}
     personas = {p["id"]: p["nombre"] for p in d.get("personas") or [] if isinstance(p, dict)
                 and isinstance(p.get("id"), str) and isinstance(p.get("nombre"), str)}
     eventos = []
@@ -41,7 +41,15 @@ def cargar(ruta=RUTA):
                         "persona": personas.get(e.get("persona")), "que": str(e.get("que") or "")[:160],
                         "dia": _numero(mov.get("dia")), "d20": _numero(mov.get("d20"))})
     eventos.sort(key=lambda e: e["ms"])
-    return {"eventos": eventos, "personas": personas, "al": d.get("al") if FECHA.match(str(d.get("al"))) else None}
+    ranking = []
+    for r in d.get("ranking") or []:
+        puntaje = r.get("puntaje") if isinstance(r, dict) else None
+        if isinstance(r, dict) and r.get("id") in personas and isinstance(puntaje, (int, float)) and 0 <= puntaje < 1000:
+            ranking.append({"nombre": personas[r["id"]], "puntaje": float(r["puntaje"]),
+                            "eventos": int(r.get("eventos") or 0), "ultimo": r.get("ultimo_evento") if FECHA.match(str(r.get("ultimo_evento"))) else None,
+                            "duro": _numero(r.get("duro_20d"))})
+    return {"eventos": eventos, "personas": personas, "ranking": ranking[:10],
+            "al": d.get("al") if FECHA.match(str(d.get("al"))) else None}
 
 
 def recientes(ms, activos, dias=30, datos=None):
@@ -50,4 +58,22 @@ def recientes(ms, activos, dias=30, datos=None):
     d = datos or cargar()
     activos = set(activos)
     lista = [e for e in d["eventos"] if e["persona"] and e["activo"] in activos and ms - dias * DIA_MS <= e["ms"] <= ms]
-    return {"eventos": lista[::-1][:5], "al": d["al"], "dias": dias}
+    return {"eventos": lista[::-1][:5], "al": d["al"], "dias": dias, "ranking": d["ranking"][:5]}
+
+
+def negativas(ms, pares, dias=5, datos=None):
+    """Las malas noticias que frenan la compra: por par, la noticia más nueva de una persona de la lista que bajó el precio
+    de esa moneda (o de BTC, que arrastra a todas) y que pasó en los últimos `dias` antes de `ms`. Es lo que pesa en la
+    decisión del perfil tendencia (`lib_tendencia.filas_cruce`): en el estudio de nov 2026, esperar en USDT esos días
+    mejoró la regla en el tramo de elegir y en el de probar."""
+    d = datos or cargar()
+    salida = {}
+    for par in pares:
+        moneda = par[:-len("USDT")] if par.endswith("USDT") else par
+        for e in reversed(d["eventos"]):
+            if (e["persona"] and e["activo"] in (moneda, "BTC") and e["dia"] is not None and e["dia"] < 0
+                    and e["ms"] < ms <= e["ms"] + dias * DIA_MS):
+                salida[par] = {"persona": e["persona"], "que": e["que"], "fecha": e["fecha"], "dia": e["dia"],
+                               "activo": e["activo"]}
+                break
+    return salida
