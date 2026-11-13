@@ -7,6 +7,8 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- Con la llave de Alpaca conectada, Tendencia y Rotación muestran las noticias de BTC y ETH al minuto. *With the Alpaca key
+  connected, Trend and Rotation show BTC and ETH news to the minute.*
 - Ahora puedes conectar una llave gratis de Alpaca en Ajustes para que Pilota lea las noticias de BTC y ETH con su hora
   exacta. La llave queda en el llavero de tu Mac. *You can now connect a free Alpaca key in Settings so Pilota reads BTC
   and ETH news with their exact time. The key stays in your Mac keychain.*

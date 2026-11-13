@@ -1549,6 +1549,20 @@
   "Conectar y probar": "Connect and test",
   "¿Desconectar la llave de Alpaca?": "Disconnect the Alpaca key?",
   "Borro la llave del llavero de este equipo. Pilota deja de leer noticias al minuto.": "I'll delete the key from this computer's keychain. Pilota stops reading news to the minute.",
-  "Llave de Alpaca conectada y probada.": "Alpaca key connected and tested."
+  "Llave de Alpaca conectada y probada.": "Alpaca key connected and tested.",
+  "Fed y tasas": "Fed and rates",
+  "Regulación": "Regulation",
+  "Hackeo": "Hack",
+  "Exchange": "Exchange",
+  "Aranceles": "Tariffs",
+  "ETF": "ETF",
+  "Trump": "Trump",
+  "Musk": "Musk",
+  "Conecta tu llave de Alpaca en Ajustes → «Noticias al minuto» y aquí vas a ver las noticias de BTC y ETH apenas salen.": "Connect your Alpaca key in Settings → “News to the minute” and you'll see BTC and ETH news here as soon as it comes out.",
+  "hace {n} min": "{n} min ago",
+  "hace {n} h": "{n} h ago",
+  "No pude traer las últimas noticias de Alpaca. Vuelvo a intentar en un minuto.": "I couldn't fetch the latest news from Alpaca. I'll try again in a minute.",
+  "Sin noticias de BTC ni ETH en las últimas {n} horas.": "No BTC or ETH news in the last {n} hours.",
+  "Las traigo cada minuto mientras Pilota está abierta. Por ahora son para mirar: si una noticia frena una compra lo decide la lista de personas influyentes, hasta que la medición al minuto diga qué tipo de noticia pesa.": "I fetch them every minute while Pilota is open. For now they're to look at: whether news pauses a buy is decided by the list of influential people, until the minute-level measurement says which kind of news matters."
  }
 }

@@ -429,7 +429,7 @@ window.PilotaVivo = (() => {
             <span class="radar-estado" data-estado="${estado === "tengo" ? "casi" : (estado === "puede" ? "espera" : "nada")}">${
               estado === "tengo" ? "La tengo" : (estado === "puede" ? "Podría entrar" : ((f.retorno || 0) <= 0 ? "Viene cayendo" : "Bajo su promedio"))}</span></li>`;
         }).join("")}</ol>
-        <p class="ayuda">Fuerza: cuánto subió en 30 días, dividido por cuánto se movió en el camino. Gana la que sube más parejo, no la que más salta. Solo entra una moneda que está sobre su promedio de 50 días, y cambio una solo cuando se cae del grupo: cada cambio paga comisión.</p></div>`;
+        <p class="ayuda">Fuerza: cuánto subió en 30 días, dividido por cuánto se movió en el camino. Gana la que sube más parejo, no la que más salta. Solo entra una moneda que está sobre su promedio de 50 días, y cambio una solo cuando se cae del grupo: cada cambio paga comisión.</p></div>${noticiasAhora((E.vivo || {}).alpaca)}`;
     }
     // La tendencia no espera un precio de entrada: mira si cada moneda está sobre su promedio de 50 días. Su tarjeta es eso.
     function cruce(E) {
@@ -454,7 +454,26 @@ window.PilotaVivo = (() => {
         <p class="ayuda">El número es cuánto está el precio sobre o bajo su promedio de los últimos 50 días. Cuando pasa de un lado al otro, compro o vendo esa parte.</p></div>
         ${comoDecido()}
         ${quePaso(filas)}
+        ${noticiasAhora(v.alpaca)}
         ${noticias(v.noticias)}`;
+    }
+    // Las noticias al minuto de Alpaca (bin/lib_alpaca.py): las trae el flujo en vivo cada minuto si la persona conectó su llave.
+    const TIPO_NOTICIA = { trump: "Trump", musk: "Musk", fed: "Fed y tasas", regulacion: "Regulación", etf: "ETF", hackeo: "Hackeo", exchange: "Exchange", aranceles: "Aranceles" };
+    function noticiasAhora(A) {
+      if (!A) return "";
+      if (!A.conectado) {
+        return `<div class="tarjeta noticias-ahora"><h3>Noticias al minuto</h3>
+          <p class="suave">Conecta tu llave de Alpaca en Ajustes → «Noticias al minuto» y aquí vas a ver las noticias de BTC y ETH apenas salen.</p></div>`;
+      }
+      const lista = A.noticias || [];
+      const hace = (ms) => { const m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 60 ? frase("hace {n} min", { n: numero(m, 0) }) : frase("hace {n} h", { n: numero(Math.round(m / 60), 0) }); };
+      return `<div class="tarjeta noticias-ahora"><h3>Noticias al minuto</h3>
+        ${A.motivo ? `<p class="freno-texto">No pude traer las últimas noticias de Alpaca. Vuelvo a intentar en un minuto.</p>` : ""}
+        ${lista.length ? `<ul class="noticias-filas">${lista.map((n) => `<li><span class="suave">${hace(n.ms)}</span>
+            ${(n.tipos || []).map((t) => `<span class="chip-tipo">${Tp(TIPO_NOTICIA[t] || t)}</span>`).join("")}
+            <span data-sin-traducir>${esc(n.titular)}</span></li>`).join("")}</ul>`
+          : `<p class="suave">${frase("Sin noticias de BTC ni ETH en las últimas {n} horas.", { n: numero(A.horas || 24, 0) })}</p>`}
+        <p class="ayuda">Las traigo cada minuto mientras Pilota está abierta. Por ahora son para mirar: si una noticia frena una compra lo decide la lista de personas influyentes, hasta que la medición al minuto diga qué tipo de noticia pesa.</p></div>`;
     }
     // Cómo pesa cada cosa en la decisión, con lo que mejoró en el estudio de nov 2026 (AGENTS.md: «Los perfiles y el robot
     // en vivo»). Los números son de las ventanas de prueba (desde nov 2023), las que nadie miró al elegir las reglas.

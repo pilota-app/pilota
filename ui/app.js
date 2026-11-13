@@ -2824,8 +2824,10 @@
         { fecha: "2026-11-02", persona: "Persona de ejemplo", que: "Noticia inventada para la vista previa", activo: "BTC", dia: 0.031 }],
         ranking: [{ nombre: "Persona de ejemplo", puntaje: 3.9, eventos: 14, ultimo: "2026-11-02", duro: 0.43 },
           { nombre: "Otra persona de ejemplo", puntaje: 0.6, eventos: 4, ultimo: "2026-02-03", duro: 1 }] };
+      const alpaca = { conectado: true, horas: 24, traido_ms: Date.now(), noticias: [
+        { id: 1, ms: Date.now() - 12 * 60000, titular: "Titular inventado para la vista previa", simbolos: ["BTCUSD"], tipos: ["fed"] }] };
       return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
-        ganancia_relativa: valor / m - 1, efectivo: m * 0.4, posiciones: [], tenencias, tendencia, noticias,
+        ganancia_relativa: valor / m - 1, efectivo: m * 0.4, posiciones: [], tenencias, tendencia, noticias, alpaca,
         ultima: { decision: "mantiene", tiene: ["BTCUSDT"] },
         movimientos: [linea(t0 + 120000, "tendencia_espera", "ETHUSDT", {}, { por: "noticia", motivo: "persona-de-ejemplo", fecha: "2026-11-02" }),
           linea(t0 + 60000, "tendencia_compra", "BTCUSDT", { precio: 96100, monto: m * 0.6 }, { por: "sobre_media" }),

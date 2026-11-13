@@ -22,6 +22,7 @@ Lo que no se negocia aquí:
 import json
 import os
 
+import lib_alpaca
 import lib_costos
 import lib_datos
 import lib_ejecutor_prueba
@@ -605,6 +606,7 @@ def estado(ahora_ms=None, minutos=None):
             "tendencia": d.get("tendencia") if perfil and perfil["tipo"] == "tendencia" else None,
             "noticias": (lib_influencia.recientes(ms, [lib_universo.MONEDA.get(x, x) for x in perfil["reparto"]])
                          if perfil and perfil["tipo"] == "tendencia" else None),
+            "alpaca": lib_alpaca.recientes(ms) if perfil and perfil["tipo"] in ("tendencia", "rotar") else None,
             "pares": list(lib_perfiles.pares_de(d.get("perfil"))) if perfil else [],
             # Las reglas del perfil puesto, para que la pantalla diga su plan con los mismos números.
             "reglas": {k: (list(x) if isinstance(x, tuple) else x) for k, x in (perfil or {}).items()},

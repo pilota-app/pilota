@@ -14,6 +14,7 @@ Lo que no se negocia aquí:
 """
 import datetime
 import json
+import os
 import re
 import urllib.error
 import urllib.parse
@@ -32,6 +33,7 @@ SIMBOLOS = ("BTCUSD", "ETHUSD")
 TIEMPO = 20
 MAXIMO = 2_000_000
 TITULAR = 200
+DIA_MS = 86_400_000
 MOTIVOS = ("formato", "sin_llavero", "rechazada", "sin_red", "respuesta", "no_guardo")
 
 
@@ -136,3 +138,72 @@ def revisar():
 def desconectar():
     lib_llavero.borrar(SERVICIO, FORMATOS)
     return {**estado(), "ok": True}
+
+
+# ── Las noticias al día, en disco (las trae el flujo en vivo; la pantalla y las decisiones leen de aquí) ─────────────
+GUARDAR_DIAS = 7
+GUARDAR_MAXIMO = 500
+TRAER_CADA_S = 60
+
+
+def ruta():
+    import nucleo
+    return os.path.join(nucleo.carpeta_privada(os.path.join(nucleo.carpeta_datos(), "noticias")), "alpaca.json")
+
+
+def guardadas():
+    try:
+        with open(ruta(), encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return {"formato": 1, "noticias": [], "traido_ms": 0}
+    lista = [n for n in (d.get("noticias") or []) if isinstance(n, dict) and isinstance(n.get("ms"), int)
+             and isinstance(n.get("titular"), str) and isinstance(n.get("id"), int)]
+    return {"formato": 1, "noticias": lista, "traido_ms": int(d.get("traido_ms") or 0), "motivo": d.get("motivo")}
+
+
+def al_dia(ms):
+    """Trae las noticias nuevas desde la última guardada y las deja en disco (las de los últimos `GUARDAR_DIAS`). Sin
+    llave no hace nada. Un fallo queda como código (`motivo`) y no borra lo que ya había."""
+    llave = guardada()
+    if not llave:
+        return None
+    d = guardadas()
+    desde = max([n["ms"] for n in d["noticias"]] or [ms - DIA_MS])
+    try:
+        nuevas = noticias(*llave, desde_ms=desde, limite=50)
+        motivo = None
+    except Falla as e:
+        nuevas, motivo = [], e.motivo
+    por_id = {n["id"]: n for n in d["noticias"]}
+    for n in nuevas:
+        por_id[n["id"]] = {**n, "tipos": tipos_de(n["titular"])}
+    lista = sorted((n for n in por_id.values() if n["ms"] >= ms - GUARDAR_DIAS * DIA_MS), key=lambda n: n["ms"])
+    salida = {"formato": 1, "noticias": lista[-GUARDAR_MAXIMO:], "traido_ms": ms if motivo is None else d["traido_ms"],
+              "motivo": motivo}
+    temporal = ruta() + ".tmp"
+    with open(temporal, "w", encoding="utf-8") as f:
+        json.dump(salida, f, ensure_ascii=False)
+    os.replace(temporal, ruta())
+    return salida
+
+
+#: De qué habla una noticia, por palabras del titular (en inglés: Benzinga escribe en inglés).
+TIPOS = {
+    "trump": ("trump",), "musk": ("musk", "tesla"), "fed": ("fed ", "powell", "warsh", "rate cut", "rate hike", "fomc"),
+    "regulacion": ("sec ", "regulat", "lawsuit", "clarity act", "ban "), "etf": ("etf",),
+    "hackeo": ("hack", "exploit", "stolen"), "exchange": ("binance", "coinbase"), "aranceles": ("tariff",),
+}
+
+
+def tipos_de(titular):
+    t = (titular or "").lower()
+    return [k for k, palabras in TIPOS.items() if any(p in t for p in palabras)]
+
+
+def recientes(ms, horas=24):
+    """Lo que lee la pantalla: las noticias de las últimas `horas`, la más nueva primero, sin tocar la red."""
+    d = guardadas()
+    lista = [n for n in d["noticias"] if ms - horas * 3_600_000 <= n["ms"] <= ms]
+    return {"conectado": guardada() is not None, "noticias": lista[::-1][:8], "traido_ms": d["traido_ms"],
+            "motivo": d.get("motivo"), "horas": horas}

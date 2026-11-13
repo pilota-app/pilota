@@ -25,6 +25,7 @@ Lo que no se negocia aquí:
 import threading
 import time
 
+import lib_alpaca
 import lib_candado
 import lib_datos
 import lib_ejecutor_prueba
@@ -244,8 +245,16 @@ def _encender(flujo, cliente, ciclos, latir, reloj, dormir, prepara=True):
         while not t.detenido() and not lib_candado.huerfano():
             preparar_universo(lib_datos.Binance(), t.detenido)
             lib_trabajo.esperar(PREPARAR_CADA, dormir=time.sleep, detenido=t.detenido, trozo=1)
+    def noticiando():                       # las noticias de Alpaca, si la persona conectó su llave (Ajustes)
+        while not t.detenido() and not lib_candado.huerfano():
+            try:
+                lib_alpaca.al_dia(_ms())
+            except (OSError, ValueError):
+                pass                         # sin noticias no se inventa nada: la pantalla dice desde cuándo no llegan
+            lib_trabajo.esperar(lib_alpaca.TRAER_CADA_S, dormir=time.sleep, detenido=t.detenido, trozo=1)
     if prepara and not ciclos:              # en las pruebas (`ciclos`) no se baja nada en segundo plano
         threading.Thread(target=preparando, daemon=True).start()
+        threading.Thread(target=noticiando, daemon=True).start()
 
     def publicar(eventos=None, piloto=None, vivo=None, forzar=False):
         if not forzar and not eventos and reloj() - ultimo_pub[0] < PUBLICAR_CADA:

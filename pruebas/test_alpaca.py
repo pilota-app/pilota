@@ -86,6 +86,28 @@ class Alpaca(unittest.TestCase):
         self.responde = {"otra": "cosa"}
         self.assertEqual(lib_alpaca.conectar(LLAVE, SECRETO)["motivo"], "respuesta")
 
+    def test_al_dia_guarda_las_nuevas_y_la_pantalla_las_lee_sin_red(self):
+        import tempfile
+        carpeta = tempfile.mkdtemp()
+        antes = os.environ.get("PILOTA_DATOS")
+        os.environ["PILOTA_DATOS"] = carpeta
+        self.addCleanup(lambda: os.environ.__setitem__("PILOTA_DATOS", antes) if antes else os.environ.pop("PILOTA_DATOS", None))
+        self.assertIsNone(lib_alpaca.al_dia(1_794_571_200_000), "sin llave no hace nada")
+        lib_alpaca.conectar(LLAVE, SECRETO)
+        self.responde = {"news": [{"id": 9, "created_at": "2026-11-13T12:00:00Z", "headline": "Fed rate cut and Trump tariff",
+                                   "symbols": ["BTCUSD"]}]}
+        ms = 1_794_571_200_000 + 60_000
+        lib_alpaca.al_dia(ms)
+        self.pedidos.clear()
+        r = lib_alpaca.recientes(ms)
+        self.assertEqual(self.pedidos, [], "la pantalla no sale a la red")
+        self.assertEqual([n["id"] for n in r["noticias"]], [9])
+        self.assertEqual(r["noticias"][0]["tipos"], ["trump", "fed", "aranceles"])
+        self.responde = lib_alpaca.Falla("sin_red")
+        lib_alpaca.al_dia(ms + 60_000)
+        self.assertEqual(lib_alpaca.recientes(ms)["motivo"], "sin_red")
+        self.assertEqual(len(lib_alpaca.recientes(ms)["noticias"]), 1, "un fallo no borra lo que había")
+
 
 if __name__ == "__main__":
     unittest.main()
