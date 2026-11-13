@@ -34,7 +34,9 @@ import lib_estrategias
 import lib_frenos
 import lib_indicadores_mercado
 import lib_perfiles
+import lib_rotacion
 import lib_tamano
+import lib_universo
 
 #: Los períodos que se pueden elegir, en días.
 PERIODOS = (30, 90, 180, 365, 1095)
@@ -249,24 +251,52 @@ def holding(monto, desde_ms, hasta_ms, com, series=None):
             "movimientos_total": len(movimientos), "tenencias": tenencias, "efectivo": efectivo}
 
 
-def ops_rapidas(temporalidad="5m", com=None, minutos=None):
-    """Las operaciones del perfil más rápido: las mismas reglas del backtest sobre velas de 5 m armadas con las de 1 m
-    (solo hay los últimos `lib_datos.DIAS_MINUTOS` días)."""
+def ops_de(pares, temporalidad, com=None, minutos=None, desde_ms=None):
+    """Las operaciones que habrían dado las reglas de siempre en esas monedas y esa vela, con los costos de cada una (contra
+    USDT no hay conversión). Las de 5 m se arman con las de 1 m (solo hay los últimos `lib_datos.DIAS_MINUTOS` días)."""
     btc = lib_datos.leer_serie(lib_indicadores_mercado.CONTEXTO_PAR, lib_estrategias.TEMPORALIDAD_DIARIA)
     filtro = lib_estrategias.filtro_en(btc) if len(btc) >= backtest.VELAS_MINIMAS else None
     modelo = lib_costos.modelo()
+    paso = lib_datos.PASO_MS[temporalidad]
     ops = []
-    for par in lib_datos.PARES_OPERADOS:
-        dia = lib_datos.leer_serie(lib_estrategias.PAR_DIARIO[par], lib_estrategias.TEMPORALIDAD_DIARIA)
+    for par in pares:
+        dia = lib_datos.leer_serie(lib_estrategias.PAR_DIARIO.get(par, par), lib_estrategias.TEMPORALIDAD_DIARIA)
         al_alza = lib_estrategias.al_alza_en(dia) if len(dia) >= backtest.VELAS_MINIMAS else None
-        uno = (minutos or {}).get(par) if minutos is not None else lib_datos.leer_serie(par, lib_datos.MINUTO)
-        velas = lib_perfiles.agrupar(uno or [], lib_perfiles.AGRUPADAS[temporalidad])
+        if temporalidad in lib_perfiles.AGRUPADAS:
+            uno = (minutos or {}).get(par) if minutos is not None else lib_datos.leer_serie(par, lib_datos.MINUTO)
+            velas = lib_perfiles.agrupar(uno or [], lib_perfiles.AGRUPADAS[temporalidad])
+        else:
+            velas = lib_datos.leer_serie(par, temporalidad)
+        if desde_ms:                         # lo justo para que los indicadores lleguen calientes al período
+            velas = [v for v in velas if v[0] >= desde_ms - 400 * paso]
         if len(velas) < backtest.VELAS_MINIMAS:
             continue
         senales = backtest.senales_de(par, temporalidad, velas, al_alza=al_alza, filtro=filtro)
-        ops.extend(backtest.recorrer(velas, senales, lib_costos.spread_de(modelo, par), com))
+        c = lib_universo.comisiones_de(par, com)
+        ops.extend(backtest.recorrer(velas, senales, lib_costos.spread_de(modelo, par), c))
     return [o for o in ops if not o.get("motivo") and o.get("llenada") and o.get("permitida")
             and o.get("neto") is not None]
+
+
+def ops_rapidas(temporalidad="5m", com=None, minutos=None, pares=None):
+    """Las operaciones del perfil más rápido (velas de 5 m armadas con las de 1 m)."""
+    return ops_de(pares or lib_perfiles.pares_de("scalper"), temporalidad, com, minutos)
+
+
+def rotacion(monto, desde, hasta, com, diarias=None, btc=None):
+    """La rotación (`lib_rotacion`) sobre el pasado, con las 8 monedas del robot."""
+    p = lib_perfiles.de("rotacion")
+    pares = lib_perfiles.pares_de("rotacion")
+    diarias = diarias if diarias is not None else {par: lib_datos.leer_serie(par, "1d") for par in pares}
+    btc = btc if btc is not None else lib_datos.leer_serie(lib_indicadores_mercado.CONTEXTO_PAR, "1d")
+    r = lib_rotacion.simular(monto, {k: v for k, v in diarias.items() if v}, btc, desde, hasta,
+                             lib_universo.comisiones_de("USDT", com), posiciones=p["posiciones"], dias=p["dias_fuerza"],
+                             media=p["media"], margen=p["margen"])
+    if r.get("listo"):
+        r["curva"] = ralear(r["curva"])
+        r["movimientos"] = r["movimientos"][-MOVIMIENTOS:]
+        r.pop("tenencias", None)
+    return r
 
 
 def comparar(monto, dias, recorrido, minimo=None, rapidas=None):
@@ -278,8 +308,6 @@ def comparar(monto, dias, recorrido, minimo=None, rapidas=None):
     monto, desde, hasta = base["monto"], base["desde_ms"], base["hasta_ms"]
     pares, _ = lib_tamano.filtros_de(minimo)
     com = base["comisiones"]
-    ops = [o for o in ((recorrido or {}).get("todas") or [])
-           if not o.get("motivo") and o.get("llenada") and o.get("permitida") and o.get("neto") is not None]
     salida = []
     for perfil in lib_perfiles.ORDEN:
         p = lib_perfiles.de(perfil)
@@ -287,11 +315,17 @@ def comparar(monto, dias, recorrido, minimo=None, rapidas=None):
             r = holding(monto, desde, hasta, com)
             salida.append({"perfil": perfil, "desde_ms": desde, "hasta_ms": hasta, "recortado": False, **r})
             continue
-        d, recortado, propias = desde, False, ops
+        if p["tipo"] == "rotar":
+            r = rotacion(monto, desde, hasta, com)
+            salida.append({"perfil": perfil, "desde_ms": desde, "hasta_ms": hasta, "recortado": False, **r})
+            continue
+        d, recortado = desde, False
         if p.get("dias_max"):
             d = max(desde, hasta - p["dias_max"] * lib_datos.DIA_MS)
             recortado = d > desde
             propias = rapidas if rapidas is not None else ops_rapidas(p["temporalidades"][0], com)
+        else:
+            propias = [o for t in p["temporalidades"] for o in ops_de(lib_perfiles.pares_de(perfil), t, com, desde_ms=d)]
         r = cartera(propias, monto, pares, com, None, d, hasta, perfil=perfil)
         salida.append({"perfil": perfil, "desde_ms": d, "hasta_ms": hasta, "recortado": recortado,
                        "listo": r["operaciones"] > 0, "motivo": "" if r["operaciones"] > 0 else "sin_operaciones", **r})

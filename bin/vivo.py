@@ -22,6 +22,7 @@ Lo que no se negocia aquí:
 - **Si la app se cierra de golpe, el trabajo termina solo** (`lib_candado.huerfano`): nunca queda un robot suelto.
 - **Si el flujo se cae, se vuelve a conectar** con una espera que crece hasta `ESPERA_MAXIMA`, y la pantalla lo dice.
 """
+import threading
 import time
 
 import lib_candado
@@ -35,6 +36,7 @@ import lib_radar
 import lib_reconciliar
 import lib_registro
 import lib_trabajo
+import lib_universo
 import muestreo
 import nucleo
 
@@ -46,6 +48,10 @@ PUBLICAR_CADA = 1.0
 ESPERA_MAXIMA = 30
 #: Si una vela de 1 m cerró en un par y el otro no avisa, la revisión se hace igual después de este rato.
 ESPERA_PAR_MS = 5000
+#: Cada cuánto se vuelven a revisar los datos de las ocho monedas (mínimos y velas largas), en segundo plano.
+PREPARAR_CADA = 6 * 3600
+#: Las velas largas de las ocho que se ponen al día justo cuando cierran (las de 1 m llegan por el flujo).
+LARGAS = ("1h", "4h", "1d")
 #: Las temporalidades del gráfico y cuántas velas se mandan de cada una.
 TEMPORALIDADES_GRAFICO = ("1m", "5m", "1h", "4h")
 VELAS_GRAFICO = 260
@@ -115,6 +121,10 @@ def con_vela(formandose, v):
     return [actual[0], actual[1], max(actual[2], v["h"]), min(actual[3], v["l"]), v["c"], actual[5]]
 
 
+#: Cuántas velas de 1 m se guardan de cada par: los últimos `lib_datos.DIAS_MINUTOS` días, ni una más.
+MINUTOS_GUARDADOS = lib_datos.DIAS_MINUTOS * 24 * 60
+
+
 def guardar_minuto(cliente, v):
     """Agrega a lo guardado la vela de 1 m que acaba de cerrar. Si falta alguna antes (el flujo se cortó), se piden a la API
     las que falten: la serie de 1 m es la que dice qué se cruzó, y no puede tener hoyos."""
@@ -127,7 +137,7 @@ def guardar_minuto(cliente, v):
             lib_datos.guardar_serie(par, lib_datos.MINUTO, velas)
         return 0
     if velas and velas[-1][0] + MINUTO_MS == v["t"]:
-        lib_datos.guardar_serie(par, lib_datos.MINUTO, [*velas, nueva])
+        lib_datos.guardar_serie(par, lib_datos.MINUTO, [*velas, nueva][-MINUTOS_GUARDADOS:])
         return 1
     try:
         return lib_datos.bajar_serie(cliente, par, lib_datos.MINUTO, dias=lib_datos.DIAS_MINUTOS,
@@ -142,10 +152,45 @@ def eventos_desde(ambiente, desde_ms):
     return [x for x in reversed(lineas) if int(x.get("ms") or 0) > desde_ms]
 
 
+def largas_al_dia(cliente, ms, pares):
+    """Las velas de 1 h, 4 h y 1 d de esas monedas, puestas al día en el minuto en que cierran: así el perfil decide con la
+    vela recién cerrada y no una hora tarde. Solo se pide lo nuevo."""
+    hechas = 0
+    for t in LARGAS:
+        if ms % lib_datos.PASO_MS[t]:
+            continue
+        for par in pares:
+            lib_datos.bajar_serie(cliente, par, t, dias=lib_universo.DIAS[t], ahora_ms=ms)
+            hechas += 1
+    return hechas
+
+
+def pares_del_perfil():
+    """Las monedas del perfil puesto (o del sugerido) que ya tienen sus datos."""
+    perfil = lib_piloto.guardado().get("perfil") or lib_perfiles.SUGERIDO
+    return tuple(p for p in lib_perfiles.pares_de(perfil) if p in LISTOS)
+
+
+#: Las monedas de las ocho que ya tienen sus datos (`lib_universo.listo`). Lo llena la preparación en segundo plano.
+LISTOS = set()
+
+
+def preparar_universo(cliente, detenido, ms=None):
+    """Baja lo que falte de las ocho monedas y anota cuáles quedaron listas. Corre en un hilo aparte: el flujo no espera."""
+    try:
+        lib_universo.preparar(cliente, ms or _ms(), detenido=detenido)
+    except (lib_datos.Limitado, lib_datos.Temporal, lib_datos.Respuesta, OSError, ValueError):
+        pass
+    for par in lib_universo.PARES:
+        if lib_universo.listo(par):
+            LISTOS.add(par)
+
+
 def revisar(cliente, ms, desde_ms):
     """La revisión del instante en que cerró una vela: las velas largas al día, reconciliar y decidir. Devuelve lo que pasó."""
     try:
         muestreo.velas_al_dia(cliente, ms)
+        largas_al_dia(cliente, ms, pares_del_perfil())
     except (lib_datos.Limitado, lib_datos.Temporal, lib_datos.Respuesta):
         pass                                 # sin las velas largas la decisión dice «sin_datos»: no se inventa nada
     resumen = {}
@@ -167,7 +212,7 @@ def encender(d=None, flujo=None, cliente=None, ciclos=0, latir=True, reloj=time.
         return {"ok": False, "datos": estado()["datos"], "error": "ya_corriendo"}
 
 
-def _encender(flujo, cliente, ciclos, latir, reloj, dormir):
+def _encender(flujo, cliente, ciclos, latir, reloj, dormir, prepara=True):
     t = lib_trabajo.nuevo(TIPO, ETAPAS, {}, latir=latir)
     plan = {"formato": 1, "estado": "corriendo", "trabajo": t.id, "conectado": False, "reconexiones": 0, "error": "",
             "revision_ms": 0}
@@ -176,6 +221,14 @@ def _encender(flujo, cliente, ciclos, latir, reloj, dormir):
     flujo = flujo or lib_flujo.Flujo()
     formandose, cerradas, visto = {}, {}, _ms()
     ultimo_pub, espera, conexiones = [0.0], 1, 0
+
+    def preparando():                       # con su propio cliente: el del flujo es de este hilo
+        LISTOS.update(p for p in lib_universo.PARES if lib_universo.listo(p))
+        while not t.detenido() and not lib_candado.huerfano():
+            preparar_universo(lib_datos.Binance(), t.detenido)
+            lib_trabajo.esperar(PREPARAR_CADA, dormir=time.sleep, detenido=t.detenido, trozo=1)
+    if prepara and not ciclos:              # en las pruebas (`ciclos`) no se baja nada en segundo plano
+        threading.Thread(target=preparando, daemon=True).start()
 
     def publicar(eventos=None, piloto=None, vivo=None, forzar=False):
         if not forzar and not eventos and reloj() - ultimo_pub[0] < PUBLICAR_CADA:
@@ -214,12 +267,15 @@ def _encender(flujo, cliente, ciclos, latir, reloj, dormir):
             for v in flujo.velas(detenido=t.detenido):
                 formandose[v["par"]] = con_vela(formandose, v)
                 if v["intervalo"] == "1m" and v["cerrada"]:
-                    guardar_minuto(cliente, v)
+                    # Las de las ocho se guardan cuando ya tienen su historia: antes, la bajada en segundo plano las trae.
+                    if v["par"] in lib_datos.PARES_OPERADOS or v["par"] in LISTOS:
+                        guardar_minuto(cliente, v)
                     cerradas.setdefault(v["t"], set()).add(v["par"])
-                # Cuando cerró el minuto en los dos pares (o uno ya esperó bastante), se revisa al tiro.
+                # Cuando cerró el minuto en todos los pares que importan (o ya se esperó bastante), se revisa al tiro.
+                esperados = set(lib_datos.PARES_OPERADOS) | set(pares_del_perfil())
                 for minuto in sorted(cerradas):
                     listos = cerradas[minuto]
-                    if len(listos) >= len(lib_datos.PARES_OPERADOS) or _ms() - (minuto + MINUTO_MS) > ESPERA_PAR_MS:
+                    if esperados <= listos or _ms() - (minuto + MINUTO_MS) > ESPERA_PAR_MS:
                         del cerradas[minuto]
                         revision(minuto + MINUTO_MS)
                 publicar()
@@ -286,7 +342,7 @@ def niveles_de(par):
 
 def grafico(d=None, ahora_ms=None):
     d = d if isinstance(d, dict) else {}
-    par = d.get("par") if d.get("par") in lib_datos.PARES_OPERADOS else lib_datos.PARES_OPERADOS[0]
+    par = d.get("par") if d.get("par") in lib_flujo.PARES else lib_datos.PARES_OPERADOS[0]
     temporalidad = d.get("temporalidad") if d.get("temporalidad") in TEMPORALIDADES_GRAFICO else "1m"
     velas = velas_grafico(par, temporalidad)
     return {"ok": True, "datos": {"par": par, "temporalidad": temporalidad, "paso_ms": lib_datos.PASO_MS[temporalidad],

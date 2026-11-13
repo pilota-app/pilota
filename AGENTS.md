@@ -64,6 +64,8 @@ cuentas ni publicidad; nada personal en el código (Ana Pérez, Matías Soto). B
 | `bin/vivo.py` | Las acciones del robot en vivo: `estado`, `empezar` (perfil y monto), `detener`, `grafico` (velas, marcas de compra y venta y líneas de lo abierto) y el trabajo `encender` (el flujo de Binance al segundo: guarda cada vela de 1 m al cerrar y revisa en ese mismo instante). |
 | `bin/lib_flujo.py` | El flujo de Binance en vivo por WebSocket, solo biblioteca estándar: un solo destino (`HOST`, `PUERTO`, `ruta_de`), el saludo revisado, marcos con tope, ping/pong, silencio que corta (`SILENCIO_MAXIMO`) y cada mensaje revisado (`vela_de`). Solo lectura. No es una acción. |
 | `bin/lib_radar.py` | Qué está esperando el robot: por par y temporalidad del perfil, el gatillo de cada estrategia (a qué precio tendría que cerrar la vela), cuánto falta (`distancia`, `cerca`), la operación posible (entrada, stop, objetivo y `rr`, y si el perfil la acepta) y la historia de esa misma jugada (`estadisticas`, `agrupar`, `al_dia`: ganadas de cuántas y lo que dejó en promedio). Lo escribe el flujo en vivo en `mercado/radar.json`. No decide nada. No es una acción. |
+| `bin/lib_universo.py` | Las ocho monedas del robot en prueba contra USDT (`lib_datos.UNIVERSO`: BTC, ETH, BNB, SOL, XRP, ADA, TRX y DOGE): sus mínimos de Binance (`filtros`, una vez al día en `mercado/universo.json`), sus velas (`preparar`: 3 años de 1 d, 4 h y 1 h y 3 días de 1 m) y sus costos (`comisiones_de`: contra USDT no hay conversión). Lo corre el flujo en vivo en segundo plano. No es una acción. |
+| `bin/lib_rotacion.py` | La rotación: la fuerza de cada moneda (`fuerza`: lo que subió en 30 días dividido por cuánto se movió), el ranking, a cuáles pasarse (`elegir`, con margen para no cambiar por nada) y la misma regla sobre el pasado (`simular`). Pura: no lee el disco. No es una acción. |
 | `bin/lib_candado.py` | Una sola cosa a la vez entre procesos: un solo trabajo de cada tipo (`unico`, `YaCorriendo`), una revisión a la vez (`candado`) y el trabajo que quedó sin app (`huerfano`). No es una acción. |
 | `ui/grafico.js` | El gráfico de velas en vivo en un `<canvas>` (`PilotaGrafico.crear`): 1 m, 5 m, 1 h y 4 h, Bollinger, medias, volumen y RSI con un botón, las flechas de compra y venta, las líneas de entrada, stop y objetivo, el precio que se mueve cada segundo y el destello de color de cada operación. |
 | `bin/lib_simulacion.py` | «Si hubiera puesto X»: el historial como una cartera con tamaño y frenos (`cartera`, con `perfil` y sus `movimientos`), comprar BTC y esperar, el holding por partes (`holding`), el scalper sobre 5 m (`ops_rapidas`) y los cinco perfiles lado a lado (`comparar`). No es una acción (la corre `bin/simular.py`). |
@@ -101,7 +103,8 @@ Reglas que no se cambian sin pensarlo dos veces (`bin/lib_datos.py`):
 - **Solo velas cerradas.** La vela en curso no se guarda: sus valores todavía pueden cambiar.
 - **La red solo va a `api.binance.com` por https**, solo a las rutas de `RUTAS`, sin redirecciones y sin los proxies del entorno.
   Mientras Pilota no tenga la pieza «Red», el candado vive en `pedir_api`. La única otra salida es el flujo público de velas en
-  vivo (`bin/lib_flujo.py`): `stream.binance.com:9443` por TLS, solo la ruta de velas de los pares que se operan, solo lectura.
+  vivo (`bin/lib_flujo.py`): `stream.binance.com:9443` por TLS, solo la ruta de velas de los pares conocidos (`lib_flujo.PARES`: los dos contra FDUSD y
+  las ocho contra USDT), solo lectura.
 - **Los límites de la API se respetan**: ante 429 o 418 se espera lo que pide Binance (`Retry-After`, tope `ESPERA_MAXIMA`) y se
   reintenta hasta `INTENTOS` veces; igual ante un 5xx o un corte de red.
 - **Continuidad antes de calcular**: `huecos()` revisa paso por paso (hora por hora en `1h`). Una serie con hoyos, corta o
@@ -648,6 +651,16 @@ Reglas que no se cambian sin pensarlo dos veces:
   compraría, cuánto falta y por qué la otra jugada no aplica. La probabilidad que muestra es la **historia** de esa jugada
   (las operaciones que de verdad habría hecho en el pasado), siempre con cuántas fueron y dicha como pasado, no como promesa.
   Cada entrada guarda esa historia en `piloto.json` (`jugadas`) para mostrarla junto a la compra.
+- **Cada perfil opera sus monedas** (`lib_perfiles`: `pares`, `pares_de`), todas contra USDT y solo en prueba. El dinero real
+  sigue en BTC y ETH contra FDUSD (`lib_datos.PARES_OPERADOS`) hasta que estas monedas pasen su prueba en vivo: el conector
+  real no las conoce. Las de las ocho se preparan solas en segundo plano (`vivo.preparar_universo`), sus velas largas se piden
+  en el minuto en que cierran (`vivo.largas_al_dia`) y sus velas de 1 m se guardan cuando ya tienen historia y nunca más de
+  `lib_datos.DIAS_MINUTOS` días.
+- **La rotación decide una vez al día** (`lib_piloto._vuelta_rotacion`): al cerrar la vela diaria ordena las ocho por fuerza,
+  tiene las `posiciones` mejores que estén sobre su promedio y cambia una solo cuando sale de los `posiciones + margen`
+  primeros. Compra y vende a mercado con la comisión taker y la diferencia de puntas, y solo con un precio de 1 m fresco
+  (`PRECIO_FRESCO_MS`). Si BTC cae o hay un freno, vende todo y espera en USDT. Cada cambio queda en el registro
+  (`rotacion_compra`, `rotacion_venta`).
 - **El gráfico no decide nada**: muestra las velas guardadas más la que se está formando, las marcas del registro y las líneas
   de lo abierto. Sus indicadores se calculan en la pantalla con las mismas fórmulas de `lib_indicadores*`.
 

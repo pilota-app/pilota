@@ -6,7 +6,11 @@
 window.PilotaGrafico = (() => {
   "use strict";
 
-  const PARES = [["BTCFDUSD", "BTC"], ["ETHFDUSD", "ETH"]];
+  // Las ocho monedas que mira el robot, contra USDT (bin/lib_datos.py: UNIVERSO).
+  const PARES = [["BTCUSDT", "BTC"], ["ETHUSDT", "ETH"], ["BNBUSDT", "BNB"], ["SOLUSDT", "SOL"], ["XRPUSDT", "XRP"],
+    ["ADAUSDT", "ADA"], ["TRXUSDT", "TRX"], ["DOGEUSDT", "DOGE"]];
+  // Los decimales de un precio según su tamaño: BTC con 2 y DOGE con 5, para que el cambio se vea.
+  const DECIMALES = (p) => (p >= 100 ? 2 : (p >= 1 ? 3 : (p >= 0.1 ? 4 : 5)));
   const TEMPORALIDADES = [["1m", "1 min"], ["5m", "5 min"], ["1h", "1 hora"], ["4h", "4 horas"]];
   const PASO = { "1m": 60000, "5m": 300000, "1h": 3600000, "4h": 14400000 };
   // Los indicadores que se pueden prender: id, nombre y si viene prendido.
@@ -60,11 +64,14 @@ window.PilotaGrafico = (() => {
     function estadoInicial() {
       return { layout: "robot", ancho: 9, precios: {}, cambio: {}, robot: {},
         ind: Object.fromEntries(INDICADORES.map(([id, , si]) => [id, si])),
-        paneles: [panel("BTCFDUSD", "1m"), panel("ETHFDUSD", "1m"), panel("BTCFDUSD", "5m"), panel("ETHFDUSD", "5m")] };
+        paneles: [panel("BTCUSDT", "1m"), panel("ETHUSDT", "1m"), panel("BTCUSDT", "5m"), panel("ETHUSDT", "5m")] };
     }
     // Los gráficos a la vista. «Lo que ve el robot»: uno por cada par y vela que el perfil está mirando (las filas del radar).
     function filasRobot() {
-      return ((((Eref || {}).vivo || {}).radar || {}).filas || []);
+      const v = (Eref || {}).vivo || {};
+      // La rotación mira el día entero: sus gráficos son las 4 primeras del ranking, en velas de 4 horas.
+      if (v.perfil === "rotacion") return (((v.rotacion || {}).ranking) || []).slice(0, 4).map((f) => ({ par: f.par, temporalidad: "4h" }));
+      return (v.radar || {}).filas || [];
     }
     function visibles(G) {
       if (G.layout !== "robot") return G.paneles.slice(0, G.layout);
@@ -99,9 +106,10 @@ window.PilotaGrafico = (() => {
       const paneles = visibles(G);
       return `<div class="tarjeta grafico">
         <div class="grafico-cabeza">
-          <div class="grafico-pares">${PARES.map(([par, nombre]) => `
-            <div class="graf-par"><span class="graf-par-nombre" data-sin-traducir>${nombre}</span>
-              <span class="graf-par-precio" id="precio-${par}" data-tic="${G.cambio[par] || ""}" data-sin-traducir>${esc(G.precios[par] ? numero(G.precios[par], 2) : "–")}</span></div>`).join("")}</div>
+          <div class="grafico-pares" role="group" aria-label="Precios en vivo">${PARES.map(([par, nombre]) => `
+            <button type="button" class="graf-par" data-graf-solo="${par}">
+              <span class="graf-par-nombre" data-sin-traducir>${nombre}</span>
+              <span class="graf-par-precio" id="precio-${par}" data-tic="${G.cambio[par] || ""}" data-sin-traducir>${esc(G.precios[par] ? numero(G.precios[par], DECIMALES(G.precios[par])) : "–")}</span></button>`).join("")}</div>
           <div class="chips grafico-layout" role="group" aria-label="Gráficos a la vez">
             <button type="button" class="chip chip-robot" data-graf-layout="robot" aria-pressed="${enRobot}">Lo que ve el robot</button>${[1, 2, 4].map((n) => `
             <button type="button" class="chip" data-graf-layout="${n}" aria-pressed="${G.layout === n}">${n === 1 ? "1 gráfico" : (n === 2 ? "2 gráficos" : "4 gráficos")}</button>`).join("")}</div>
@@ -157,7 +165,7 @@ window.PilotaGrafico = (() => {
       if (antes != null && v[4] !== antes) G.cambio[par] = v[4] > antes ? "sube" : "baja";
       const el = document.getElementById(`precio-${par}`);
       if (el) {
-        el.textContent = numero(v[4], 2);
+        el.textContent = numero(v[4], DECIMALES(v[4]));
         el.dataset.tic = "";
         void el.offsetWidth;            // reinicia la animación del destello del precio
         el.dataset.tic = G.cambio[par] || "";
@@ -314,7 +322,7 @@ window.PilotaGrafico = (() => {
       for (let k = 0; k <= 5; k++) {
         const p = lo + (hi - lo) * k / 5, y = Math.round(Y(p)) + 0.5;
         c.beginPath(); c.moveTo(0, y); c.lineTo(plotW, y); c.stroke();
-        c.fillText(numero(p, p > 1000 ? 0 : 2), plotW + 6, y);
+        c.fillText(numero(p, p > 1000 ? 0 : DECIMALES(p)), plotW + 6, y);
       }
       // El eje del tiempo: unas cinco marcas.
       c.textAlign = "center"; c.textBaseline = "top";
@@ -381,7 +389,7 @@ window.PilotaGrafico = (() => {
         // El gatillo se escribe a la derecha y debajo de su línea: así no se pisa con la entrada ni con el stop.
         const gat = nv.tipo === "gatillo";
         c.fillStyle = color; c.textAlign = gat ? "right" : "left"; c.textBaseline = gat ? "top" : "bottom";
-        c.fillText(`${gat ? nombre : Tp(nombre)} ${numero(nv.precio, 2)}`, gat ? plotW - 6 : 6, gat ? y + 2 : y - 2);
+        c.fillText(`${gat ? nombre : Tp(nombre)} ${numero(nv.precio, DECIMALES(nv.precio))}`, gat ? plotW - 6 : 6, gat ? y + 2 : y - 2);
       }
       // Las compras (flecha verde hacia arriba, bajo la vela) y las ventas (flecha hacia abajo, sobre la vela; verde si ganó).
       for (const m of d.marcas || []) {
@@ -407,7 +415,7 @@ window.PilotaGrafico = (() => {
       c.setLineDash([2, 3]); c.strokeStyle = colorP; c.beginPath(); c.moveTo(0, yp); c.lineTo(plotW, yp); c.stroke(); c.setLineDash([]);
       c.fillStyle = colorP; c.fillRect(plotW, yp - 9, EJE, 18);
       c.fillStyle = "#fff"; c.textAlign = "left"; c.textBaseline = "middle"; c.font = `700 ${fuente}`;
-      c.fillText(numero(ult[4], 2), plotW + 6, yp); c.font = fuente;
+      c.fillText(numero(ult[4], DECIMALES(ult[4])), plotW + 6, yp); c.font = fuente;
 
       // El RSI, en su propio panel abajo.
       if (conRsi) {
@@ -435,11 +443,11 @@ window.PilotaGrafico = (() => {
       if (sobre[1] < plotH) {
         const p = lo + (hi - lo) * (1 - (sobre[1] - 6) / (plotH - 12 - volH));
         c.fillStyle = col.texto; c.fillRect(plotW, sobre[1] - 9, EJE, 18);
-        c.fillStyle = col.panel; c.textAlign = "left"; c.textBaseline = "middle"; c.fillText(numero(p, 2), plotW + 6, sobre[1]);
+        c.fillStyle = col.panel; c.textAlign = "left"; c.textBaseline = "middle"; c.fillText(numero(p, DECIMALES(p)), plotW + 6, sobre[1]);
       }
       return Tp("{fecha} · abre {o} · alto {h} · bajo {l} · cierra {c}", {
         fecha: new Date(v[0]).toLocaleString(i18n.idioma, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
-        o: numero(v[1], 2), h: numero(v[2], 2), l: numero(v[3], 2), c: numero(v[4], 2) });
+        o: numero(v[1], DECIMALES(v[1])), h: numero(v[2], DECIMALES(v[2])), l: numero(v[3], DECIMALES(v[3])), c: numero(v[4], DECIMALES(v[4])) });
     }
 
     return { html, montar, dibujar, vela, destello, marca, datos, pedidos, estadoInicial, visibles, PARES, TEMPORALIDADES, PASO, INDICADORES };

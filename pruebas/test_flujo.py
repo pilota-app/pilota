@@ -83,7 +83,8 @@ class VelaDe(unittest.TestCase):
         self.assertEqual((v["par"], v["intervalo"], v["t"], v["c"], v["cerrada"]), ("BTCFDUSD", "1m", AHORA, 100.5, True))
 
     def test_lo_que_no_es_nuestro_se_descarta(self):
-        self.assertIsNone(lib_flujo.vela_de(kline(par="DOGEUSDT")))
+        self.assertIsNone(lib_flujo.vela_de(kline(par="PEPEUSDT")))
+        self.assertIsNotNone(lib_flujo.vela_de(kline(par="DOGEUSDT")), "las ocho monedas sí se escuchan")
         self.assertIsNone(lib_flujo.vela_de(kline(intervalo="1h")))
         self.assertIsNone(lib_flujo.vela_de(kline(c="nan")))
         self.assertIsNone(lib_flujo.vela_de(kline(o=-1)))
@@ -93,6 +94,7 @@ class VelaDe(unittest.TestCase):
 
     def test_la_ruta_solo_lleva_pares_y_velas_conocidos(self):
         self.assertEqual(lib_flujo.ruta_de(["BTCFDUSD"], ["1m"]), "/stream?streams=btcfdusd@kline_1m")
+        self.assertEqual(lib_flujo.ruta_de(lib_flujo.PARES).count("@kline_"), 20, "diez pares, de 1 s y de 1 m")
         with self.assertRaises(ValueError):
             lib_flujo.ruta_de(["BTCFDUSD/../x"])
         with self.assertRaises(ValueError):
@@ -267,6 +269,31 @@ class Grafico(unittest.TestCase):
                   {"ms": base + 3 * MIN, "par": "ETHFDUSD", "razon": "stop", "resultado": {"precio": 9, "neto": -1}}]
         m = vivo.marcas_de("BTCFDUSD", base, lineas)
         self.assertEqual([(x["tipo"], x["precio"]) for x in m], [("compra", 1.0), ("venta", 1.2)])
+
+
+class OchoMonedas(Grafico):
+    """Las ocho contra USDT: las velas largas se piden justo al cerrar y las de 1 m no pasan de 30 días."""
+
+    def test_las_largas_se_piden_solo_cuando_cierran(self):
+        hora = AHORA // (3600_000) * 3600_000
+        with mock.patch.object(lib_datos, "bajar_serie", return_value=0) as bajar:
+            self.assertEqual(vivo.largas_al_dia(None, hora + MIN, ("SOLUSDT",)), 0, "a mitad de hora no se pide nada")
+            self.assertEqual(vivo.largas_al_dia(None, hora, ("SOLUSDT", "ADAUSDT")), 2 * sum(
+                1 for t in vivo.LARGAS if hora % lib_datos.PASO_MS[t] == 0))
+        self.assertTrue(all(c.args[1] in ("SOLUSDT", "ADAUSDT") for c in bajar.call_args_list))
+
+    def test_el_minuto_se_guarda_sin_pasar_de_treinta_dias(self):
+        n = vivo.MINUTOS_GUARDADOS
+        inicio = AHORA - n * MIN
+        lib_datos.guardar_serie("SOLUSDT", "1m", [[inicio + i * MIN, 1, 2, 0.5, 1.5, 1] for i in range(n)])
+        vela = {"par": "SOLUSDT", "t": inicio + n * MIN, "o": 1, "h": 2, "l": 0.5, "c": 1.5, "v": 1}
+        self.assertEqual(vivo.guardar_minuto(None, vela), 1)
+        velas = lib_datos.leer_serie("SOLUSDT", "1m")
+        self.assertEqual(len(velas), n)
+        self.assertEqual(velas[-1][0], vela["t"])
+
+    def test_el_grafico_acepta_las_ocho(self):
+        self.assertEqual(vivo.grafico({"par": "DOGEUSDT", "temporalidad": "1m"})["datos"]["par"], "DOGEUSDT")
 
 
 if __name__ == "__main__":

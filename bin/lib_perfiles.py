@@ -13,6 +13,10 @@ Así lo que se ve en vivo es coherente con lo que mostró la comparación.
 | equilibrado | operaciones medianas, más selectivas | 1 h y 4 h | 1,5 | 1,5 % | 2 |
 | trader | muchas operaciones chicas | 1 h | 1 | 2 % | 2 |
 | scalper | el más rápido: entra y sale en minutos | 5 m | 1 | 1 % | 2 |
+| rotacion | tiene las 2 monedas más fuertes de las 8 y cambia cuando otra las pasa | 1 d | — | — | 2 |
+
+Cada perfil de señales mira sus propias monedas, contra USDT (`pares`): el conservador solo las tres más grandes, el trader
+las ocho. Las monedas son las de `lib_datos.UNIVERSO`.
 
 Lo que no se negocia aquí:
 - **Los frenos de siempre valen para todos** (pérdida diaria, racha, piso y piso absoluto) y la reserva del 40 % en USDT.
@@ -27,13 +31,21 @@ DIA_MS = lib_datos.DIA_MS
 PERFILES = {
     "holding": {"tipo": "acumular", "partes": 12, "cada_ms": 7 * DIA_MS,
                 "reparto": {"BTCFDUSD": 0.6, "ETHFDUSD": 0.4}},
-    "conservador": {"tipo": "senales", "temporalidades": ("4h",), "rr": 2.0, "riesgo": 0.01, "posiciones": 1},
-    "equilibrado": {"tipo": "senales", "temporalidades": ("1h", "4h"), "rr": 1.5, "riesgo": 0.015, "posiciones": 2},
-    "trader": {"tipo": "senales", "temporalidades": ("1h",), "rr": 1.0, "riesgo": 0.02, "posiciones": 2},
+    "conservador": {"tipo": "senales", "temporalidades": ("4h",), "rr": 2.0, "riesgo": 0.01, "posiciones": 1,
+                    "pares": ("BTCUSDT", "ETHUSDT", "BNBUSDT")},
+    "equilibrado": {"tipo": "senales", "temporalidades": ("1h", "4h"), "rr": 1.5, "riesgo": 0.015, "posiciones": 2,
+                    "pares": ("BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT")},
+    "trader": {"tipo": "senales", "temporalidades": ("1h",), "rr": 1.0, "riesgo": 0.02, "posiciones": 2,
+               "pares": lib_datos.UNIVERSO},
     "scalper": {"tipo": "senales", "temporalidades": ("5m",), "rr": 1.0, "riesgo": 0.01, "posiciones": 2,
-                "dias_max": lib_datos.DIAS_MINUTOS},
+                "dias_max": lib_datos.DIAS_MINUTOS, "pares": ("BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT")},
+    # Rotación: cada día, las 2 monedas más fuertes de las 8 (fuerza = cuánto subieron en 30 días contra cuánto se movieron),
+    # solo las que están sobre su media de 50 días y solo si BTC está sobre su media de 200. Cambia una cuando otra la pasa
+    # con margen (`margen`), para no ir y venir por nada. Ver `lib_rotacion`.
+    "rotacion": {"tipo": "rotar", "temporalidades": ("1d",), "posiciones": 2, "pares": lib_datos.UNIVERSO,
+                 "dias_fuerza": 30, "media": 50, "margen": 1},
 }
-ORDEN = ("holding", "conservador", "equilibrado", "trader", "scalper")
+ORDEN = ("holding", "conservador", "equilibrado", "trader", "scalper", "rotacion")
 SUGERIDO = "equilibrado"
 #: Las velas que no se guardan tal cual: se arman juntando velas de 1 m.
 AGRUPADAS = {"5m": 5}
@@ -45,6 +57,12 @@ def de(perfil):
     return {"id": perfil, **p} if p else None
 
 
+def pares_de(perfil):
+    """Las monedas que mira un perfil (contra USDT). El holding compra las suyas aparte (`reparto`)."""
+    p = PERFILES.get(perfil) or {}
+    return tuple(x for x in p.get("pares", ()) if x in lib_datos.UNIVERSO)
+
+
 def relacion(s):
     """Cuánto se gana si sale por el objetivo por cada unidad que se pierde si sale por el stop."""
     riesgo = s["entrada"] - s["stop"]
@@ -52,9 +70,11 @@ def relacion(s):
 
 
 def acepta(perfil, s):
-    """Si una señal entra en las reglas del perfil: su temporalidad y su relación ganancia/riesgo."""
+    """Si una señal entra en las reglas del perfil: su moneda, su temporalidad y su relación ganancia/riesgo.
+    BTCFDUSD cuenta como BTC: la moneda es la misma, solo cambia contra qué se paga."""
     p = PERFILES.get(perfil) or {}
     return (p.get("tipo") == "senales" and s.get("temporalidad") in p.get("temporalidades", ())
+            and (not s.get("par") or s["par"].replace("FDUSD", "USDT") in p.get("pares", ()))
             and relacion(s) >= p.get("rr", 99) - 1e-9)
 
 

@@ -135,12 +135,14 @@ class Simular(unittest.TestCase):
         self.assertTrue(r["sin_exigencia"], "sin calibrar, el resultado lo dice")
         self.assertEqual(r["usdt"]["saldo"], 100)
 
-    def test_comparar_da_los_cinco_perfiles(self):
+    def test_comparar_da_todos_los_perfiles(self):
         self.minimos()
         r = sim.comparar(100, 30, self.recorrido([op(95, 0.01)]), rapidas=[])
         self.assertEqual([p["perfil"] for p in r["perfiles"]], list(sim.lib_perfiles.ORDEN))
-        rapido = r["perfiles"][-1]
+        rapido = next(p for p in r["perfiles"] if p["perfil"] == "scalper")
         self.assertEqual(rapido["operaciones"], 0)
+        rota = next(p for p in r["perfiles"] if p["perfil"] == "rotacion")
+        self.assertEqual(rota["motivo"], "sin_historial", "sin velas diarias de las 8 monedas, la rotación lo dice")
         self.assertEqual(r["sugerido"], "equilibrado")
 
     def test_sin_operaciones_en_el_periodo_lo_dice(self):

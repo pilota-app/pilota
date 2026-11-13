@@ -62,11 +62,14 @@ def agrupar(ops):
 
 
 def estadisticas(ahora_ms=None, recorrido=None, rapidas=None):
-    """La historia de cada jugada: 3 años en 1 h y 4 h (el backtest) y los últimos 30 días en 5 m (las velas de 1 m)."""
+    """La historia de cada jugada: 3 años en 1 h y 4 h y los últimos 30 días en 5 m (las velas de 1 m), en las ocho monedas
+    contra USDT (y las dos contra FDUSD del backtest, si se le pasa su recorrido)."""
     ms = ahora_ms or lib_datos.ahora_local_ms()
-    rec = recorrido if recorrido is not None else backtest.correr(ms, sensibilidad=False, con_todas=True)
     com = lib_tamano.comisiones(lib_costos.comisiones())
-    ops = list((rec or {}).get("todas") or [])
+    if recorrido is not None:
+        ops = list((recorrido or {}).get("todas") or [])
+    else:
+        ops = [o for t in ("1h", "4h") for o in lib_simulacion.ops_de(lib_datos.UNIVERSO, t, com)]
     ops += rapidas if rapidas is not None else lib_simulacion.ops_rapidas("5m", com)
     return {"formato": 1, "cuando_ms": ms, "jugadas": agrupar(ops)}
 
@@ -175,19 +178,27 @@ def radar(perfil, ahora_ms=None, series=None, ctx=None, historia=None):
     p = lib_perfiles.de(perfil)
     if p is None or p.get("tipo") != "senales":
         return {"perfil": perfil or "", "cuando_ms": ms, "filas": [], "filtro": None}
-    filtro_en, alzas = ctx if ctx is not None else lib_piloto.contexto(ms)
+    pares = lib_perfiles.pares_de(perfil)
+    filtro_en, alzas = ctx if ctx is not None else lib_piloto.contexto(ms, pares)
     filtro = filtro_en(ms) if filtro_en else {"pasa": False, "motivo": "sin_contexto"}
     hist = historia if historia is not None else (guardado().get("historia") or {}).get("jugadas") or {}
     filas = []
-    for par in lib_datos.PARES_OPERADOS:
+    for par in pares:
         al = alzas.get(par)
         for t in p["temporalidades"]:
             paso = lib_datos.PASO_MS[t]
             velas = (series or {}).get((par, t)) if series is not None else lib_perfiles.serie(par, t)
             cerradas = [v for v in (velas or []) if v[0] + paso <= ms][-lib_piloto.VELAS_MIRADAS:]
             filas.append(mirar_serie(par, t, cerradas, al(ms) if al else None, filtro, perfil, hist))
+    # Lo más cerca de comprar va primero: la pantalla muestra las primeras y abre sus gráficos.
+    filas.sort(key=lambda f: (0 if f.get("cerca") else (1 if f.get("espera") else 2), _distancia(f)))
     return {"perfil": perfil, "cuando_ms": ms, "filtro": {"pasa": bool(filtro.get("pasa")), "motivo": filtro.get("motivo") or ""},
             "filas": filas}
+
+
+def _distancia(f):
+    e = next((x for x in f.get("estrategias") or [] if x.get("estrategia") == f.get("espera")), None)
+    return abs(e.get("distancia") or 0) if e else 9.0
 
 
 def escribir(r):

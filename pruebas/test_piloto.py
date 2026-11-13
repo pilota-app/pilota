@@ -59,8 +59,8 @@ class Base(unittest.TestCase):
 
 
 class Perfiles(unittest.TestCase):
-    def test_hay_cinco_y_el_sugerido_existe(self):
-        self.assertEqual(perfiles.ORDEN, ("holding", "conservador", "equilibrado", "trader", "scalper"))
+    def test_hay_seis_y_el_sugerido_existe(self):
+        self.assertEqual(perfiles.ORDEN, ("holding", "conservador", "equilibrado", "trader", "scalper", "rotacion"))
         self.assertIn(perfiles.SUGERIDO, perfiles.PERFILES)
 
     def test_ningun_perfil_arriesga_mas_que_el_tamano(self):
@@ -75,6 +75,9 @@ class Perfiles(unittest.TestCase):
         self.assertFalse(perfiles.acepta("conservador", s), "pide 2 y además solo mira 4 h")
         self.assertFalse(perfiles.acepta("holding", s), "el holding no opera señales")
         self.assertFalse(perfiles.acepta("scalper", s), "el scalper solo mira 5 m")
+        self.assertFalse(perfiles.acepta("conservador", {**s, "temporalidad": "4h", "objetivo": 102_000.0, "par": "DOGEUSDT"}),
+                         "el conservador no opera DOGE")
+        self.assertTrue(perfiles.acepta("trader", {**s, "par": "DOGEUSDT"}))
 
     def test_agrupar_arma_velas_de_cinco_minutos_completas(self):
         base = 1_770_000_000_000 // (5 * MIN) * (5 * MIN)
@@ -160,16 +163,80 @@ class Decidir(Base):
 class SenalesDeAhora(unittest.TestCase):
     def test_una_serie_atrasada_no_da_senales(self):
         vieja = [[AHORA - 10 * HORA, 1, 1, 1, 1, 1]]
-        series = {(par, "1h"): vieja for par in lib_datos.PARES_OPERADOS}
+        series = {(par, "1h"): vieja for par in perfiles.pares_de("trader")}
         senales, atrasadas = piloto.senales_de_ahora("trader", AHORA, series=series, ctx=(None, {}))
         self.assertEqual(senales, [])
-        self.assertEqual(len(atrasadas), 2)
+        self.assertEqual(len(atrasadas), len(perfiles.pares_de("trader")), "cada moneda del perfil se mira")
 
     def test_la_vela_en_curso_no_cuenta(self):
         en_curso = [[AHORA - HORA // 2, 1, 1, 1, 1, 1]]
-        series = {(par, "1h"): en_curso for par in lib_datos.PARES_OPERADOS}
+        series = {(par, "1h"): en_curso for par in perfiles.pares_de("trader")}
         _, atrasadas = piloto.senales_de_ahora("trader", AHORA, series=series, ctx=(None, {}))
-        self.assertEqual(len(atrasadas), 2, "solo hay una vela y todavía no cierra")
+        self.assertEqual(len(atrasadas), 8, "solo hay una vela y todavía no cierra")
+
+
+class OchoMonedas(Base):
+    def test_un_perfil_entra_en_una_moneda_contra_usdt(self):
+        import lib_universo
+        nucleo.escribir_json(lib_universo.ruta(), {"filtros": {"SOLUSDT": {**FILTROS, "par": "SOLUSDT", "moneda": "SOL",
+                                                                         "paso": 0.001, "cantidad_minima": 0.001}},
+                                                   "filtros_ms": AHORA})
+        piloto.empezar("trader", 300, AHORA)
+        s = {**SENAL, "par": "SOLUSDT", "entrada": 100.0, "stop": 98.0, "objetivo": 104.0}
+        with mock.patch.object(piloto, "senales_de_ahora", return_value=([s], [])), \
+                mock.patch.object(lib_ejecutor_prueba, "minutos_de", return_value=minutos({"SOLUSDT": 101.0})):
+            r = piloto.decidir({"ahora_ms": AHORA, "ambiente": "prueba"})["piloto"]
+        self.assertEqual((r["decision"], r["par"]), ("entrada", "SOLUSDT"))
+        self.assertEqual([p["par"] for p in lib_ejecutor_prueba.guardado()["posiciones"]], ["SOLUSDT"])
+        self.assertIn("entrada_rebote", self.razones())
+
+
+class RotacionEnVivo(Base):
+    """La rotación con dinero ficticio: una vez por día pasa a las monedas que vienen más fuertes."""
+    DIA = lib_datos.DIA_MS
+
+    def diarias(self, subida):
+        """60 días por moneda: cada una sube a su ritmo (`subida[par]` por día), con un poco de ruido."""
+        hoy = AHORA // self.DIA * self.DIA
+        return {par: [[hoy - (60 - i) * self.DIA, 0, 0, 0, 100 * (1 + subida.get(par, -0.001)) ** i * (1 + 0.002 * (i % 3)), 1]
+                      for i in range(60)] for par in perfiles.pares_de("rotacion")}
+
+    def vuelta(self, ms, subida, pasa=True):
+        series = self.diarias(subida)
+        with mock.patch.object(piloto, "_diaria", side_effect=lambda par: series.get(par, [])), \
+                mock.patch.object(piloto, "contexto", return_value=(lambda m: {"pasa": pasa}, {})), \
+                mock.patch.object(piloto, "precio_fresco", side_effect=lambda par, m: series[par][-1][4]):
+            return piloto.decidir({"ahora_ms": ms, "ambiente": "prueba"})["piloto"]
+
+    def test_compra_las_dos_mas_fuertes_y_cambia_la_que_se_cae(self):
+        piloto.empezar("rotacion", 200, AHORA)
+        r = self.vuelta(AHORA, {"SOLUSDT": 0.02, "TRXUSDT": 0.015, "BTCUSDT": 0.005})
+        self.assertEqual((r["decision"], sorted(r["entran"])), ("rotacion", ["SOLUSDT", "TRXUSDT"]))
+        self.assertEqual(self.vuelta(AHORA + HORA, {"SOLUSDT": 0.02})["decision"], "esperando", "una vez por día")
+        # Al día siguiente TRX se cae y ADA pasa adelante: sale TRX, entra ADA, y SOL se queda.
+        r = self.vuelta(AHORA + self.DIA, {"SOLUSDT": 0.02, "ADAUSDT": 0.03, "TRXUSDT": -0.01})
+        self.assertEqual((r["salen"], r["entran"]), (["TRXUSDT"], ["ADAUSDT"]))
+        self.assertEqual(self.razones().count("rotacion_compra"), 3)
+        self.assertEqual(self.razones().count("rotacion_venta"), 1)
+        e = piloto.estado(AHORA + self.DIA, minutos={})
+        self.assertEqual(sorted(x["par"] for x in e["tenencias"]), ["ADAUSDT", "SOLUSDT"])
+        self.assertLess(e["valor"], 250)
+
+    def test_sin_el_permiso_de_btc_vende_todo_y_espera(self):
+        piloto.empezar("rotacion", 200, AHORA)
+        self.vuelta(AHORA, {"SOLUSDT": 0.02, "TRXUSDT": 0.015})
+        r = self.vuelta(AHORA + self.DIA, {"SOLUSDT": 0.02, "TRXUSDT": 0.015}, pasa=False)
+        self.assertEqual(sorted(r["salen"]), ["SOLUSDT", "TRXUSDT"])
+        self.assertAlmostEqual(piloto.estado(AHORA + self.DIA, minutos={})["efectivo"], 200, delta=2)
+
+    def test_sin_precio_fresco_no_mueve_nada(self):
+        piloto.empezar("rotacion", 200, AHORA)
+        series = self.diarias({"SOLUSDT": 0.02, "TRXUSDT": 0.015})
+        with mock.patch.object(piloto, "_diaria", side_effect=lambda par: series.get(par, [])), \
+                mock.patch.object(piloto, "contexto", return_value=(lambda m: {"pasa": True}, {})):
+            r = piloto.decidir({"ahora_ms": AHORA, "ambiente": "prueba"})["piloto"]
+        self.assertEqual(r["decision"], "sin_datos")
+        self.assertNotIn("rotacion_compra", self.razones())
 
 
 class Holding(Base):

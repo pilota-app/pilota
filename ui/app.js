@@ -1624,6 +1624,13 @@
       P.datos = null;
       pedirGrafico();
       pintar();
+    } else if (b.dataset.grafSolo) {
+      // Tocar el precio de una moneda la abre sola y en grande, con las velas que ya estaba mirando.
+      const P = E.graf.paneles[0];
+      if (P.par !== b.dataset.grafSolo) { P.par = b.dataset.grafSolo; P.datos = null; }
+      E.graf.layout = 1;
+      pedirGrafico();
+      pintar();
     } else if (b.dataset.grafLayout) {
       E.graf.layout = b.dataset.grafLayout === "robot" ? "robot" : Number(b.dataset.grafLayout);
       pedirGrafico();
@@ -2566,10 +2573,10 @@
       usdt: { saldo: monto, rendimiento: 0 }, btc: { saldo: b, rendimiento: (b - monto) / monto, caida_maxima: 0.12, curva: btc },
       sin_exigencia: true, topado: true, tope: 15, perfiles: perfilesDemo(monto, desde, hasta), sugerido: "equilibrado" };
   }
-  // Los cinco perfiles de la vista previa: números inventados, con la forma que devuelve lib_simulacion.comparar.
+  // Los seis perfiles de la vista previa: números inventados, con la forma que devuelve lib_simulacion.comparar.
   function perfilesDemo(monto, desde, hasta) {
-    const ritmo = { holding: 0, conservador: 6, equilibrado: 14, trader: 30, scalper: 60 };
-    return ["holding", "conservador", "equilibrado", "trader", "scalper"].map((perfil, k) => {
+    const ritmo = { holding: 0, conservador: 6, equilibrado: 14, trader: 30, scalper: 60, rotacion: 8 };
+    return ["holding", "conservador", "equilibrado", "trader", "scalper", "rotacion"].map((perfil, k) => {
       const d0 = perfil === "scalper" ? Math.max(desde, hasta - 30 * 86400000) : desde;
       let saldo = monto, techo = monto, caida = 0;
       const curva = [[d0, monto]], movimientos = [];
@@ -2577,7 +2584,12 @@
       for (let i = 1; i <= n; i++) {
         const x = d0 + (hasta - d0) * i / (n + 1);
         const par = i % 3 ? "BTCFDUSD" : "ETHFDUSD", precio = par === "BTCFDUSD" ? 95000 + i * 120 : 3500 + i * 6;
-        if (perfil === "holding") {
+        if (perfil === "rotacion") {
+          const nueva = ["SOLUSDT", "TRXUSDT", "BNBUSDT", "XRPUSDT"][i % 4], r = Math.sin(i * 1.7) * 0.06 + 0.012;
+          if (i > 1) movimientos.push({ ms: x, que: "venta", par: ["SOLUSDT", "TRXUSDT", "BNBUSDT", "XRPUSDT"][(i + 2) % 4], precio: 100, monto: saldo / 2, por: "rotacion", estrategia: "rotacion", ganancia: saldo / 2 * r, saldo: saldo + saldo / 2 * r });
+          saldo += saldo / 2 * r;
+          movimientos.push({ ms: x, que: "compra", par: nueva, precio: 100, monto: saldo / 2, estrategia: "rotacion", temporalidad: "1d" });
+        } else if (perfil === "holding") {
           movimientos.push({ ms: x, que: "compra", par, precio, monto: monto / 12, estrategia: "holding", temporalidad: "1d" });
           saldo = monto * (1 + Math.sin(i / 2) * 0.03 + i * 0.004);
         } else {
@@ -2598,7 +2610,8 @@
   }
   // El gráfico de la vista previa: una caminata al azar, siempre la misma para el mismo par, que termina en el precio de
   // ahora; el flujo de la vista previa la sigue moviendo cada segundo y, de vez en cuando, compra o vende.
-  const PRECIO_DEMO = { BTCFDUSD: 71780, ETHFDUSD: 2027 };
+  const PRECIO_DEMO = { BTCFDUSD: 71780, ETHFDUSD: 2027, BTCUSDT: 71790, ETHUSDT: 2027.4, BNBUSDT: 612.3, SOLUSDT: 168.42,
+    XRPUSDT: 0.5821, ADAUSDT: 0.4512, TRXUSDT: 0.1873, DOGEUSDT: 0.13472 };
   function azar(semilla) {
     let x = semilla >>> 0;
     return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
@@ -2640,10 +2653,10 @@
       }
       const eventos = [];
       if (DEMO.vivo && DEMO.vivo.activo && tic % 20 === 0) {
-        const p = DEMO.precio.BTCFDUSD, ms = Date.now();
+        const p = DEMO.precio.BTCUSDT, ms = Date.now();
         eventos.push((tic / 20) % 2
-          ? { ms, fecha: new Date(ms).toISOString(), par: "BTCFDUSD", razon: "entrada_rebote", orden: { precio: p, monto: 60, estado: "llenada" }, resultado: {} }
-          : { ms, fecha: new Date(ms).toISOString(), par: "BTCFDUSD", razon: "objetivo", orden: {}, resultado: { precio: p, neto: 0.42 } });
+          ? { ms, fecha: new Date(ms).toISOString(), par: "BTCUSDT", razon: "entrada_rebote", orden: { precio: p, monto: 60, estado: "llenada" }, resultado: {} }
+          : { ms, fecha: new Date(ms).toISOString(), par: "BTCUSDT", razon: "objetivo", orden: {}, resultado: { precio: p, neto: 0.42 } });
       }
       c.responder("vivoProgreso", { t: "estado", trabajo: { id: "20260210T140500-f1u70", tipo: "vivo",
         avance: { conectado: true, error: "", ms: Date.now(), velas, eventos, ...(eventos.length ? { vivo: vivoDemo() } : {}) } } });
@@ -2654,7 +2667,7 @@
     const v = DEMO.vivo;
     const flujo = { corriendo: !!DEMO.flujo, conectado: !!DEMO.flujo };
     // Lo que espera el robot en la vista previa: BTC cerca de su gatillo de rebote, ETH lejos y la ruptura frenada por el día.
-    const pb = (DEMO.precio && DEMO.precio.BTCFDUSD) || PRECIO_DEMO.BTCFDUSD, pe = (DEMO.precio && DEMO.precio.ETHFDUSD) || PRECIO_DEMO.ETHFDUSD;
+    const precio = (par) => (DEMO.precio && DEMO.precio[par]) || PRECIO_DEMO[par];
     const fila = (par, t, precio, dist) => ({ par, temporalidad: t, precio, adx: 14, volumen_relativo: 0.8, espera: "rebote", cerca: dist < 0.0025,
       estrategias: [
         { estrategia: "rebote", motivo: "lejos", gatillo: precio * (1 - dist), distancia: dist, entrada: precio * (1 - dist),
@@ -2662,26 +2675,49 @@
           historia: { n: 214, ganadas: 92, gana: 0.43, neto_medio: 0.0004 } },
         { estrategia: "ruptura", motivo: "dia_no_al_alza", gatillo: precio * 1.004, distancia: 0.004, rr: 1, rr_pide: 1, sirve: true } ] });
     const t = (v && v.perfil === "scalper") ? "5m" : "1h";
+    const MONEDAS_DEMO = { conservador: ["BTC", "ETH", "BNB"], equilibrado: ["BTC", "ETH", "BNB", "SOL", "XRP"],
+      scalper: ["BTC", "ETH", "SOL", "XRP", "DOGE"] };
+    const suyas = MONEDAS_DEMO[(v && v.perfil) || "equilibrado"] || ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"];
+    const DISTANCIA = { BTC: 0.0018, ETH: 0.0091, BNB: 0.0052, SOL: 0.0123, XRP: 0.0034, ADA: 0.0167, TRX: 0.0071, DOGE: 0.0208 };
     const radar = { perfil: (v && v.perfil) || "equilibrado", filtro: { pasa: true, motivo: "" },
-      filas: [fila("BTCFDUSD", t, pb, 0.0018), fila("ETHFDUSD", t, pe, 0.0091)] };
+      filas: suyas.map((m) => fila(`${m}USDT`, t, precio(`${m}USDT`), DISTANCIA[m])) };
+    // La rotación de la vista previa: las 8 ordenadas por fuerza, con SOL y TRX en la mano.
+    const FUERZA = [["SOLUSDT", 1.62, 0.214], ["TRXUSDT", 1.31, 0.118], ["BNBUSDT", 0.94, 0.087], ["BTCUSDT", 0.71, 0.064],
+      ["XRPUSDT", 0.33, 0.041], ["ETHUSDT", 0.12, 0.016], ["ADAUSDT", -0.28, -0.052], ["DOGEUSDT", -0.61, -0.133]];
+    const hoy = Math.floor(Date.now() / 86400000) * 86400000;
+    const rotacion = { dia_ms: hoy, pasa_btc: true, ranking: FUERZA.map(([par, fuerza, retorno], i) => ({
+      par, puesto: i + 1, fuerza, retorno, elegible: retorno > 0 && i !== 4 })) };
     if (!v) return { formato: 1, activo: false, perfil: "", monto: 0, movimientos: [], posiciones: [], tenencias: [], flujo, radar };
     const h = 3600000, t0 = v.desde_ms, m = v.monto;
     const linea = (ms, razon, par, orden, resultado) => ({ ms, fecha: new Date(ms).toISOString(), par, razon, orden, resultado });
+    if (v.perfil === "rotacion") {
+      const sol = precio("SOLUSDT"), trx = precio("TRXUSDT"), mitad = m / 2 * 0.9985;
+      const tenencias = [
+        { par: "SOLUSDT", cantidad: mitad / 166.1, gastado: m / 2, precio_ahora: sol, valor: mitad / 166.1 * sol, precio_medio: 166.1 },
+        { par: "TRXUSDT", cantidad: mitad / 0.1861, gastado: m / 2, precio_ahora: trx, valor: mitad / 0.1861 * trx, precio_medio: 0.1861 }];
+      const valor = tenencias.reduce((a, x) => a + x.valor, 0);
+      return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
+        ganancia_relativa: valor / m - 1, efectivo: 0, posiciones: [], tenencias, rotacion,
+        ultima: { decision: "mantiene", tiene: ["SOLUSDT", "TRXUSDT"] },
+        movimientos: [linea(t0 + 60000, "rotacion_compra", "TRXUSDT", { precio: 0.1861, monto: m / 2 }, { puesto: 2 }),
+          linea(t0 + 60000, "rotacion_compra", "SOLUSDT", { precio: 166.1, monto: m / 2 }, { puesto: 1 }),
+          linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m })], flujo, radar, jugadas: {} };
+    }
     const movs = v.perfil === "holding"
       ? [linea(t0 + 60000, "compra_holding", "BTCFDUSD", { precio: 97250, cantidad: m / 12 * 0.6 / 97250, monto: m / 12 * 0.6 }, {}),
         linea(t0 + 60000, "compra_holding", "ETHFDUSD", { precio: 3610, cantidad: m / 12 * 0.4 / 3610, monto: m / 12 * 0.4 }, {})]
-      : [linea(t0 + 0.5 * h, "entrada_rebote", "BTCFDUSD", { precio: 97250, monto: m * 0.3, stop: 96400, objetivo: 98600, estado: "puesta" }, {}),
-        linea(t0 + 0.9 * h, "entrada_rebote", "BTCFDUSD", { precio: 97250, monto: m * 0.3, stop: 96400, objetivo: 98600, estado: "llenada" }, {}),
-        linea(t0 + 2.2 * h, "objetivo", "BTCFDUSD", {}, { precio: 98600, neto: m * 0.3 * 0.0125, saldo: m * 1.0037 }),
-        linea(t0 + 2.6 * h, "rechazo", "ETHFDUSD", {}, { motivo: "bajo_minimo" }),
-        linea(t0 + 2.8 * h, "entrada_ruptura", "ETHFDUSD", { precio: 3610, monto: m * 0.25, stop: 3560, objetivo: 3665, estado: "llenada" }, {})];
+      : [linea(t0 + 0.5 * h, "entrada_rebote", "BTCUSDT", { precio: 97250, monto: m * 0.3, stop: 96400, objetivo: 98600, estado: "puesta" }, {}),
+        linea(t0 + 0.9 * h, "entrada_rebote", "BTCUSDT", { precio: 97250, monto: m * 0.3, stop: 96400, objetivo: 98600, estado: "llenada" }, {}),
+        linea(t0 + 2.2 * h, "objetivo", "BTCUSDT", {}, { precio: 98600, neto: m * 0.3 * 0.0125, saldo: m * 1.0037 }),
+        linea(t0 + 2.6 * h, "rechazo", "SOLUSDT", {}, { motivo: "bajo_minimo" }),
+        linea(t0 + 2.8 * h, "entrada_ruptura", "ETHUSDT", { precio: 3610, monto: m * 0.25, stop: 3560, objetivo: 3665, estado: "llenada" }, {})];
     movs.push(linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m }));
     movs.sort((a, b) => b.ms - a.ms);
     const holding = v.perfil === "holding";
     const tenencias = holding ? [
       { par: "BTCFDUSD", cantidad: m / 12 * 0.6 / 97250, gastado: m / 12 * 0.6, precio_ahora: 97800, valor: m / 12 * 0.6 / 97250 * 97800, precio_medio: 97250 },
       { par: "ETHFDUSD", cantidad: m / 12 * 0.4 / 3610, gastado: m / 12 * 0.4, precio_ahora: 3592, valor: m / 12 * 0.4 / 3610 * 3592, precio_medio: 3610 }] : [];
-    const posiciones = holding || !v.activo ? [] : [{ par: "ETHFDUSD", estado: "abierta", precio: 3610, precio_ahora: 3622,
+    const posiciones = holding || !v.activo ? [] : [{ par: "ETHUSDT", estado: "abierta", precio: 3610, precio_ahora: 3622,
       stop: 3560, objetivo: 3665, monto: m * 0.25, ganancia: m * 0.25 * (12 / 3610) }];
     const valor = holding ? m * 11 / 12 + tenencias.reduce((a, x) => a + x.valor, 0) : m * 1.0037 + (posiciones[0] ? posiciones[0].ganancia : 0);
     return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,

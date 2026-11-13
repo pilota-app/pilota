@@ -449,13 +449,14 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
   --graf-media50: light-dark(var(--graf-media50-claro), var(--graf-media50-oscuro)); }
 .grafico { padding: 16px 16px 10px; }
 .grafico-cabeza { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.grafico-pares { display: flex; gap: 6px; }
-.graf-par { display: grid; gap: 0; min-width: 120px; padding: 6px 12px; border: 1px solid var(--linea); border-radius: 10px;
+.grafico-pares { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; width: 100%; }
+.graf-par { display: grid; gap: 0; min-width: 0; padding: 6px 10px; border: 1px solid var(--linea); border-radius: 10px;
   background: var(--fondo); color: var(--texto); text-align: left; font: inherit; cursor: pointer; }
 .graf-par[aria-selected="true"] { border-color: var(--acento); background: color-mix(in srgb, var(--acento) 8%, var(--fondo)); }
 .graf-par:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
 .graf-par-nombre { color: var(--texto-suave); font-size: 12px; font-weight: 700; }
-.graf-par-precio { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; border-radius: 4px; }
+.graf-par:hover { border-color: var(--acento); }
+.graf-par-precio { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; border-radius: 4px; }
 .graf-par-precio[data-tic="sube"] { color: var(--gana); animation: tic-sube 0.9s ease-out; }
 .graf-par-precio[data-tic="baja"] { color: var(--pierde); animation: tic-baja 0.9s ease-out; }
 @keyframes tic-sube { from { background: color-mix(in srgb, var(--gana) 28%, transparent); } to { background: transparent; } }
@@ -485,8 +486,9 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 @media (prefers-reduced-motion: reduce) {
   .graf-par-precio, .grafico-destello.anda, .conexion-punto { animation: none !important; }
 }
+@media (max-width: 900px) { .grafico-pares { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 520px) {
-  .graf-par { min-width: 0; flex: 1; }
+  .graf-par { min-width: 0; }
   .grafico-caja canvas { height: 300px; }
   .grafico-destello { font-size: 14px; white-space: normal; text-align: center; width: 86%; }
 }
@@ -504,7 +506,6 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 .graf-panel-cabeza { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
 .chips-chicos .chip { min-height: 26px; padding: 2px 9px; font-size: 12px; }
 .grafico-layout .chip { font-size: 13px; }
-.graf-par { cursor: default; }
 /* Qué estoy esperando */
 .radar { padding: 20px; }
 .radar-filas { list-style: none; display: grid; gap: 0; margin: 0 0 8px; padding: 0; }
@@ -566,3 +567,23 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 .cabina-perfil { padding: 18px; margin: 0 0 20px; }
 .cabina-perfil h2 { margin: 0 0 6px; }
 @media (prefers-reduced-motion: reduce) { .solo-corre-lista li .estacion-luz { animation: none; } }
+
+/* El perfil muestra sus monedas, y la rotación su ranking de fuerza */
+.perfil-monedas { font-size: 12px; font-weight: 600; color: var(--acento); letter-spacing: .02em; }
+.ranking { padding: 20px; }
+.ranking-filas { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; }
+.ranking-fila { display: grid; grid-template-columns: 22px 54px minmax(60px, 1fr) 70px 120px; align-items: center; gap: 10px;
+  padding: 6px 0; border-bottom: 1px solid var(--linea); }
+.ranking-fila:last-child { border-bottom: 0; }
+.ranking-fila[data-estado="tengo"] .ranking-moneda { color: var(--acento); }
+.ranking-puesto { color: var(--texto-suave); font-variant-numeric: tabular-nums; text-align: right; }
+.ranking-barra { width: 100%; height: 8px; }
+.ranking-fondo { fill: var(--linea); }
+.ranking-relleno { fill: var(--acento); }
+.ranking-relleno[data-signo="baja"] { fill: var(--pierde); }
+.ranking-cambio { font-variant-numeric: tabular-nums; text-align: right; }
+.ranking-cambio[data-signo="sube"] { color: var(--gana); }
+.ranking-cambio[data-signo="baja"] { color: var(--pierde); }
+.radar-resto summary { cursor: pointer; color: var(--acento); font-weight: 600; padding: 6px 0; }
+@media (max-width: 520px) { .ranking-fila { grid-template-columns: 18px 44px 1fr 62px; } .ranking-fila .radar-estado { grid-column: 2 / -1; justify-self: start; } }
+.ranking-fila .radar-estado { justify-self: end; }

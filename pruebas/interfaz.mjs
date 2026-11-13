@@ -83,14 +83,15 @@ for (let i = 0; i < 10 && await page.locator(".pieza-bv [data-bv-ir].pz-principa
 await page.click(".pieza-bv [data-bv-fin]:not([data-bv-fin=despues])");
 await page.waitForSelector("#descargar");
 
-// 1b. El centro de operaciones: seis pestañas, el robot en vivo con un perfil, la comparación de los cinco perfiles con su
+// 1b. El centro de operaciones: seis pestañas, el robot en vivo con un perfil, la comparación de los seis perfiles con su
 // película, la cabina con dibujos (sin style="" en línea: la CSP lo bloquearía) y el paso a real con sus requisitos.
 {
   const cab = await abrir("?demo&idioma=es", 1280, { plegado: true });
   await cab.waitForSelector("#pestana-vivo .perfiles");
   assert.equal(await cab.locator('.pestanas [role="tab"]').count(), 6, "seis pestañas");
   assert.equal(await cab.locator('.pestanas [role="tab"][aria-selected="true"]').getAttribute("id"), "tab-vivo", "parte en «En vivo»");
-  assert.equal(await cab.locator(".perfil").count(), 5, "los cinco perfiles");
+  assert.equal(await cab.locator(".perfil").count(), 6, "los seis perfiles");
+  assert.match(await cab.textContent('.perfil[data-perfil="rotacion"]'), /BTC · ETH · BNB · SOL · XRP · ADA · TRX · DOGE/, "cada perfil dice sus monedas");
   assert.equal(await cab.getAttribute('.perfil[data-perfil="equilibrado"]', "aria-checked"), "true", "el sugerido viene elegido");
   assert.ok(await cab.locator("#pestana-como").isHidden(), "lo técnico vive en su pestaña");
   // En vivo: el perfil y el monto, y el robot cuenta lo que hace.
@@ -108,9 +109,9 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.getAttribute("#tab-vivo", "aria-selected"), "true");
   // El gráfico en vivo: velas en un lienzo, el precio que se mueve solo y los indicadores que se prenden con un botón.
   await cab.waitForSelector("#grafico-lienzo-0");
-  await cab.waitForFunction(() => /\d/.test(document.getElementById("precio-BTCFDUSD").textContent), null, { timeout: 10000 });
-  const precio1 = await cab.textContent("#precio-BTCFDUSD");
-  await cab.waitForFunction((p) => document.getElementById("precio-BTCFDUSD").textContent !== p, precio1, { timeout: 10000 });
+  await cab.waitForFunction(() => /\d/.test(document.getElementById("precio-BTCUSDT").textContent), null, { timeout: 10000 });
+  const precio1 = await cab.textContent("#precio-BTCUSDT");
+  await cab.waitForFunction((p) => document.getElementById("precio-BTCUSDT").textContent !== p, precio1, { timeout: 10000 });
   assert.match(await cab.textContent("#pestana-vivo .conexion"), /En vivo: conectado a Binance/);
   assert.equal(await cab.getAttribute('[data-graf-ind="bb"]', "aria-pressed"), "true", "Bollinger viene prendido");
   await cab.click('[data-graf-ind="rsi"]');
@@ -150,13 +151,13 @@ await page.waitForSelector("#descargar");
   await cab.keyboard.press("ArrowRight");
   assert.equal(await cab.evaluate(() => document.activeElement.id), "tab-comparar");
   assert.ok(await cab.locator("#pestana-comparar").isVisible());
-  // Comparar: el monto, el período y los cinco perfiles al lado de quedarse en USDT y de comprar BTC y esperar.
+  // Comparar: el monto, el período y los seis perfiles al lado de quedarse en USDT y de comprar BTC y esperar.
   await cab.fill("#sim-monto", "250");
   await cab.click('[data-sim-dias="365"]');
   assert.equal(await cab.inputValue("#sim-monto"), "250", "lo escrito sigue ahí al volver a pintar");
   await cab.click("#sim-correr");
   await cab.waitForSelector(".comp-grilla");
-  assert.equal(await cab.locator(".comp-perfil").count(), 5, "los cinco perfiles lado a lado");
+  assert.equal(await cab.locator(".comp-perfil").count(), 6, "los seis perfiles lado a lado");
   assert.match(await cab.textContent(".sim-resultado"), /365 días\) con 250 USDT[\s\S]*Quedarte en USDT[\s\S]*Comprar BTC y esperar/);
   assert.match(await cab.textContent('.comp-perfil[data-comparar="scalper"]'), /últimos 30 días/, "el scalper dice que mira menos");
   // La película: tocar un perfil la pone a andar, movimiento por movimiento.
@@ -175,6 +176,20 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.locator(".cabina .media-luna").count(), 1, "el saldo se ve como medidor");
   assert.ok(await cab.locator(".cabina .dial").count() >= 1, "cada moneda tiene su dial");
   assert.equal(await cab.locator("#app [style]").count(), 0, "nada usa style en línea");
+  // La rotación: en vez de esperar un precio, ordena las 8 monedas por fuerza y dice cuáles tiene.
+  await cab.click("#tab-vivo");
+  if (await cab.locator("#vivo-cambiar").count()) await cab.click("#vivo-cambiar");
+  await cab.click('[data-perfil="rotacion"]');
+  await cab.click("#vivo-empezar");
+  await cab.waitForSelector("[role=alertdialog]");
+  await cab.click('[data-pz-confirmar="si"]');
+  await cab.waitForSelector(".ranking-fila");
+  assert.equal(await cab.locator(".ranking-fila").count(), 8, "las ocho monedas en el ranking");
+  assert.equal(await cab.locator('.ranking-fila[data-estado="tengo"]').count(), 2, "y las dos que tiene");
+  assert.match(await cab.textContent(".vivo-piensa"), /Tengo SOL y TRX/);
+  assert.equal(await cab.locator(".grafico-pares .graf-par").count(), 8, "el precio de las ocho, en vivo");
+  await cab.click('[data-graf-solo="SOLUSDT"]');
+  assert.equal(await cab.getAttribute('[data-graf-layout="1"]', "aria-pressed"), "true", "tocar un precio abre esa moneda sola");
   // Dinero real: los cinco requisitos y la llave; sin cumplirlos, no hay cómo encender.
   await cab.click("#tab-operar");
   await cab.waitForSelector(".requisitos");
@@ -185,7 +200,8 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.getAttribute("#real-secreto", "type"), "password", "el secreto no se ve al escribirlo");
   await cab.fill("#real-llave", "Llave9Corta");
   await cab.click("#real-conectar");
-  await cab.waitForSelector(".pz-toast");
+  // El aviso puede llegar tapado por otro del robot en vivo: se espera el de la llave.
+  await cab.waitForFunction(() => /solo letras y números/.test(document.querySelector(".pz-toast")?.textContent || ""), null, { timeout: 5000 });
   assert.match(await cab.textContent(".pz-toast"), /solo letras y números/, "una llave mal copiada se dice antes de mandarla");
   assert.equal(await cab.evaluate(() => JSON.stringify(window.Pilota._pruebas.E).includes("Llave9Corta")), false,
     "la llave no se guarda en el estado de la pantalla");

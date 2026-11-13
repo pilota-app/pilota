@@ -7,6 +7,15 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- El robot de prueba ahora mira 8 monedas contra USDT: BTC, ETH, BNB, SOL, XRP, ADA, TRX y DOGE. Cada perfil opera las suyas
+  y lo dice en su tarjeta. Arriba del gráfico ves el precio de las 8 en vivo; toca una para abrirla en grande. *The test robot
+  now watches 8 coins against USDT: BTC, ETH, BNB, SOL, XRP, ADA, TRX and DOGE. Each profile trades its own and shows them on
+  its card. Above the chart you see the live price of all 8; tap one to open it large.*
+- Nuevo perfil: Rotación. Una vez al día ordena las 8 monedas por fuerza, tiene las 2 mejores y cambia a la que pasa adelante.
+  Su pantalla muestra el ranking y por qué cambió. *New profile: Rotation. Once a day it ranks the 8 coins by strength, holds
+  the top 2 and switches to the one that moves ahead. Its screen shows the ranking and why it switched.*
+- «Qué estoy esperando» pone primero lo que está más cerca de comprar y guarda el resto en «Ver las otras». *"What I'm
+  waiting for" puts what is closest to buying first and keeps the rest under "See the other".*
 - «Avanzado» dice arriba que todo se prepara solo (datos, historial, muestras, precios en vivo y mínimos) y en qué va cada
   cosa: no hay que apretar ningún botón para que el robot funcione. Los datos del mercado ahora también se bajan solos.
   *"Advanced" now says at the top that everything gets ready on its own (data, history, samples, live prices and minimums)

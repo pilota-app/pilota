@@ -37,6 +37,10 @@ SILENCIO_MAXIMO = 30
 TROZO = 1.0
 
 
+#: Los pares que escucha el flujo: los dos de siempre (contra FDUSD, los del dinero real) y las ocho monedas contra USDT.
+PARES = lib_datos.PARES_OPERADOS + tuple(p for p in lib_datos.UNIVERSO if p not in lib_datos.PARES_OPERADOS)
+
+
 class Caido(Exception):
     """La conexión se cortó o no se pudo abrir. Se vuelve a intentar."""
 
@@ -49,7 +53,7 @@ def ruta_de(pares, intervalos=INTERVALOS):
     """La ruta del flujo combinado de velas de esos pares. Solo pares que se operan y solo los intervalos conocidos."""
     nombres = []
     for par in pares:
-        if par not in lib_datos.PARES_OPERADOS:
+        if par not in PARES:
             raise ValueError(f"Par no permitido en el flujo: {par!r}")
         for i in intervalos:
             if i not in INTERVALOS:
@@ -76,7 +80,7 @@ def vela_de(mensaje):
     if not isinstance(k, dict) or d.get("e") != "kline":
         return None
     par, intervalo = k.get("s"), k.get("i")
-    if par not in lib_datos.PARES_OPERADOS or intervalo not in INTERVALOS:
+    if par not in PARES or intervalo not in INTERVALOS:
         return None
     t, evento = k.get("t"), d.get("E")
     if isinstance(t, bool) or not isinstance(t, int) or t <= 0:
@@ -110,7 +114,7 @@ def _marco(opcode, datos=b""):
 class Flujo:
     """Una conexión al flujo de velas. `abrir` se reemplaza en las pruebas por un socket falso: ninguna sale a la red."""
 
-    def __init__(self, pares=lib_datos.PARES_OPERADOS, abrir=None, reloj=time.monotonic):
+    def __init__(self, pares=PARES, abrir=None, reloj=time.monotonic):
         self.ruta = ruta_de(pares)
         self._abrir = abrir or self._abrir_red
         self._reloj = reloj

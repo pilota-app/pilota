@@ -32,6 +32,11 @@ import nucleo
 PARES = ("BTCFDUSD", "ETHFDUSD", "BTCUSDT", "ETHUSDT")
 #: Los dos que se compran: solo de ellos se guardan velas de 1 m y muestras del libro.
 PARES_OPERADOS = ("BTCFDUSD", "ETHFDUSD")
+#: Las monedas que mira el robot en prueba (`lib_universo`), todas contra USDT. Sus series se guardan igual que las de
+#: siempre (1 h, 4 h, 1 d y 1 m), pero no entran en el estado de los datos ni en el historial de los 3 años: las prepara
+#: `lib_universo` y las mantiene al día el flujo en vivo.
+UNIVERSO = ("BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "TRXUSDT", "DOGEUSDT")
+CONOCIDOS = PARES + tuple(p for p in UNIVERSO if p not in PARES)
 TEMPORALIDADES = ("1h", "4h", "1d")
 #: El minuto va aparte: solo de los pares que se operan y solo los últimos días (el ejecutor de prueba y reconciliar).
 MINUTO = "1m"
@@ -167,9 +172,9 @@ class Binance:
 
     def info_pares(self, pares):
         """Los símbolos de `pares` como los da exchangeInfo: sus filtros vigentes (tick, paso de cantidad, mínimos) y si
-        aceptan protección automática. Los nombres salen de PARES, nunca de afuera."""
+        aceptan protección automática. Los nombres salen de PARES o del universo, nunca de afuera."""
         for par in pares:
-            if par not in PARES:
+            if par not in CONOCIDOS:
                 raise ValueError(f"No conozco ese par: {par!r}")
         d = self.obtener("/api/v3/exchangeInfo", {"symbols": json.dumps(list(pares), separators=(",", ":"))})
         if not isinstance(d, dict) or not isinstance(d.get("symbols"), list):
@@ -244,7 +249,10 @@ def carpeta_mercado():
 
 
 def serie_valida(par, temporalidad):
-    """Las series que Pilota guarda: las 12 de siempre (4 pares × 1 h, 4 h, 1 d) y, solo de los pares que se operan, la de 1 m."""
+    """Las series que Pilota guarda: las 12 de siempre (4 pares × 1 h, 4 h, 1 d), la de 1 m de los pares que se operan, y las
+    del universo del robot (1 h, 4 h, 1 d y 1 m)."""
+    if par in UNIVERSO:
+        return temporalidad in TEMPORALIDADES or temporalidad == MINUTO
     return par in PARES and (temporalidad in TEMPORALIDADES or (temporalidad == MINUTO and par in PARES_OPERADOS))
 
 

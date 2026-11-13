@@ -32,7 +32,9 @@ import lib_indicadores_mercado
 import lib_modos
 import lib_perfiles
 import lib_registro
+import lib_rotacion
 import lib_tamano
+import lib_universo
 import nucleo
 
 FORMATO = 1
@@ -105,6 +107,8 @@ def empezar(perfil, monto, ahora_ms=None):
     if p["tipo"] == "acumular":
         d["holding"] = {"efectivo": monto, "tenencias": {par: 0.0 for par in p["reparto"]}, "partes": 0,
                         "ultima_ms": 0, "compras": []}
+    if p["tipo"] == "rotar":
+        d["rotacion"] = {"efectivo": monto, "tenencias": {}, "gastado": {}, "dia_ms": 0, "ranking": []}
     guardar(d)
     lib_registro.anotar(AMBIENTE, "perfil_empezado", ms=ms, resultado={"perfil": perfil, "saldo": monto})
     return {"ok": True, "datos": d}
@@ -123,24 +127,33 @@ def detener(ahora_ms=None):
 
 # ── Una vuelta ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
-def contexto(ms=None):
+def contexto(ms=None, pares=None):
     """La tendencia diaria de cada par y el filtro de BTC, como los arma el backtest. Sin ellos no hay entrada."""
     btc = lib_datos.leer_serie(lib_indicadores_mercado.CONTEXTO_PAR, lib_estrategias.TEMPORALIDAD_DIARIA)
     filtro = lib_estrategias.filtro_en(btc) if len(btc) >= VELAS_MINIMAS_DIA else None
     alzas = {}
-    for par in lib_datos.PARES_OPERADOS:
-        dia = lib_datos.leer_serie(lib_estrategias.PAR_DIARIO[par], lib_estrategias.TEMPORALIDAD_DIARIA)
+    for par in (pares or lib_datos.PARES_OPERADOS):
+        dia = _diaria(par)
         alzas[par] = lib_estrategias.al_alza_en(dia) if len(dia) >= VELAS_MINIMAS_DIA else None
     return filtro, alzas
+
+
+def _diaria(par):
+    """Las velas diarias de un par: las de FDUSD se miran en su par contra USDT, que tiene más historia."""
+    try:
+        return lib_datos.leer_serie(lib_estrategias.PAR_DIARIO.get(par, par), lib_estrategias.TEMPORALIDAD_DIARIA)
+    except ValueError:
+        return []
 
 
 def senales_de_ahora(perfil, ms, series=None, ctx=None):
     """Las señales de la última vela cerrada de cada par en las temporalidades del perfil, ya filtradas por el perfil.
     Devuelve las señales y las series que no estaban al día (`atrasadas`)."""
     p = lib_perfiles.de(perfil) or {}
-    filtro, alzas = ctx if ctx is not None else contexto(ms)
+    pares = lib_perfiles.pares_de(perfil)
+    filtro, alzas = ctx if ctx is not None else contexto(ms, pares)
     salida, atrasadas = [], []
-    for par in lib_datos.PARES_OPERADOS:
+    for par in pares:
         for t in p.get("temporalidades", ()):
             paso = lib_datos.PASO_MS[t]
             velas = (series or {}).get((par, t)) if series is not None else lib_perfiles.serie(par, t)
@@ -168,7 +181,8 @@ def _vuelta_senales(d, ms, f, ex_estado):
         d["vistas"][f"{s['par']}|{s['temporalidad']}|{s['estrategia']}"] = s["vela"]
         abiertas, comprometido = lib_tamano.posiciones_de(cuenta)
         t = lib_perfiles.tamano(perfil, _numero(cuenta.get("saldo")), s["entrada"], s["stop"],
-                                pares.get(s["par"]) or {}, com, abiertas=abiertas, comprometido=comprometido)
+                                pares.get(s["par"]) or {}, lib_universo.comisiones_de(s["par"], com),
+                                abiertas=abiertas, comprometido=comprometido)
         r = lib_ejecutor_prueba.entrar(s, ahora_ms=ms, tamano_=t, frenos=f)
         if r["puesta"]:
             anotar_jugada(d, r["posicion"], s)
@@ -226,6 +240,78 @@ def _vuelta_holding(d, ms, minutos=None):
     return {"decision": "compra", "parte": h["partes"]}
 
 
+#: Un precio de 1 m más viejo que esto no sirve para comprar ni vender en la rotación: se espera al siguiente.
+PRECIO_FRESCO_MS = 10 * 60_000
+#: Lo que se pierde entre la punta de compra y la de venta en cada cambio de moneda (lo mismo que supone la comparación).
+SPREAD_ROTACION = 0.0005
+
+
+def precio_fresco(par, ms):
+    """El último cierre de 1 m de esa moneda, si es de hace poco. Sin precio fresco no se mueve nada."""
+    try:
+        velas = lib_datos.leer_serie(par, lib_datos.MINUTO)
+    except ValueError:
+        return None
+    if not velas or ms - (velas[-1][0] + 60_000) > PRECIO_FRESCO_MS:
+        return None
+    return _numero(velas[-1][4]) or None
+
+
+def _vuelta_rotacion(d, ms, f):
+    """Una vez por día, apenas cierra la vela diaria: ordena las ocho por fuerza, se queda con las mejores y cambia solo la
+    que se cayó del grupo. Vende y compra a mercado, con la comisión taker y la diferencia de puntas."""
+    p = lib_perfiles.de(d["perfil"])
+    r = d.setdefault("rotacion", {"efectivo": _numero(d.get("monto")), "tenencias": {}, "gastado": {}, "dia_ms": 0})
+    dia = ms // lib_rotacion.DIA_MS * lib_rotacion.DIA_MS
+    if int(r.get("dia_ms") or 0) >= dia:
+        return {"decision": "esperando", "proxima_ms": dia + lib_rotacion.DIA_MS}
+    diarias = {par: _diaria(par) for par in p["pares"]}
+    filas = lib_rotacion.ranking(diarias, ms, p["dias_fuerza"], p["media"])
+    if not filas:
+        return {"decision": "sin_datos"}
+    filtro_en, _ = contexto(ms, ())
+    pasa = bool(filtro_en(ms).get("pasa")) if filtro_en else False
+    puerta = lib_frenos.permite_entrada(f)
+    actuales = [par for par, q in (r.get("tenencias") or {}).items() if _numero(q) > 0]
+    quiero = lib_rotacion.elegir(filas, actuales, p["posiciones"], p["margen"], pasa and puerta["puede"])
+    salen = [par for par in actuales if par not in quiero]
+    entran = [par for par in quiero if par not in actuales]
+    precio = {par: precio_fresco(par, ms) for par in salen + entran}
+    if any(not precio[par] for par in precio):
+        return {"decision": "sin_datos", "faltan": [par for par in precio if not precio[par]]}
+    taker = lib_tamano.comisiones(lib_costos.comisiones())["taker"]
+    tenencias, gastado = r.setdefault("tenencias", {}), r.setdefault("gastado", {})
+    for par in salen:
+        cantidad = _numero(tenencias.pop(par, 0))
+        recibe = cantidad * precio[par] * (1 - taker - SPREAD_ROTACION)
+        costo = _numero(gastado.pop(par, 0))
+        r["efectivo"] = _numero(r.get("efectivo")) + recibe
+        lib_registro.anotar(AMBIENTE, "rotacion_venta", par=par, ms=ms,
+                            orden={"lado": "venta", "tipo": "mercado", "precio": precio[par], "cantidad": cantidad,
+                                   "monto": recibe, "estado": "llenada"},
+                            resultado={"precio": precio[par], "neto": recibe - costo, "comision": cantidad * precio[par] * taker})
+    for i, par in enumerate(entran):
+        gasto = _numero(r.get("efectivo")) / (len(entran) - i)
+        if gasto <= 0:
+            break
+        cantidad = gasto * (1 - taker - SPREAD_ROTACION) / precio[par]
+        tenencias[par] = cantidad
+        gastado[par] = gasto
+        r["efectivo"] = max(0.0, _numero(r.get("efectivo")) - gasto)
+        fila = next((x for x in filas if x["par"] == par), {})
+        lib_registro.anotar(AMBIENTE, "rotacion_compra", par=par, ms=ms,
+                            orden={"lado": "compra", "tipo": "mercado", "precio": precio[par], "cantidad": cantidad,
+                                   "monto": gasto, "estado": "llenada"},
+                            resultado={"comision": gasto * taker, "puesto": fila.get("puesto"), "fuerza": fila.get("fuerza")})
+    r["dia_ms"] = dia
+    r["ranking"] = [{k: x.get(k) for k in ("par", "puesto", "fuerza", "retorno", "elegible")} for x in filas]
+    r["pasa_btc"] = pasa
+    d["rotacion"] = r
+    if salen or entran:
+        return {"decision": "rotacion", "salen": salen, "entran": entran}
+    return {"decision": "mantiene" if actuales else ("frenado" if not pasa else "sin_senal"), "tiene": actuales}
+
+
 def decidir(ctx=None, ahora_ms=None):
     """El gancho del motor. En prueba con un perfil puesto, opera el perfil; si no, deciden los tres modos de siempre."""
     c = ctx if isinstance(ctx, dict) else {}
@@ -238,6 +324,8 @@ def decidir(ctx=None, ahora_ms=None):
     ej = c.get("ejecutor") if isinstance(c.get("ejecutor"), dict) else lib_ejecutor_prueba.guardado()
     if lib_perfiles.de(d["perfil"])["tipo"] == "acumular":
         vuelta = _vuelta_holding(d, ms)
+    elif lib_perfiles.de(d["perfil"])["tipo"] == "rotar":
+        vuelta = _vuelta_rotacion(d, ms, f)
     else:
         puerta = lib_frenos.permite_entrada(f)
         vuelta = ({"decision": "frenado", "motivo": puerta["motivo"]} if not puerta["puede"]
@@ -251,7 +339,7 @@ def decidir(ctx=None, ahora_ms=None):
 
 # ── Lo que lee la pantalla ───────────────────────────────────────────────────────────────────────────────────────────
 
-MOVIMIENTOS = ("perfil_empezado", "perfil_detenido", "compra_holding", "entrada_ruptura", "entrada_rebote", "objetivo",
+MOVIMIENTOS = ("perfil_empezado", "perfil_detenido", "compra_holding", "rotacion_compra", "rotacion_venta", "entrada_ruptura", "entrada_rebote", "objetivo",
                "stop", "stop_movil", "cierre_manual", "propuesta_vencida", "rechazo", "freno_diario", "freno_racha",
                "freno_piso", "freno_piso_absoluto", "saldo_reiniciado")
 
@@ -281,6 +369,17 @@ def estado(ahora_ms=None, minutos=None):
                               "valor": None if precio is None else _numero(cantidad) * precio,
                               "precio_medio": gastado / _numero(cantidad) if _numero(cantidad) > 0 else None})
         valor = efectivo + sum(_numero(x["valor"]) for x in tenencias)
+    elif perfil and perfil["tipo"] == "rotar":
+        r = d.get("rotacion") or {}
+        efectivo = _numero(r.get("efectivo"))
+        for par, cantidad in sorted((r.get("tenencias") or {}).items()):
+            gastado = _numero((r.get("gastado") or {}).get(par))
+            precio = ahora.get(par) or precio_fresco(par, ms)
+            ahora[par] = precio
+            tenencias.append({"par": par, "cantidad": _numero(cantidad), "gastado": gastado, "precio_ahora": precio,
+                              "valor": gastado if precio is None else _numero(cantidad) * precio,
+                              "precio_medio": gastado / _numero(cantidad) if _numero(cantidad) > 0 else None})
+        valor = efectivo + sum(_numero(x["valor"]) for x in tenencias)
     else:
         ej = lib_ejecutor_prueba.estado(ms, minutos=minutos)
         efectivo = _numero(ej.get("saldo")) - _numero(ej.get("comprometido"))
@@ -296,6 +395,7 @@ def estado(ahora_ms=None, minutos=None):
             "ganancia_relativa": (valor / monto - 1) if hay else None, "efectivo": efectivo,
             "posiciones": posiciones, "tenencias": tenencias, "precios": ahora,
             "holding": d.get("holding") if perfil and perfil["tipo"] == "acumular" else None,
+            "rotacion": d.get("rotacion") if perfil and perfil["tipo"] == "rotar" else None,
             "ultima": d.get("ultima") or {}, "ultima_ms": int(d.get("ultima_ms") or 0),
             "jugadas": d.get("jugadas") or {},
             "movimientos": movimientos(int(d.get("desde_ms") or 0)) if hay else [],
