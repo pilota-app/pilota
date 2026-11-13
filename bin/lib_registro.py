@@ -63,7 +63,7 @@ RAZONES = (
     "freno_diario", "freno_racha", "freno_piso", "freno_piso_absoluto", "freno_comision", "freno_fdusd",
     "pausa", "reanudar",
     # La prueba en vivo con un perfil (`lib_piloto`): cuándo empezó y paró, y cada compra por partes del holding
-    "perfil_empezado", "perfil_detenido", "compra_holding",
+    "perfil_empezado", "perfil_detenido", "compra_holding", "venta_holding",
     # La rotación: pasa a la moneda que viene más fuerte (vende la que se cae del grupo y compra la que entra)
     "rotacion_compra", "rotacion_venta",
 )

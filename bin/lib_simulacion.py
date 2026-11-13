@@ -32,6 +32,7 @@ import lib_costos
 import lib_datos
 import lib_estrategias
 import lib_frenos
+import lib_holding
 import lib_indicadores_mercado
 import lib_perfiles
 import lib_rotacion
@@ -251,6 +252,18 @@ def holding(monto, desde_ms, hasta_ms, com, series=None):
             "movimientos_total": len(movimientos), "tenencias": tenencias, "efectivo": efectivo}
 
 
+def holding_variante(perfil, monto, desde_ms, hasta_ms, com, diarias=None):
+    """Una variante de holding (`lib_holding`) sobre el pasado, con las velas diarias de sus monedas contra USDT."""
+    p = lib_perfiles.de(perfil)
+    diarias = diarias if diarias is not None else {par: lib_datos.leer_serie(par, "1d") for par in p["reparto"]}
+    r = lib_holding.simular(monto, diarias, desde_ms, hasta_ms, p, com)
+    if r.get("listo"):
+        r["curva"] = ralear(r["curva"])
+        r["movimientos"] = r["movimientos"][-MOVIMIENTOS:]
+        r.pop("libro", None)
+    return r
+
+
 def ops_de(pares, temporalidad, com=None, minutos=None, desde_ms=None):
     """Las operaciones que habrían dado las reglas de siempre en esas monedas y esa vela, con los costos de cada una (contra
     USDT no hay conversión). Las de 5 m se arman con las de 1 m (solo hay los últimos `lib_datos.DIAS_MINUTOS` días)."""
@@ -312,7 +325,7 @@ def comparar(monto, dias, recorrido, minimo=None, rapidas=None):
     for perfil in lib_perfiles.ORDEN:
         p = lib_perfiles.de(perfil)
         if p["tipo"] == "acumular":
-            r = holding(monto, desde, hasta, com)
+            r = holding_variante(perfil, monto, desde, hasta, com) if p.get("variante") else holding(monto, desde, hasta, com)
             salida.append({"perfil": perfil, "desde_ms": desde, "hasta_ms": hasta, "recortado": False, **r})
             continue
         if p["tipo"] == "rotar":

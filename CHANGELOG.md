@@ -7,6 +7,12 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- Nuevos perfiles de comprar y guardar: Holding 8 monedas, Compra semanal (cada compra un 1 % más abajo), Rebalanceo (mitad en
+  cripto, vende lo que sobra y compra lo que falta) y Cosecha (vende un cuarto cuando sube 30 % y recompra si cae 15 %). Cada
+  uno dice su plan en «Mi plan», y se agrupan en «Comprar y guardar» y «Experimento». *New buy-and-keep profiles: Holding 8
+  coins, Weekly buy (each buy 1 % lower), Rebalance (half in crypto, sells the excess and buys what is missing) and Harvest
+  (sells a quarter when it rises 30 % and buys back if it falls 15 %). Each one shows its plan in "My plan", grouped under
+  "Buy and keep" and "Experiment".*
 - Pilota ahora ofrece solo dos perfiles: Holding (el sugerido) y Rotación (marcada como experimento). Conservador, Equilibrado,
   Trader y Scalper se retiraron porque perdieron contra quedarse en USDT con datos reales; si tenías uno andando, se detiene
   solo y lo abierto sigue protegido. *Pilota now offers only two profiles: Holding (the suggested one) and Rotation (marked as

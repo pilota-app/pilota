@@ -15,7 +15,8 @@ Así lo que se ve en vivo es coherente con lo que mostró la comparación.
 | scalper | el más rápido: entra y sale en minutos | 5 m | 1 | 1 % | 2 |
 | rotacion | tiene las 2 monedas más fuertes de las 8 y cambia cuando otra las pasa | 1 d | — | — | 2 |
 
-**Se ofrecen solo dos** (`ORDEN`): holding y rotacion. Los cuatro perfiles de señales (conservador, equilibrado, trader y
+**Se ofrecen** (`ORDEN`) la familia holding —holding, holding_ocho, compra_semanal, rebalanceo y cosecha, cada una con
+una sola variante de comprar por partes y guardar (`lib_holding`)— y la rotacion. Los cuatro perfiles de señales (conservador, equilibrado, trader y
 scalper) quedan **retirados**: perdieron contra quedarse en USDT con datos reales (nov 2026) y la pantalla ya no los ofrece.
 Sus reglas siguen aquí porque la máquina de señales es la misma que usan los tres modos del dinero real, y sus pruebas la
 cuidan. Un perfil retirado que estaba andando se detiene solo (`vivo.retirar`).
@@ -44,6 +45,17 @@ PERFILES = {
                "pares": lib_datos.UNIVERSO},
     "scalper": {"tipo": "senales", "temporalidades": ("5m",), "rr": 1.0, "riesgo": 0.01, "posiciones": 2,
                 "dias_max": lib_datos.DIAS_MINUTOS, "pares": ("BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT")},
+    # La familia holding: comprar por partes y guardar, con una variante cada uno (`lib_holding`). Todas contra USDT.
+    "holding_ocho": {"tipo": "acumular", "variante": True, "partes": 12, "cada_ms": 7 * DIA_MS,
+                     "reparto": {p: 1 / len(lib_datos.UNIVERSO) for p in lib_datos.UNIVERSO}, "pares": lib_datos.UNIVERSO},
+    "compra_semanal": {"tipo": "acumular", "variante": True, "partes": 52, "cada_ms": 7 * DIA_MS, "descuento": 0.01,
+                       "reparto": {"BTCUSDT": 0.6, "ETHUSDT": 0.4}, "pares": ("BTCUSDT", "ETHUSDT")},
+    "rebalanceo": {"tipo": "acumular", "variante": True, "partes": 12, "cada_ms": 7 * DIA_MS,
+                   "rebalanceo": {"cripto": 0.5, "banda": 0.1},
+                   "reparto": {"BTCUSDT": 0.6, "ETHUSDT": 0.4}, "pares": ("BTCUSDT", "ETHUSDT")},
+    "cosecha": {"tipo": "acumular", "variante": True, "partes": 12, "cada_ms": 7 * DIA_MS,
+                "cosecha": {"sube": 0.3, "vende": 0.25, "recompra": 0.15},
+                "reparto": {"BTCUSDT": 0.6, "ETHUSDT": 0.4}, "pares": ("BTCUSDT", "ETHUSDT")},
     # Rotación: cada día, las 2 monedas más fuertes de las 8 (fuerza = cuánto subieron en 30 días contra cuánto se movieron),
     # solo las que están sobre su media de 50 días y solo si BTC está sobre su media de 200. Cambia una cuando otra la pasa
     # con margen (`margen`), para no ir y venir por nada. Ver `lib_rotacion`.
@@ -51,7 +63,7 @@ PERFILES = {
                  "dias_fuerza": 30, "media": 50, "margen": 1},
 }
 #: Los que se ofrecen, en el orden de la pantalla. El resto está retirado (ver arriba).
-ORDEN = ("holding", "rotacion")
+ORDEN = ("holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "rotacion")
 RETIRADOS = ("conservador", "equilibrado", "trader", "scalper")
 SUGERIDO = "holding"
 #: Las velas que no se guardan tal cual: se arman juntando velas de 1 m.

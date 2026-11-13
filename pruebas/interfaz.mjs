@@ -90,8 +90,10 @@ await page.waitForSelector("#descargar");
   await cab.waitForSelector("#pestana-vivo .perfiles");
   assert.equal(await cab.locator('.pestanas [role="tab"]').count(), 6, "seis pestañas");
   assert.equal(await cab.locator('.pestanas [role="tab"][aria-selected="true"]').getAttribute("id"), "tab-vivo", "parte en «En vivo»");
-  // Solo se ofrecen los dos perfiles que los datos respaldan; los de señales quedaron retirados.
-  assert.equal(await cab.locator(".perfil").count(), 2, "holding y rotación");
+  // Se ofrecen la familia holding y la rotación, agrupados; los de señales quedaron retirados.
+  assert.equal(await cab.locator(".perfil").count(), 6, "cinco holding y la rotación");
+  assert.equal(await cab.locator('.perfiles-grupo[data-grupo="guardar"] .perfil').count(), 5, "la familia holding junta");
+  assert.match(await cab.textContent('.perfil[data-perfil="holding_ocho"]'), /BTC · ETH · BNB · SOL · XRP · ADA · TRX · DOGE/);
   assert.equal(await cab.locator('.perfil[data-perfil="scalper"]').count(), 0, "el scalper ya no se ofrece");
   assert.match(await cab.textContent('.perfil[data-perfil="rotacion"]'), /Experimento[\s\S]*BTC · ETH · BNB · SOL · XRP · ADA · TRX · DOGE/,
     "la rotación dice que es un experimento y sus monedas");
@@ -162,18 +164,27 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.inputValue("#sim-monto"), "250", "lo escrito sigue ahí al volver a pintar");
   await cab.click("#sim-correr");
   await cab.waitForSelector(".comp-grilla");
-  assert.equal(await cab.locator(".comp-perfil").count(), 2, "los dos perfiles lado a lado");
+  assert.equal(await cab.locator(".comp-perfil").count(), 6, "los seis perfiles lado a lado");
   // Cada perfil dice si le ganó a quedarse en USDT y a comprar BTC.
-  assert.equal(await cab.locator(".comp-veredicto").count(), 2, "cada perfil con su veredicto");
+  assert.equal(await cab.locator(".comp-veredicto").count(), 6, "cada perfil con su veredicto");
   assert.match(await cab.textContent(".sim-resultado"), /365 días\) con 250 USDT[\s\S]*Quedarte en USDT[\s\S]*Comprar BTC y esperar/);
   // La película: tocar un perfil la pone a andar, movimiento por movimiento.
-  await cab.click('[data-comparar="holding"]');
+  await cab.click('[data-comparar="cosecha"]');
   await cab.waitForSelector(".peli .mov");
   await cab.waitForFunction(() => /Movimiento (\d+) de \1\b/.test(document.querySelector(".peli").textContent), null, { timeout: 20000 });
   assert.equal(await cab.locator(".peli svg polyline").count(), 2, "al final, las dos curvas enteras");
-  await cab.click('[data-usar-perfil="holding"]');
-  assert.equal(await cab.getAttribute('.perfil[data-perfil="holding"]', "aria-checked"), "true", "pasa el perfil a «En vivo»");
+  assert.match(await cab.textContent(".peli"), /Coseché ETH/, "la película cuenta la venta de la cosecha");
+  await cab.click('[data-usar-perfil="cosecha"]');
+  assert.equal(await cab.getAttribute('.perfil[data-perfil="cosecha"]', "aria-checked"), "true", "pasa el perfil a «En vivo»");
   assert.equal(await cab.inputValue("#vivo-monto"), "250", "y el monto");
+  // Un holding andando dice su plan: cuántas compras lleva y a qué precio vendería un cuarto.
+  await cab.click("#vivo-empezar");
+  await cab.waitForSelector("[role=alertdialog]");          // ya hubo un robot: empezar de nuevo se confirma
+  await cab.click('[data-pz-confirmar="si"]');
+  await cab.waitForSelector("#plan");
+  assert.match(await cab.textContent("#plan"), /Llevo 1 de 12 compras[\s\S]*Vendo un cuarto de BTC si llega a/);
+  await cab.click("#vivo-detener");
+  await cab.waitForSelector("#vivo-cambiar >> text=Empezar de nuevo");
   // La cabina sigue: la cadena de los seis agentes, el medidor del saldo y un dial por moneda.
   await cab.click("#tab-ahora");
   await cab.waitForSelector(".cabina .cadena");

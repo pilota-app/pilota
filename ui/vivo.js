@@ -13,14 +13,26 @@ window.PilotaVivo = (() => {
     equilibrado: { nombre: "Equilibrado", que: "Operaciones medianas en velas de 1 y 4 horas. Es el punto de partida que te sugiero.", ritmo: "Medio" },
     trader: { nombre: "Trader", que: "Muchas operaciones chicas en velas de 1 hora.", ritmo: "Rápido" },
     scalper: { nombre: "Scalper", que: "El más rápido: velas de 5 minutos, entra y sale en minutos u horas. Más operaciones, más comisiones.", ritmo: "Muy rápido" },
+    holding_ocho: { nombre: "Holding 8 monedas", que: "Compra las 8 monedas en partes iguales, una vez por semana, y las guarda. Más repartido: si una se cae, pesa menos.", ritmo: "Muy lento" },
+    compra_semanal: { nombre: "Compra semanal", que: "Compra BTC y ETH todas las semanas durante un año. Deja cada compra un 1 % más abajo; si el precio no llega, compra igual ese día.", ritmo: "Muy lento" },
+    rebalanceo: { nombre: "Rebalanceo", que: "Mitad en BTC y ETH, mitad en USDT. Si cripto sube y pasa del 60 %, vende lo que sobra; si baja del 40 %, compra lo que falta.", ritmo: "Lento" },
+    cosecha: { nombre: "Cosecha", que: "Compra BTC y ETH por partes. Cuando una sube 30 % sobre lo que pagó, vende un cuarto; si después cae 15 %, la vuelve a comprar.", ritmo: "Lento" },
     rotacion: { nombre: "Rotación", que: "Experimento: tiene las 2 monedas que vienen más fuertes de las 8 y cambia a la que pasa adelante. Se parece a comprar BTC: a veces gana y a veces pierde, y puede caer tanto como BTC.", ritmo: "Lento" },
   };
   // Los que se ofrecen (bin/lib_perfiles.py: ORDEN). Los otros cuatro quedaron retirados: perdieron con datos reales. Sus
   // nombres siguen arriba para contar lo que ya pasó en el registro.
-  const ORDEN = ["holding", "rotacion"];
+  const ORDEN = ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "rotacion"];
+  // Cómo se agrupan en la pantalla: la familia holding primero (comprar y guardar) y aparte los experimentos.
+  const GRUPOS = [["guardar", "Comprar y guardar", ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha"]],
+    ["experimento", "Experimento", ["rotacion"]]];
+  const GRUPO_AYUDA = {
+    guardar: "Compran por partes y guardan. Cada uno cambia una sola cosa: qué monedas, cada cuánto compra o si vende una parte.",
+    experimento: "Opera más seguido. Se mide igual que los otros, pero no tiene una ventaja probada.",
+  };
   // Las monedas de cada perfil (bin/lib_perfiles.py: «pares»). Todas contra USDT; el holding guarda BTC y ETH.
   const MONEDAS = {
-    holding: ["BTC", "ETH"], conservador: ["BTC", "ETH", "BNB"], equilibrado: ["BTC", "ETH", "BNB", "SOL", "XRP"],
+    holding: ["BTC", "ETH"], holding_ocho: ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"],
+    compra_semanal: ["BTC", "ETH"], rebalanceo: ["BTC", "ETH"], cosecha: ["BTC", "ETH"], conservador: ["BTC", "ETH", "BNB"], equilibrado: ["BTC", "ETH", "BNB", "SOL", "XRP"],
     trader: ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"], scalper: ["BTC", "ETH", "SOL", "XRP", "DOGE"],
     rotacion: ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"],
   };
@@ -37,6 +49,7 @@ window.PilotaVivo = (() => {
     esperando: "Ya compré esta semana. La próxima compra es el {fecha}.",
     completo: "Ya compré todas las partes: ahora solo mantengo.",
     rotacion: "Cambié de moneda: vendí {salen} y compré {entran}.",
+    venta: "Vendí una parte: está en «Lo último que hizo».",
     mantiene: "Comparé las 8 y sigo con {tiene}: siguen entre las más fuertes.",
   };
   // Por qué no se pudo (bin/lib_simulacion.py: MOTIVOS y bin/lib_piloto.py).
@@ -108,7 +121,14 @@ window.PilotaVivo = (() => {
       switch (l.razon) {
         case "perfil_empezado": return frase("Empecé con {monto} ficticios, en perfil {perfil}.", { monto: usdt(r.saldo), perfil: Tp(nombre(r.perfil)) });
         case "perfil_detenido": return frase("Me detuviste (perfil {perfil}). Lo abierto sigue protegido.", { perfil: Tp(nombre(r.perfil)) });
-        case "compra_holding": return frase("Compré {cantidad} {moneda} a {precio} ({monto}).", { cantidad: numero(o.cantidad, 6), moneda: m, precio: usdt(o.precio), monto: usdt(o.monto) });
+        case "compra_holding": return ({
+            limite: frase("Compré {cantidad} {moneda} a {precio} ({monto}): el precio bajó hasta mi orden.", { cantidad: numero(o.cantidad, 6), moneda: m, precio: usdt(o.precio), monto: usdt(o.monto) }),
+            recompra: frase("Recompré {moneda} a {precio} ({monto}): cayó desde que coseché.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto) }),
+            rebalanceo: frase("Rebalanceo: compré {monto} de {moneda} a {precio} porque cripto quedó bajo su parte.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto) }),
+          })[r.por] || frase("Compré {cantidad} {moneda} a {precio} ({monto}).", { cantidad: numero(o.cantidad, 6), moneda: m, precio: usdt(o.precio), monto: usdt(o.monto) });
+        case "venta_holding": return r.por === "rebalanceo"
+          ? frase("Rebalanceo: vendí {monto} de {moneda} a {precio} porque cripto pasó de su parte.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto) })
+          : frase("Coseché {moneda}: vendí {monto} a {precio} y gané {neto}. Guardo esa plata para recomprar si baja.", { moneda: m, precio: usdt(o.precio), monto: usdt(o.monto), neto: usdt(r.neto || 0) });
         case "rotacion_compra": return frase("Pasé a {moneda}: compré {monto} a {precio}. Es la número {puesto} de las 8 en fuerza.", { moneda: m, monto: usdt(o.monto), precio: usdt(o.precio), puesto: numero(r.puesto || 0, 0) });
         case "rotacion_venta": return (r.neto || 0) >= 0
           ? frase("Salí de {moneda}: se cayó del grupo de las más fuertes. Vendí a {precio} y gané {neto}.", { moneda: m, precio: usdt(o.precio), neto: usdt(r.neto || 0) })
@@ -135,7 +155,7 @@ window.PilotaVivo = (() => {
       }
     }
     const claseLinea = (l) => ({ objetivo: "gana", stop: "pierde", stop_movil: (l.resultado || {}).neto > 0 ? "gana" : "pierde",
-      compra_holding: "compra", rotacion_compra: "compra", rotacion_venta: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", entrada_ruptura: "compra", entrada_rebote: "compra", rechazo: "nada", propuesta_vencida: "nada" })[l.razon] || "info";
+      compra_holding: "compra", venta_holding: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", rotacion_compra: "compra", rotacion_venta: (l.resultado || {}).neto >= 0 ? "gana" : "pierde", entrada_ruptura: "compra", entrada_rebote: "compra", rechazo: "nada", propuesta_vencida: "nada" })[l.razon] || "info";
     function filaLinea(l) {
       return `<li class="mov" data-tipo="${claseLinea(l)}"><span class="mov-punto" aria-hidden="true"></span>
         <span class="mov-cuando" data-sin-traducir>${esc(fechaHora(l.fecha))}</span>
@@ -144,11 +164,16 @@ window.PilotaVivo = (() => {
     // Un movimiento de la simulación (bin/lib_simulacion.py: movimientos).
     function textoMov(v) {
       const m = moneda(v.par);
+      if (v.que === "venta" && (v.por === "cosecha" || v.por === "rebalanceo")) {
+        return v.por === "cosecha"
+          ? frase("Coseché {moneda} a {precio}: dejó {neto}. Saldo: {saldo}.", { moneda: m, precio: usdt(v.precio), neto: usdt(v.ganancia || 0), saldo: usdt(v.saldo) })
+          : frase("Rebalanceo: vendí {moneda} a {precio} porque cripto pasó de su parte. Saldo: {saldo}.", { moneda: m, precio: usdt(v.precio), saldo: usdt(v.saldo) });
+      }
       if (v.que === "venta" && v.por === "rotacion") {
         return frase("Vendí {moneda} a {precio}: pasé a una más fuerte. Dejó {neto}. Saldo: {saldo}.", { moneda: m, precio: usdt(v.precio), neto: usdt(v.ganancia || 0), saldo: usdt(v.saldo) });
       }
       if (v.que === "compra") {
-        return v.estrategia === "holding" || v.estrategia === "rotacion"
+        return v.estrategia === "holding" || v.estrategia === "rotacion" || !v.stop
           ? frase("Compré {monto} de {moneda} a {precio}.", { monto: usdt(v.monto), moneda: m, precio: usdt(v.precio) })
           : frase("Compré {monto} de {moneda} a {precio}, con stop en {stop} y objetivo en {objetivo}.", { monto: usdt(v.monto), moneda: m, precio: usdt(v.precio), stop: usdt(v.stop), objetivo: usdt(v.objetivo) });
       }
@@ -211,7 +236,12 @@ window.PilotaVivo = (() => {
       const monto = E.campos["vivo-monto"] || E.vivoMonto || 100;
       return `<div class="tarjeta vivo-elegir">
         <h3>${opciones.titulo || "Elige cómo quieres que opere"}</h3>
-        <div class="perfiles" role="radiogroup" aria-label="Perfil">${buenos.map((p) => botonPerfil(p, elegido)).join("")}</div>
+        <div class="perfiles-grupos" role="radiogroup" aria-label="Perfil">${GRUPOS.map(([id, titulo, suyos]) => {
+          const estos = suyos.filter((p) => buenos.includes(p));
+          return estos.length ? `<section class="perfiles-grupo" data-grupo="${id}"><h4>${titulo}</h4>
+            <p class="ayuda">${GRUPO_AYUDA[id]}</p>
+            <div class="perfiles">${estos.map((p) => botonPerfil(p, elegido)).join("")}</div></section>` : "";
+        }).join("")}</div>
         ${malos.length ? `<details class="perfiles-perdedores"${fuera[elegido] ? " open" : ""}>
           <summary>${frase("Perfiles que perdieron en el pasado ({n}): solo para experimentar", { n: numero(malos.length, 0) })}</summary>
           <p class="ayuda">En la última comparación perdieron plata con sus reglas de hoy. Puedes probarlos con dinero ficticio para ver cómo operan, pero no son una buena opción para tu plata.</p>
@@ -368,6 +398,42 @@ window.PilotaVivo = (() => {
           <ul class="radar-filas">${resto.map(fila).join("")}</ul></details>` : ""}
         <p class="ayuda">Decido solo con velas cerradas: cuando una cierra donde dice arriba, compro en ese mismo segundo. La historia es el pasado, no una promesa.</p></div>`;
     }
+    // ── El plan de un holding: cuántas compras lleva, qué orden dejó puesta y a qué precio vendería o recompraría ──
+    // Sale del libro del holding (bin/lib_holding.py) y de las reglas del perfil: los mismos números que usa el robot.
+    function plan(E) {
+      const v = E.vivo || {}, h = v.holding || {}, R = v.reglas || {};
+      if (R.tipo !== "acumular" || !v.activo) return "";
+      const lineas = [];
+      const partes = Number(h.partes) || 0, total = Number(R.partes) || 0;
+      if (total && partes < total) {
+        const prox = h.ultima_ms ? Number(h.ultima_ms) + (Number(R.cada_ms) || 604800000) : Date.now();
+        lineas.push(["compra", frase("Llevo {n} de {total} compras. La próxima es el {fecha}.", { n: numero(partes, 0), total: numero(total, 0), fecha: dia(prox) })]);
+      } else if (total) {
+        lineas.push(["listo", frase("Ya hice las {total} compras: ahora guardo hasta que tú decidas.", { total: numero(total, 0) })]);
+      }
+      for (const [par, o] of Object.entries(h.pendiente || {})) {
+        lineas.push(["espera", frase("Dejé una compra de {moneda} en {precio}. Si mañana el precio no llega, compro igual a ese precio.", { moneda: moneda(par), precio: usdt(o.limite) })]);
+      }
+      const co = R.cosecha;
+      if (co) {
+        for (const t of (v.tenencias || []).filter((x) => x.cantidad > 0 && x.precio_medio)) {
+          if ((h.guardado || {})[t.par]) continue;
+          const meta = t.precio_medio * (1 + co.sube);
+          lineas.push(["espera", frase("Vendo un cuarto de {moneda} si llega a {precio} (falta {falta}).", { moneda: moneda(t.par), precio: usdt(meta), falta: porcentaje(Math.max(0, meta / (t.precio_ahora || meta) - 1), 1) })]);
+        }
+        for (const [par, g] of Object.entries(h.guardado || {})) {
+          lineas.push(["guardado", frase("Guardé {monto} de {moneda}. Lo recompro si baja a {precio}.", { moneda: moneda(par), monto: usdt(g.monto), precio: usdt(g.precio * (1 - co.recompra)) })]);
+        }
+      }
+      const rb = R.rebalanceo;
+      if (rb && v.valor) {
+        const parte = Math.max(0, (v.valor - (v.efectivo || 0)) / v.valor);
+        lineas.push(["espera", frase("Ahora tengo {pct} en cripto. Vendo el sobrante si pasa de {alto} y compro si baja de {bajo}.", { pct: porcentaje(parte, 0), alto: porcentaje(rb.cripto + rb.banda, 0), bajo: porcentaje(rb.cripto - rb.banda, 0) })]);
+      }
+      if (!lineas.length) return "";
+      return `<div class="tarjeta plan" id="plan"><h3>Mi plan</h3>
+        <ul class="plan-lineas">${lineas.map(([tipo, t]) => `<li data-tipo="${tipo}"><span class="plan-punto" aria-hidden="true"></span><span>${t}</span></li>`).join("")}</ul></div>`;
+    }
     // Lo que el robot dice sobre un gráfico: comprado, casi casi, esperando, en pausa o sin jugada (la insignia del gráfico).
     function estadoFila(E, par, t) {
       const v = E.vivo || {}, R = v.radar || {};
@@ -428,6 +494,10 @@ window.PilotaVivo = (() => {
       equilibrado: "Mira velas de 1 y 4 horas. Compra si la operación puede ganar al menos 1,5 veces lo que arriesga, arriesga el 1,5 % del saldo y tiene como máximo 2 posiciones.",
       trader: "Mira velas de 1 hora. Compra si la operación gana al menos lo mismo que arriesga, arriesga el 2 % del saldo y tiene como máximo 2 posiciones.",
       scalper: "Mira velas de 5 minutos, armadas con las de 1 minuto. Compra si gana al menos lo mismo que arriesga, arriesga el 1 % del saldo y tiene como máximo 2 posiciones. Opera mucho: las comisiones pesan.",
+      holding_ocho: "Compra las 8 monedas (BTC, ETH, BNB, SOL, XRP, ADA, TRX y DOGE) en partes iguales, en 12 compras, una por semana. No vende: guarda hasta que tú decidas.",
+      compra_semanal: "Reparte el monto en 52 compras, una por semana, 60 % BTC y 40 % ETH. Cada compra se deja un 1 % bajo el precio del día; si al día siguiente el precio no llegó, compra a ese precio igual. Nunca se salta una semana.",
+      rebalanceo: "Compra BTC y ETH en 12 partes hasta tener la mitad del monto en cripto. Después, una vez por semana: si cripto pasa del 60 % del total, vende el sobrante y lo deja en USDT; si baja del 40 %, compra lo que falta. Vende caro y compra barato por regla, sin adivinar.",
+      cosecha: "Compra BTC y ETH en 12 partes. Cuando una moneda vale 30 % más de lo que pagaste en promedio, vende un cuarto y guarda esa plata. Si después cae 15 % desde esa venta, la vuelve a comprar. Si no cae, la plata queda esperando en USDT.",
       rotacion: "Una vez al día, cuando cierra la vela diaria, ordena las 8 monedas por fuerza: cuánto subieron en 30 días, dividido por cuánto se movieron en el camino. Tiene las 2 primeras que estén sobre su promedio de 50 días, mitad y mitad. Cambia una solo cuando sale del grupo de las 3 mejores: cada cambio paga comisión. No pone stop: sale cuando la moneda pierde fuerza.",
     };
     function reglas(perfil) {
@@ -436,7 +506,7 @@ window.PilotaVivo = (() => {
         <p class="ayuda">${REGLAS[perfil]}</p>
         <p class="ayuda">${frase("Monedas que mira: {monedas}. Todas contra USDT.", { monedas: (MONEDAS[perfil] || []).join(", ") })}</p>
         ${perfil === "rotacion" ? `<p class="ayuda">Siempre: si BTC viene cayendo, vende todo y espera en USDT. Los frenos de la cuenta (5 % al día, el piso) también la cortan.</p>` : ""}
-        ${perfil !== "holding" && perfil !== "rotacion" ? `<p class="ayuda">Rebote: cuando el precio va y viene sin rumbo (fuerza de tendencia baja) y una vela cierra pegada a la banda de abajo de Bollinger, compro ahí. Salgo en la media de la banda (objetivo) o 1 ATR más abajo (stop).</p>
+        ${!["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "rotacion"].includes(perfil) ? `<p class="ayuda">Rebote: cuando el precio va y viene sin rumbo (fuerza de tendencia baja) y una vela cierra pegada a la banda de abajo de Bollinger, compro ahí. Salgo en la media de la banda (objetivo) o 1 ATR más abajo (stop).</p>
         <p class="ayuda">Ruptura: cuando el día viene al alza y una vela cierra sobre el techo de las 20 anteriores con 1,5 veces el volumen normal, dejo una compra en ese techo: espero a que vuelva, no la persigo. Objetivo +1,5 %, stop 1,5 ATR más abajo; la mitad sale en el objetivo y la otra sigue con stop móvil.</p>
         <p class="ayuda">Siempre: si BTC viene cayendo, no compro nada. Cada compra lleva su stop y su objetivo desde el principio, el 40 % queda en USDT y los frenos (5 % al día, 4 pérdidas seguidas, el piso) cortan todo.</p>` : ""}</details>`;
     }
@@ -488,7 +558,7 @@ window.PilotaVivo = (() => {
               apagado: "Sin conexión con Binance: el robot no está mirando. Solo opera con Pilota abierta.",
             }[conexion]}</p>
           </div></div>
-        ${radar(E)}
+        ${radar(E) || plan(E)}
         ${grafico ? grafico() : ""}
         <div class="tarjeta vivo-saldo" data-signo="${signo(v.ganancia)}">
           <p class="vivo-saldo-titulo">Cuánto vale ahora</p>

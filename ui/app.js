@@ -2577,12 +2577,15 @@
   }
   // Los perfiles que se ofrecen, en la vista previa: números inventados, con la forma que devuelve lib_simulacion.comparar.
   function perfilesDemo(monto, desde, hasta) {
-    const ritmo = { holding: 0, rotacion: 8 };
-    return ["holding", "rotacion"].map((perfil, k) => {
+    const ritmo = { holding: 0, holding_ocho: 0, compra_semanal: 0, rebalanceo: 0, cosecha: 0, rotacion: 8 };
+    // Cuánto deja cada holding en la vista previa, por semana de compra (números inventados, con la forma de los reales).
+    const RUMBO = { holding: 0.004, holding_ocho: 0.0034, compra_semanal: 0.0045, rebalanceo: 0.0028, cosecha: 0.0036 };
+    return ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "rotacion"].map((perfil, k) => {
       const d0 = perfil === "scalper" ? Math.max(desde, hasta - 30 * 86400000) : desde;
       let saldo = monto, techo = monto, caida = 0;
       const curva = [[d0, monto]], movimientos = [];
-      const n = perfil === "holding" ? 12 : ritmo[perfil];
+      const familia = perfil in RUMBO;
+      const n = familia ? 12 : ritmo[perfil];
       for (let i = 1; i <= n; i++) {
         const x = d0 + (hasta - d0) * i / (n + 1);
         const par = i % 3 ? "BTCFDUSD" : "ETHFDUSD", precio = par === "BTCFDUSD" ? 95000 + i * 120 : 3500 + i * 6;
@@ -2591,9 +2594,11 @@
           if (i > 1) movimientos.push({ ms: x, que: "venta", par: ["SOLUSDT", "TRXUSDT", "BNBUSDT", "XRPUSDT"][(i + 2) % 4], precio: 100, monto: saldo / 2, por: "rotacion", estrategia: "rotacion", ganancia: saldo / 2 * r, saldo: saldo + saldo / 2 * r });
           saldo += saldo / 2 * r;
           movimientos.push({ ms: x, que: "compra", par: nueva, precio: 100, monto: saldo / 2, estrategia: "rotacion", temporalidad: "1d" });
-        } else if (perfil === "holding") {
+        } else if (familia) {
           movimientos.push({ ms: x, que: "compra", par, precio, monto: monto / 12, estrategia: "holding", temporalidad: "1d" });
-          saldo = monto * (1 + Math.sin(i / 2) * 0.03 + i * 0.004);
+          if (perfil === "cosecha" && i === 9) movimientos.push({ ms: x, que: "venta", par, precio: precio * 1.3, monto: monto / 20, por: "cosecha", ganancia: monto / 80, saldo });
+          if (perfil === "rebalanceo" && i === 10) movimientos.push({ ms: x, que: "venta", par, precio: precio * 1.2, monto: monto / 25, por: "rebalanceo", ganancia: monto / 100, saldo });
+          saldo = monto * (1 + Math.sin(i / 2 + k) * 0.03 + i * RUMBO[perfil]);
         } else {
           // Como en la realidad: los perfiles de señales rápidas pierden de a poco (comisiones y jugadas que ganan poco).
           const sesgo = { equilibrado: -0.006, trader: -0.005, scalper: -0.004 }[perfil] || 0.0015;
@@ -2609,7 +2614,7 @@
       curva.push([hasta, saldo]);
       return { perfil, listo: true, motivo: "", desde_ms: d0, hasta_ms: hasta, recortado: d0 > desde, saldo,
         ganancia: saldo - monto, rendimiento: (saldo - monto) / monto, caida_maxima: caida, curva,
-        operaciones: perfil === "holding" ? 12 : n, movimientos, movimientos_total: movimientos.length };
+        operaciones: familia ? movimientos.length : n, movimientos, movimientos_total: movimientos.length };
     });
   }
   // El gráfico de la vista previa: una caminata al azar, siempre la misma para el mismo par, que termina en el precio de
@@ -2684,7 +2689,7 @@
     const suyas = MONEDAS_DEMO[(v && v.perfil) || "equilibrado"] || ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"];
     const DISTANCIA = { BTC: 0.0018, ETH: 0.0091, BNB: 0.0052, SOL: 0.0123, XRP: 0.0034, ADA: 0.0167, TRX: 0.0071, DOGE: 0.0208 };
     const radar = { perfil: (v && v.perfil) || "equilibrado", filtro: { pasa: true, motivo: "" },
-      filas: (v && ["holding", "rotacion"].includes(v.perfil)) || !v ? [] : suyas.map((m) => fila(`${m}USDT`, t, precio(`${m}USDT`), DISTANCIA[m])) };
+      filas: (v && v.perfil) || !v ? [] : suyas.map((m) => fila(`${m}USDT`, t, precio(`${m}USDT`), DISTANCIA[m])) };
     // La rotación de la vista previa: las 8 ordenadas por fuerza, con SOL y TRX en la mano.
     const FUERZA = [["SOLUSDT", 1.62, 0.214], ["TRXUSDT", 1.31, 0.118], ["BNBUSDT", 0.94, 0.087], ["BTCUSDT", 0.71, 0.064],
       ["XRPUSDT", 0.33, 0.041], ["ETHUSDT", 0.12, 0.016], ["ADAUSDT", -0.28, -0.052], ["DOGEUSDT", -0.61, -0.133]];
@@ -2707,7 +2712,8 @@
           linea(t0 + 60000, "rotacion_compra", "SOLUSDT", { precio: 166.1, monto: m / 2 }, { puesto: 1 }),
           linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m })], flujo, radar, jugadas: {} };
     }
-    const movs = v.perfil === "holding"
+    const familia = ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha"].includes(v.perfil);
+    const movs = familia
       ? [linea(t0 + 60000, "compra_holding", "BTCFDUSD", { precio: 97250, cantidad: m / 12 * 0.6 / 97250, monto: m / 12 * 0.6 }, {}),
         linea(t0 + 60000, "compra_holding", "ETHFDUSD", { precio: 3610, cantidad: m / 12 * 0.4 / 3610, monto: m / 12 * 0.4 }, {})]
       : [linea(t0 + 0.5 * h, "entrada_rebote", "BTCUSDT", { precio: 97250, monto: m * 0.3, stop: 96400, objetivo: 98600, estado: "puesta" }, {}),
@@ -2717,7 +2723,7 @@
         linea(t0 + 2.8 * h, "entrada_ruptura", "ETHUSDT", { precio: 3610, monto: m * 0.25, stop: 3560, objetivo: 3665, estado: "llenada" }, {})];
     movs.push(linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m }));
     movs.sort((a, b) => b.ms - a.ms);
-    const holding = v.perfil === "holding";
+    const holding = familia;
     const tenencias = holding ? [
       { par: "BTCFDUSD", cantidad: m / 12 * 0.6 / 97250, gastado: m / 12 * 0.6, precio_ahora: 97800, valor: m / 12 * 0.6 / 97250 * 97800, precio_medio: 97250 },
       { par: "ETHFDUSD", cantidad: m / 12 * 0.4 / 3610, gastado: m / 12 * 0.4, precio_ahora: 3592, valor: m / 12 * 0.4 / 3610 * 3592, precio_medio: 3610 }] : [];
@@ -2727,8 +2733,18 @@
     return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
       ganancia_relativa: valor / m - 1, efectivo: holding ? m * 11 / 12 : m * 1.0037 - m * 0.25, posiciones, tenencias,
       ultima: holding ? { decision: "esperando", proxima_ms: t0 + 7 * 24 * h } : { decision: "sin_senal" },
-      movimientos: movs, flujo, radar, jugadas: {} };
+      movimientos: movs, flujo, radar, jugadas: {},
+      // Las reglas y el libro del holding (bin/lib_perfiles.py y bin/lib_holding.py), para «Mi plan».
+      reglas: holding ? REGLAS_DEMO[v.perfil] : {}, holding: holding ? { partes: 1, ultima_ms: t0 + 60000, guardado: {},
+        pendiente: v.perfil === "compra_semanal" ? { BTCUSDT: { limite: 71000, monto: m / 52 * 0.6 } } : {} } : null };
   }
+  const REGLAS_DEMO = {
+    holding: { tipo: "acumular", partes: 12, cada_ms: 604800000 },
+    holding_ocho: { tipo: "acumular", partes: 12, cada_ms: 604800000 },
+    compra_semanal: { tipo: "acumular", partes: 52, cada_ms: 604800000, descuento: 0.01 },
+    rebalanceo: { tipo: "acumular", partes: 12, cada_ms: 604800000, rebalanceo: { cripto: 0.5, banda: 0.1 } },
+    cosecha: { tipo: "acumular", partes: 12, cada_ms: 604800000, cosecha: { sube: 0.3, vende: 0.25, recompra: 0.15 } },
+  };
   function realDemo() {
     DEMO.real = DEMO.real || { conectado: false, pista: "", conexion: { ok: false }, activo: false, cuenta: { existe: false } };
     const c = DEMO.real.conexion || {}, libres = c.libres || {};

@@ -409,7 +409,7 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 /* Comparar */
 .comp-elegir { padding: 20px; margin-bottom: 16px; }
 .comp-elegir .boton-ancho { margin-top: 14px; max-width: 480px; }
-.comp-grilla { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.comp-grilla { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .comp-perfil { display: grid; align-content: start; gap: 2px; padding: 12px; color: var(--texto); text-align: left; font: inherit; cursor: pointer; }
 .comp-perfil:hover { border-color: var(--texto-suave); }
 .comp-perfil:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
@@ -597,3 +597,19 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 
 .perfiles-perdedores summary { cursor: pointer; font-weight: 600; color: var(--texto-suave); padding: 6px 0; }
 .perfil[data-perdio="1"] { opacity: .85; }
 .perfil-perdio { font-size: 12px; font-weight: 700; color: var(--pierde); }
+
+/* Los perfiles por familia: primero comprar y guardar, aparte los experimentos */
+.perfiles-grupos { display: grid; gap: 18px; margin: 4px 0 16px; }
+.perfiles-grupo h4 { margin: 0 0 2px; font-size: 14px; }
+.perfiles-grupo > .ayuda { margin: 0 0 10px; }
+.perfiles-grupo[data-grupo="experimento"] .perfiles { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+
+/* Mi plan: lo que va a hacer un holding, en frases cortas */
+.plan { padding: 20px; }
+.plan h3 { margin: 0 0 8px; }
+.plan-lineas { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.plan-lineas li { display: grid; grid-template-columns: 10px 1fr; gap: 10px; align-items: baseline; }
+.plan-punto { width: 8px; height: 8px; border-radius: 50%; background: var(--linea); }
+.plan-lineas li[data-tipo="compra"] .plan-punto, .plan-lineas li[data-tipo="listo"] .plan-punto { background: var(--acento); }
+.plan-lineas li[data-tipo="espera"] .plan-punto { background: var(--espera); }
+.plan-lineas li[data-tipo="guardado"] .plan-punto { background: var(--gana); }

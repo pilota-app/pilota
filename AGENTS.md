@@ -66,6 +66,7 @@ cuentas ni publicidad; nada personal en el código (Ana Pérez, Matías Soto). B
 | `bin/lib_radar.py` | Qué está esperando el robot: por par y temporalidad del perfil, el gatillo de cada estrategia (a qué precio tendría que cerrar la vela), cuánto falta (`distancia`, `cerca`), la operación posible (entrada, stop, objetivo y `rr`, y si el perfil la acepta) y la historia de esa misma jugada (`estadisticas`, `agrupar`, `al_dia`: ganadas de cuántas y lo que dejó en promedio). Lo escribe el flujo en vivo en `mercado/radar.json`. No decide nada. No es una acción. |
 | `bin/lib_universo.py` | Las ocho monedas del robot en prueba contra USDT (`lib_datos.UNIVERSO`: BTC, ETH, BNB, SOL, XRP, ADA, TRX y DOGE): sus mínimos de Binance (`filtros`, una vez al día en `mercado/universo.json`), sus velas (`preparar`: 3 años de 1 d, 4 h y 1 h y 3 días de 1 m) y sus costos (`comisiones_de`: contra USDT no hay conversión). Lo corre el flujo en vivo en segundo plano. No es una acción. |
 | `bin/lib_rotacion.py` | La rotación: la fuerza de cada moneda (`fuerza`: lo que subió en 30 días dividido por cuánto se movió), el ranking, a cuáles pasarse (`elegir`, con margen para no cambiar por nada) y la misma regla sobre el pasado (`simular`). Pura: no lee el disco. No es una acción. |
+| `bin/lib_holding.py` | Las formas de holdear: comprar por partes y guardar, con una variante cada una (`reparto`, `partes`, `descuento`, `rebalanceo`, `cosecha`). `paso` es un día y lo usan igual la comparación (`simular`) y el robot en vivo (`lib_piloto._vuelta_holding_v`). Puro. No es una acción. |
 | `bin/lib_tendencia.py` | Seguir la tendencia y ajustar el tamaño por volatilidad (`en_tendencia`, `volatilidad`, `tamano`, `pesos_tendencia`, `pesos_rotacion`) y su recorrido por el pasado día por día (`simular`). **No lo usa ningún perfil**: no pasó la prueba con datos reales (ver «Los perfiles y el robot en vivo»). Queda para probarlo de nuevo con datos nuevos. Puro. No es una acción. |
 | `bin/lib_candado.py` | Una sola cosa a la vez entre procesos: un solo trabajo de cada tipo (`unico`, `YaCorriendo`), una revisión a la vez (`candado`) y el trabajo que quedó sin app (`huerfano`). No es una acción. |
 | `ui/grafico.js` | El gráfico de velas en vivo en un `<canvas>` (`PilotaGrafico.crear`): 1 m, 5 m, 1 h y 4 h, Bollinger, medias, volumen y RSI con un botón, las flechas de compra y venta, las líneas de entrada, stop y objetivo, el precio que se mueve cada segundo y el destello de color de cada operación. |
@@ -623,14 +624,26 @@ Lo que ve la persona primero es el robot (`ui/vivo.js`, pestaña «En vivo»): e
 opera solo con precios reales de Binance (`bin/lib_piloto.py`). «Comparar» corre los perfiles que se ofrecen sobre el pasado
 con el mismo monto (`lib_simulacion.comparar`), y «Movimientos» cuenta todo lo que hizo, en palabras.
 
-**Se ofrecen dos perfiles** (`lib_perfiles.ORDEN`), los únicos que los datos respaldan:
+**Se ofrecen la familia holding y la rotación** (`lib_perfiles.ORDEN`), agrupados en la pantalla («Comprar y guardar» y
+«Experimento»):
 
 | Perfil | Qué hace |
 |---|---|
-| holding (el sugerido) | compra BTC 60 % y ETH 40 % en 12 partes, una por semana, y mantiene |
+| holding (el sugerido) | compra BTC 60 % y ETH 40 % (contra FDUSD) en 12 partes, una por semana, y mantiene |
+| holding_ocho | lo mismo con las 8 monedas en partes iguales |
+| compra_semanal | 52 compras semanales de BTC y ETH, cada una un 1 % bajo el cierre; si al día siguiente no llega, compra igual |
+| rebalanceo | la mitad en BTC y ETH y la mitad en USDT; vende el sobrante sobre 60 % y compra lo que falta bajo 40 % |
+| cosecha | vende un cuarto cuando una moneda vale 30 % sobre su costo y lo recompra si cae 15 % desde esa venta |
 | rotacion (experimento) | una vez al día tiene las 2 monedas más fuertes de las 8 contra USDT (`lib_rotacion`); puede caer tanto como BTC |
 
-**Por qué solo dos** (medido en nov 2026 con velas diarias reales de Binance, eligiendo con 2018-06 → 2023-11 y probando una
+Las variantes de holding (`variante` en `lib_perfiles`) se deciden una vez por día, al cerrar la vela diaria, con
+`lib_holding.paso`: el mismo paso que mide la comparación. En vivo compran y venden con el precio de 1 m de ahora y la orden
+más abajo se llena con el mínimo del día que acaba de cerrar. Cada compra queda como `compra_holding` y cada venta como
+`venta_holding` (con `por`: `semana`, `limite`, `cierre`, `rebalanceo`, `cosecha` o `recompra`). La pantalla dice su plan
+(«Mi plan»: cuántas compras lleva, qué orden dejó y a qué precio vendería o recompraría) con las reglas que manda
+`lib_piloto.estado` (`reglas`).
+
+**Por qué no hay perfiles de señales** (medido en nov 2026 con velas diarias reales de Binance, eligiendo con 2018-06 → 2023-11 y probando una
 sola vez con 2023-11 → 2026-11, el tramo que nadie miró al elegir):
 - Los cuatro perfiles de señales (conservador, equilibrado, trader y scalper) perdieron o quedaron en cero contra quedarse en
   USDT en 3 años. Quedan **retirados** (`RETIRADOS`): no se ofrecen y uno que estaba andando se detiene solo (`vivo.retirar`).

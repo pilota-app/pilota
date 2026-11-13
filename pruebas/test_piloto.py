@@ -59,8 +59,8 @@ class Base(unittest.TestCase):
 
 
 class Perfiles(unittest.TestCase):
-    def test_se_ofrecen_dos_y_el_sugerido_existe(self):
-        self.assertEqual(perfiles.ORDEN, ("holding", "rotacion"))
+    def test_se_ofrecen_los_holding_y_la_rotacion(self):
+        self.assertEqual(perfiles.ORDEN, ("holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "rotacion"))
         self.assertTrue(all(p in perfiles.PERFILES and p not in perfiles.ORDEN for p in perfiles.RETIRADOS))
         self.assertIn(perfiles.SUGERIDO, perfiles.PERFILES)
 
@@ -190,6 +190,41 @@ class OchoMonedas(Base):
         self.assertEqual((r["decision"], r["par"]), ("entrada", "SOLUSDT"))
         self.assertEqual([p["par"] for p in lib_ejecutor_prueba.guardado()["posiciones"]], ["SOLUSDT"])
         self.assertIn("entrada_rebote", self.razones())
+
+
+class HoldingsEnVivo(Base):
+    """Las variantes de holding en vivo: el mismo paso diario de la comparación (`lib_holding.paso`)."""
+    DIA = lib_datos.DIA_MS
+
+    def vuelta(self, ms, precios, bajos=None):
+        with mock.patch.object(piloto, "precio_fresco", side_effect=lambda par, m: precios.get(par)), \
+                mock.patch.object(piloto, "_bajo_de", side_effect=lambda par, dia: (bajos or {}).get(par)):
+            return piloto.decidir({"ahora_ms": ms, "ambiente": "prueba"})["piloto"]
+
+    def test_la_compra_semanal_deja_la_orden_mas_abajo_y_la_llena_al_dia_siguiente(self):
+        piloto.empezar("compra_semanal", 520, AHORA)
+        p = {"BTCUSDT": 100_000.0, "ETHUSDT": 4_000.0}
+        self.assertEqual(self.vuelta(AHORA, p)["decision"], "esperando", "la orden queda puesta, no compra al tiro")
+        self.assertEqual(self.vuelta(AHORA + HORA, p)["decision"], "esperando", "una vez por día")
+        r = self.vuelta(AHORA + self.DIA, p, {"BTCUSDT": 98_000.0, "ETHUSDT": 4_100.0})
+        self.assertEqual(r["decision"], "compra")
+        lineas = [x for x in lib_registro.ultimas(lib_estado.PRUEBA, 20)[0] if x["razon"] == "compra_holding"]
+        tipos = sorted((x["par"], x["orden"]["tipo"]) for x in lineas)
+        self.assertEqual(tipos, [("BTCUSDT", "limite"), ("ETHUSDT", "mercado")], "BTC llegó al límite; ETH no")
+        e = piloto.estado(AHORA + self.DIA, minutos={})
+        self.assertEqual(sorted(t["par"] for t in e["tenencias"]), ["BTCUSDT", "ETHUSDT"])
+
+    def test_la_cosecha_vende_una_parte_cuando_sube_harto(self):
+        piloto.empezar("cosecha", 120, AHORA)
+        self.vuelta(AHORA, {"BTCUSDT": 100.0, "ETHUSDT": 10.0})
+        r = self.vuelta(AHORA + self.DIA, {"BTCUSDT": 140.0, "ETHUSDT": 10.0})
+        self.assertEqual(r["decision"], "venta")
+        self.assertIn("venta_holding", self.razones())
+        self.assertIn("venta_holding", [x["razon"] for x in piloto.movimientos()])
+
+    def test_sin_precio_no_hace_nada(self):
+        piloto.empezar("holding_ocho", 100, AHORA)
+        self.assertEqual(self.vuelta(AHORA, {"BTCUSDT": 1.0})["decision"], "sin_datos")
 
 
 class RotacionEnVivo(Base):
