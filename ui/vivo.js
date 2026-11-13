@@ -166,8 +166,8 @@ window.PilotaVivo = (() => {
     // ── Qué estoy esperando (bin/lib_radar.py): el gatillo de cada estrategia, cuánto falta, la operación y su historia ──
     const NOMBRE_ESTRATEGIA = { rebote: "rebote", ruptura: "ruptura" };
     function porQueNo(e, fila) {
+      if (/^btc|^sin_contexto/.test(e.motivo || "")) return frase("BTC viene cayendo: no compro nada hasta que se calme.", {});
       switch (e.motivo) {
-        case "btc_frena": case "btc": case "sin_contexto": return frase("BTC viene cayendo: no compro nada hasta que se calme.", {});
         case "dia_no_al_alza": return frase("Ruptura: no, el día no viene al alza.", {});
         case "con_rumbo": return frase("Rebote: no, el precio tiene rumbo (fuerza {adx}; pido {max} o menos para comprar en la banda de abajo).", { adx: numero(fila.adx || 0, 0), max: numero(e.adx_maximo || 20, 0) });
         case "sin_volumen": return frase("Ruptura: rompió el techo, pero sin volumen ({rel} veces lo normal; pido {pide}).", { rel: numero(fila.volumen_relativo || 0, 1), pide: numero(e.volumen_pide || 1.5, 1) });
@@ -204,6 +204,7 @@ window.PilotaVivo = (() => {
       return `<svg class="radar-barra" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true">
         <rect class="pista" x="0" y="0" width="100" height="6" rx="3"/><rect class="valor" x="0" y="0" width="${(x * 100).toFixed(1)}" height="6" rx="3"/></svg>`;
     }
+    const rebote = (f) => (f.estrategias || []).find((e) => e.estrategia === "rebote" && e.sirve && e.gatillo > 0);
     function radar(E) {
       const R = (E.vivo || {}).radar || {};
       const filas = R.filas || [];
@@ -214,7 +215,8 @@ window.PilotaVivo = (() => {
         ${frena ? `<p class="freno-texto">${frase("BTC viene cayendo: no compro nada hasta que se calme.", {})}</p>` : ""}
         <ul class="radar-filas">${filas.map((f) => {
           const espera = (f.estrategias || []).find((e) => e.estrategia === f.espera);
-          const otras = (f.estrategias || []).filter((e) => e !== espera || f.condicion).map((e) => porQueNo(e, f))
+          const otras = (f.estrategias || []).filter((e) => (e !== espera || f.condicion) && !(frena && /^btc|^sin_contexto/.test(e.motivo || "")))
+            .map((e) => porQueNo(e, f))
             .filter((t, i, todos) => t && todos.indexOf(t) === i)
             .filter((t) => !(f.condicion && /^Rebote|^Bounce/.test(t.replace(/<[^>]+>/g, ""))));
           return `<li class="radar-fila" data-cerca="${f.cerca ? 1 : 0}">
@@ -224,7 +226,10 @@ window.PilotaVivo = (() => {
               ${f.cerca ? `<span class="radar-casi">Casi casi</span>` : ""}</div>
             ${espera ? `${cercania(espera)}<p class="radar-gatillo">${gatillo(espera, f)}</p>
               <p class="radar-plan">${plan(espera)}</p><p class="radar-historia suave">${historia(espera.historia)}</p>`
-              : `<p class="radar-gatillo">${frase("Nada que esperar en {moneda} por ahora: ninguna de mis dos jugadas sirve aquí.", { moneda: moneda(f.par) })}</p>`}
+              : (frena && rebote(f)
+                ? `<p class="radar-gatillo">${frase("En pausa por BTC. Si no estuviera cayendo, compraría {moneda} por rebote si una vela cierra en {precio} o menos (falta {falta}).", { moneda: moneda(f.par), precio: usdt(rebote(f).gatillo), falta: porcentaje(Math.max(0, rebote(f).distancia || 0), 2) })}</p>
+                  <p class="radar-plan">${plan(rebote(f))}</p><p class="radar-historia suave">${historia(rebote(f).historia)}</p>`
+                : `<p class="radar-gatillo">${frase("Nada que esperar en {moneda} por ahora: ninguna de mis dos jugadas sirve aquí.", { moneda: moneda(f.par) })}</p>`)}
             ${otras.length ? `<p class="radar-no suave">${otras.join(" ")}</p>` : ""}</li>`;
         }).join("")}</ul>
         <p class="ayuda">Decido solo con velas cerradas: cuando una cierra donde dice arriba, compro en ese mismo segundo. La historia es el pasado, no una promesa.</p></div>`;
@@ -236,6 +241,9 @@ window.PilotaVivo = (() => {
       const mejor = filas.map((f) => ({ f, e: f.estrategias.find((e) => e.estrategia === f.espera) }))
         .sort((a, b) => (a.e.distancia || 0) - (b.e.distancia || 0))[0];
       if (v.ultima && ["entrada", "compra", "frenado"].includes(v.ultima.decision)) return vuelta(v);
+      if (v.radar && v.radar.filtro && !v.radar.filtro.pasa) {
+        return frase("BTC viene cayendo, así que no compro nada: espero a que se calme. Cuando pase, te digo a qué precio compraría.", {});
+      }
       if (cerca.length && mejor) return `${frase("¡Casi casi!", {})} ${gatillo(mejor.e, mejor.f)}`;
       if (mejor) return `${frase("Esperando:", {})} ${gatillo(mejor.e, mejor.f)}`;
       return vuelta(v);
