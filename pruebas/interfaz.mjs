@@ -91,9 +91,18 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.locator('.pestanas [role="tab"]').count(), 6, "seis pestañas");
   assert.equal(await cab.locator('.pestanas [role="tab"][aria-selected="true"]').getAttribute("id"), "tab-vivo", "parte en «En vivo»");
   // Se ofrecen la familia holding y la rotación, agrupados; los de señales quedaron retirados.
-  assert.equal(await cab.locator(".perfil").count(), 12, "los holding, las acciones, las mezclas y la rotación");
-  assert.equal(await cab.locator(".perfiles-grupo").count(), 4, "en cuatro grupos");
+  // Cripto y acciones van aparte; la mezcla de los dos sale en ambos lados.
+  assert.equal(await cab.getAttribute('[data-mercado="cripto"]', "aria-pressed"), "true", "parte en cripto");
+  assert.equal(await cab.locator(".perfil").count(), 9, "los holding, las mezclas y la rotación");
+  assert.equal(await cab.locator(".perfiles-grupo").count(), 3, "en tres grupos");
+  assert.equal(await cab.locator('.perfil[data-perfil="indice_eeuu"]').count(), 0, "sin acciones en cripto");
+  await cab.click('[data-mercado="acciones"]');
+  assert.equal(await cab.locator(".perfil").count(), 4, "las tres de acciones y la mezcla");
+  assert.match(await cab.textContent(".mercado-elegir"), /En Binance existen desde junio de 2026/);
   assert.match(await cab.textContent('.perfil[data-perfil="indice_eeuu"]'), /S&P 500[\s\S]*SPY · QQQ/);
+  assert.equal(await cab.getAttribute('.perfil[data-perfil="indice_eeuu"]', "aria-checked"), "true", "queda elegido uno de acciones");
+  await cab.click('[data-mercado="cripto"]');
+  assert.equal(await cab.getAttribute('.perfil[data-perfil="holding"]', "aria-checked"), "true", "y de vuelta, el holding");
   assert.equal(await cab.locator('.perfiles-grupo[data-grupo="guardar"] .perfil').count(), 5, "la familia holding junta");
   assert.match(await cab.textContent('.perfil[data-perfil="holding_ocho"]'), /BTC · ETH · BNB · SOL · XRP · ADA · TRX · DOGE/);
   assert.equal(await cab.locator('.perfil[data-perfil="scalper"]').count(), 0, "el scalper ya no se ofrece");
@@ -166,15 +175,20 @@ await page.waitForSelector("#descargar");
   assert.equal(await cab.inputValue("#sim-monto"), "250", "lo escrito sigue ahí al volver a pintar");
   await cab.click("#sim-correr");
   await cab.waitForSelector(".comp-grilla");
-  assert.equal(await cab.locator(".comp-perfil").count(), 12, "todos los perfiles lado a lado");
+  assert.equal(await cab.locator(".comp-perfil").count(), 9, "los perfiles de cripto lado a lado");
   // Cada perfil dice si le ganó a quedarse en USDT y a comprar BTC.
-  assert.equal(await cab.locator(".comp-veredicto").count(), 12, "cada perfil con su veredicto");
-  assert.match(await cab.textContent('[data-comparar="indice_eeuu"]'), /las acciones llegaron a Binance en junio de 2026/);
+  assert.equal(await cab.locator(".comp-veredicto").count(), 9, "cada perfil con su veredicto");
   // El mapa de inicios: cuánto tendrías hoy según cuándo empezaste, y qué perfil aguanta un mal comienzo.
   await cab.click("#mapa-ver");
   await cab.waitForSelector(".mapa-tabla");
-  assert.equal(await cab.locator(".mapa-tabla tbody tr").count(), 12, "once perfiles y comprar BTC");
+  assert.equal(await cab.locator(".mapa-tabla tbody tr").count(), 8, "los siete de cripto y comprar BTC");
   assert.match(await cab.textContent(".mapa-tabla"), /Peor inicio:[\s\S]*le ganó a BTC en \d+ de \d+/);
+  await cab.click('#pestana-comparar [data-mercado="acciones"]');
+  assert.equal(await cab.locator(".comp-perfil").count(), 4, "en acciones, las tres y la mezcla");
+  assert.match(await cab.textContent('[data-comparar="indice_eeuu"]'), /las acciones llegaron a Binance en junio de 2026/);
+  assert.equal(await cab.locator(".mapa-tabla").count(), 0, "sin mapa: no hay historia");
+  assert.match(await cab.textContent("#mapa"), /Con acciones todavía no se puede medir/);
+  await cab.click('#pestana-comparar [data-mercado="cripto"]');
   assert.match(await cab.textContent(".sim-resultado"), /365 días\) con 250 USDT[\s\S]*Quedarte en USDT[\s\S]*Comprar BTC y esperar/);
   // La película: tocar un perfil la pone a andar, movimiento por movimiento.
   await cab.click('[data-comparar="cosecha"]');

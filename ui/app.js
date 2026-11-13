@@ -1643,6 +1643,16 @@
       E.graf.ind[b.dataset.grafInd] = !E.graf.ind[b.dataset.grafInd];
       pintar();
     }
+    else if (b.dataset.mercado) {
+      // Cripto o acciones: si el perfil elegido no es de ese mercado, queda el primero que sí es.
+      E.mercado = b.dataset.mercado;
+      const m = vivoUI.mercadoDe(E.vivoPerfil || "holding");
+      if (m !== E.mercado && m !== "mixto") {
+        E.vivoPerfil = E.mercado === "acciones" ? "indice_eeuu" : "holding";
+        E.vivoPerfilTocado = true;
+      }
+      pintar();
+    }
     else if (b.dataset.perfil) {
       E.vivoPerfil = b.dataset.perfil;
       E.vivoPerfilTocado = true;

@@ -67,6 +67,13 @@ class Perfiles(unittest.TestCase):
         self.assertTrue(all(p in perfiles.PERFILES and p not in perfiles.ORDEN for p in perfiles.RETIRADOS))
         self.assertIn(perfiles.SUGERIDO, perfiles.PERFILES)
 
+    def test_cada_perfil_dice_si_opera_cripto_acciones_o_las_dos(self):
+        mercado = {p: perfiles.mercado_de(p) for p in perfiles.ORDEN}
+        self.assertEqual({p for p, m in mercado.items() if m == "acciones"}, {"indice_eeuu", "indice_semanal", "acciones_ocho"})
+        self.assertEqual({p for p, m in mercado.items() if m == "mixto"}, {"cripto_acciones"})
+        self.assertEqual(mercado["holding"], "cripto")
+        self.assertTrue(all(p["mercado"] == mercado[p["id"]] for p in perfiles.parametros()["perfiles"]))
+
     def test_ningun_perfil_arriesga_mas_que_el_tamano(self):
         for p in perfiles.PERFILES.values():
             self.assertLessEqual(p.get("riesgo", 0), lib_tamano.RIESGO)

@@ -676,6 +676,16 @@ sola vez con 2023-11 → 2026-11, el tramo que nadie miró al elegir):
 - La rotación simple fue la única que aguantó los dos tramos, y sin ventaja clara: según cuándo reparte da entre +55 % y +96 %
   en el tramo de prueba. Por eso va como experimento y la pantalla lo dice.
 - Para volver a probar una idea hace falta un tramo nuevo que nadie haya mirado: el de 2023-11 → 2026-11 ya se usó.
+- **103 fórmulas en muchas ventanas** (nov 2026, solo cripto): reglas de tendencia, rotación, volatilidad, mezclas, compra
+  semanal y rebalanceo, medidas en ventanas de 1 a 4 años que empiezan cada mes. Se eligieron las 5 mejores solo con las
+  ventanas que terminan antes de 2023-11 y se miraron una vez en las que empiezan después. Ninguna le gana a BTC en todas
+  las ventanas. Las de «BTC (o BTC y ETH) solo sobre su media de 50 días» le ganan en 5 o 6 de cada 10 ventanas de prueba,
+  con una peor ventana de 1 año de −7 % a −17 % contra −45 % de BTC: pierden un poco en las subidas fuertes (inicios de
+  2024) y ganan en las caídas (inicios de 2025). Son 103 intentos y el tramo de prueba es un solo mercado: es una pista, no
+  una ventaja probada. Las acciones no se midieron: tienen pocos meses de historia.
+- **Cripto y acciones van aparte** en la pantalla (`lib_perfiles.mercado_de`: `cripto`, `acciones` o `mixto`, que sale en los
+  dos lados): las criptos operan siempre, caen más y tienen años de historia; las acciones siguen el horario de EE. UU. y en
+  Binance tienen meses. El mapa de inicios solo se muestra en cripto.
 
 Reglas que no se cambian sin pensarlo dos veces:
 - **Las mismas reglas en el pasado y en vivo.** `lib_perfiles` es el único lugar de los números, y lo usan `lib_simulacion` y

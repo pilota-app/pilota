@@ -52,6 +52,29 @@ window.PilotaVivo = (() => {
     trader: ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"], scalper: ["BTC", "ETH", "SOL", "XRP", "DOGE"],
     rotacion: ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"],
   };
+  // Cripto y acciones se muestran aparte porque se comportan distinto (bin/lib_perfiles.py: mercado_de). Sale de las monedas
+  // de cada perfil: solo acciones, solo cripto o las dos («mixto», que aparece en los dos lados).
+  const ACCIONES = ["SPY", "QQQ", "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AVGO"];
+  function mercadoDe(p) {
+    const m = MONEDAS[p] || [], a = m.filter((x) => ACCIONES.includes(x)).length;
+    return a === 0 ? "cripto" : (a === m.length ? "acciones" : "mixto");
+  }
+  const MERCADOS = [["cripto", "Cripto"], ["acciones", "Acciones de EE. UU."]];
+  const MERCADO_AYUDA = {
+    cripto: "Se compran y venden todo el día, todos los días, y se mueven mucho: caídas de 50 % o más ya pasaron varias veces. Hay historia en Binance desde 2017, así que las pruebas en el pasado son largas.",
+    acciones: "Siguen el horario y las noticias de EE. UU. y se mueven menos que las criptos. En Binance existen desde junio de 2026: con tan poca historia todavía no se puede saber qué táctica funciona mejor.",
+  };
+  function mercadoElegido(E) {
+    if (E.mercado === "cripto" || E.mercado === "acciones") return E.mercado;
+    return mercadoDe(E.vivoPerfil || "holding") === "acciones" ? "acciones" : "cripto";
+  }
+  const enMercado = (p, m) => mercadoDe(p) === m || mercadoDe(p) === "mixto";
+  function chipsMercado(E) {
+    const m = mercadoElegido(E);
+    return `<div class="mercado-elegir"><div class="chips" role="group" aria-label="Mercado">${MERCADOS.map(([id, t]) =>
+      `<button type="button" class="chip" data-mercado="${id}" aria-pressed="${m === id}">${t}</button>`).join("")}</div>
+      <p class="ayuda">${MERCADO_AYUDA[m]}</p></div>`;
+  }
   const MONTOS = [50, 100, 200, 500, 1000];
   const PERIODOS = [[30, "1 mes"], [90, "3 meses"], [180, "6 meses"], [365, "1 año"], [1095, "3 años"]];
   // Lo que pensó el robot en su última vuelta (bin/lib_piloto.py: DECISIONES).
@@ -248,12 +271,13 @@ window.PilotaVivo = (() => {
     function selector(E, opciones = {}) {
       const elegido = perfilDePartida(E);
       const fuera = perdedores(E);
-      const buenos = ORDEN.filter((p) => !fuera[p]), malos = ORDEN.filter((p) => fuera[p]);
+      const buenos = ORDEN.filter((p) => !fuera[p]), malos = ORDEN.filter((p) => fuera[p] && enMercado(p, mercadoElegido(E)));
       const monto = E.campos["vivo-monto"] || E.vivoMonto || 100;
       return `<div class="tarjeta vivo-elegir">
         <h3>${opciones.titulo || "Elige cómo quieres que opere"}</h3>
+        ${chipsMercado(E)}
         <div class="perfiles-grupos" role="radiogroup" aria-label="Perfil">${GRUPOS.map(([id, titulo, suyos]) => {
-          const estos = suyos.filter((p) => buenos.includes(p));
+          const estos = suyos.filter((p) => buenos.includes(p) && enMercado(p, mercadoElegido(E)));
           return estos.length ? `<section class="perfiles-grupo" data-grupo="${id}"><h4>${titulo}</h4>
             <p class="ayuda">${GRUPO_AYUDA[id]}</p>
             <div class="perfiles">${estos.map((p) => botonPerfil(p, elegido)).join("")}</div></section>` : "";
@@ -657,7 +681,7 @@ window.PilotaVivo = (() => {
       else {
         cuerpo = `<div class="sim-resultado">
           <p class="sim-periodo">${frase("Del {desde} al {hasta} ({dias} días) con {monto}", { desde: dia(r.desde_ms), hasta: dia(r.hasta_ms), dias: numero(r.dias_reales, 0), monto: usdt(r.monto) })}</p>
-          <div class="comp-grilla">${r.perfiles.map((p) => tarjetaPerfil(p, r.monto, (E.peli || {}).perfil, r)).join("")}</div>
+          <div class="comp-grilla">${r.perfiles.filter((p) => enMercado(p.perfil, mercadoElegido(E))).map((p) => tarjetaPerfil(p, r.monto, (E.peli || {}).perfil, r)).join("")}</div>
           <div class="comp-referencias">
             <p><span>Quedarte en USDT</span> <strong data-sin-traducir>${esc(usdt(r.monto))}</strong></p>
             <p><span>Comprar BTC y esperar</span> <strong data-sin-traducir>${esc(typeof (r.btc || {}).saldo === "number" ? `${usdt(r.btc.saldo)} (${conSigno(r.btc.rendimiento, (x) => porcentaje(x, 1))})` : "–")}</strong></p></div>
@@ -671,6 +695,7 @@ window.PilotaVivo = (() => {
       return `<div class="centro">
         <header class="centro-cabeza"><h2>Compara los perfiles en el pasado</h2>
           <p class="ayuda">Todos los perfiles con el mismo monto y el mismo período, con precios reales de Binance. Mira cuál se parece a lo que buscas.</p></header>
+        <div class="tarjeta">${chipsMercado(E)}</div>
         <div class="tarjeta comp-elegir">
           <label class="campo-monto"><span>¿Cuánto pondrías?</span>
             <span class="campo-monto-caja"><input id="sim-monto" type="number" inputmode="decimal" min="10" max="1000000" step="1" value="${esc(monto)}"><span data-sin-traducir>USDT</span></span></label>
@@ -692,8 +717,12 @@ window.PilotaVivo = (() => {
           <p class="ayuda">Mira qué habría pasado con cada perfil si empezabas en distintas fechas desde 2018, hasta hoy. No sirve para adivinar el mejor momento: sirve para ver qué perfil aguanta mejor un mal comienzo.</p>
           <button type="button" class="pz-boton pz-principal" id="mapa-ver"${E.mapaCargando ? " disabled" : ""}>${E.mapaCargando ? "Calculando…" : "Ver el mapa de inicios"}</button></div>`;
       }
+      if (mercadoElegido(E) === "acciones") {
+        return `<div class="tarjeta mapa" id="mapa"><h3>¿Importa cuándo empiezas?</h3>
+          <p class="ayuda">Con acciones todavía no se puede medir: en Binance existen desde junio de 2026 y el mapa necesita años de inicios distintos. Mira el mapa en «Cripto».</p></div>`;
+      }
       const fecha = (ms) => new Date(Number(ms)).toLocaleDateString(i18n.idioma, { month: "short", year: "numeric", timeZone: "UTC" });
-      const filas = [...M.filas, { perfil: "btc", valores: M.btc }];
+      const filas = [...M.filas.filter((f) => mercadoDe(f.perfil) === "cripto"), { perfil: "btc", valores: M.btc }];
       const tono = (x) => (x == null ? "nada" : (x >= 1 ? "muy-bien" : (x >= 0.2 ? "bien" : (x >= 0 ? "igual" : (x >= -0.3 ? "mal" : "muy-mal")))));
       const resumen = (f) => {
         const vals = f.valores.filter((x) => x != null);
@@ -708,7 +737,7 @@ window.PilotaVivo = (() => {
           <tbody>${filas.map((f) => `<tr${f.perfil === "btc" ? ` class="mapa-btc"` : ""}><th scope="row">${f.perfil === "btc" ? Tp("Comprar BTC de una") : Tp(nombre(f.perfil))}</th>
             ${f.valores.map((x) => `<td data-tono="${tono(x)}" data-sin-traducir>${x == null ? "·" : esc(conSigno(x, (y) => porcentaje(y, 0)))}</td>`).join("")}
             <td class="mapa-resumen">${f.perfil === "btc" ? "" : resumen(f)}</td></tr>`).join("")}</tbody></table></div>
-        <p class="ayuda">Un punto es que no había historia: las acciones llegaron a Binance en junio de 2026. Es el pasado con comisiones, no una promesa.</p></div>`;
+        <p class="ayuda">Un punto es que esa moneda todavía no tenía historia. Es el pasado con comisiones, no una promesa.</p></div>`;
     }
 
     // ── Todos los movimientos del robot en vivo ──
@@ -730,7 +759,7 @@ window.PilotaVivo = (() => {
         <details class="que-es" id="registro-completo"><summary>El registro completo (técnico)</summary>${registro}</details></div>`;
     }
 
-    return { vivo, comparar, pelicula, movimientos, textoLinea, ERRORES_VIVO, ORDEN, narra, estadoFila, nombre };
+    return { vivo, comparar, pelicula, movimientos, textoLinea, ERRORES_VIVO, ORDEN, narra, estadoFila, nombre, mercadoDe };
   }
   return { crear };
 })();

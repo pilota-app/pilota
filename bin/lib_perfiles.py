@@ -158,8 +158,18 @@ def tamano(perfil, capital, precio, stop, filtros, com=None, abiertas=0, comprom
             "arriesgado": cantidad * (t["precio"] - t["stop"]) + costos}
 
 
+def mercado_de(perfil):
+    """Dónde opera un perfil: «cripto», «acciones» o «mixto» (una mezcla de los dos). Sale de sus pares. Se muestran
+    aparte porque se comportan distinto: las criptos operan todo el día y caen más; las acciones siguen el horario y las
+    noticias de EE. UU. y en Binance tienen poca historia."""
+    pares = set(pares_de(perfil)) | set((PERFILES.get(perfil) or {}).get("reparto") or ())
+    acciones = pares & set(lib_datos.ACCIONES)
+    return "acciones" if acciones == pares and pares else ("mixto" if acciones else "cripto")
+
+
 def parametros():
-    return {"perfiles": [{"id": k, **{c: (list(v) if isinstance(v, tuple) else v) for c, v in PERFILES[k].items()}}
+    return {"perfiles": [{"id": k, "mercado": mercado_de(k),
+                          **{c: (list(v) if isinstance(v, tuple) else v) for c, v in PERFILES[k].items()}}
                          for k in ORDEN], "sugerido": SUGERIDO}
 
 

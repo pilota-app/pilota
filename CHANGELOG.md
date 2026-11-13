@@ -7,6 +7,9 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- Cripto y acciones ahora van aparte en «En vivo» y en «Comparar», con lo que cambia entre los dos. La mezcla de los dos
+  sale en ambos lados. *Crypto and stocks are now separate in "Live" and "Compare", with what is different between them.
+  The mix of both shows on both sides.*
 - Acciones de EE. UU.: Índice EE. UU. (S&P 500 y Nasdaq 100), Índice semanal y 8 acciones grandes, con las acciones
   tokenizadas de Binance. Mezclas: Semanal + Rotación, Núcleo y satélite, y Cripto + Acciones. Y en «Comparar», el mapa de
   inicios: cuánto tendrías hoy con cada perfil según cuándo empezabas desde 2018. *US stocks: US index (S&P 500 and Nasdaq
