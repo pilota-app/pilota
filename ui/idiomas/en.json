@@ -1485,6 +1485,13 @@
   "Si sale mal": "If it goes badly",
   "Lo normal": "Typical",
   "Si sale bien": "If it goes well",
-  "«Si sale mal» es lo que te pasa en 1 de cada 10 inicios, los peores. «Si sale bien», en 1 de cada 10, los mejores. Es lo que ya pasó, no una promesa: el mercado que viene puede ser distinto.": "“If it goes badly” is what happens in 1 of every 10 starts, the worst ones. “If it goes well”, in 1 of every 10, the best ones. This is what already happened, not a promise: the coming market can be different."
+  "«Si sale mal» es lo que te pasa en 1 de cada 10 inicios, los peores. «Si sale bien», en 1 de cada 10, los mejores. Es lo que ya pasó, no una promesa: el mercado que viene puede ser distinto.": "“If it goes badly” is what happens in 1 of every 10 starts, the worst ones. “If it goes well”, in 1 of every 10, the best ones. This is what already happened, not a promise: the coming market can be different.",
+  "¿Qué pasó antes en un día como hoy?": "What happened before on a day like today?",
+  "Las {dias} veces que estuvo sobre su promedio, a los {h} días había subido {sube} de cada 100 veces (en promedio {medio}) y en {cae} de cada 100 cayó más de 10 % en el camino.": "Of the {dias} times it was above its average, {h} days later it was up {sube} times in 100 (on average {medio}), and in {cae} of every 100 it fell more than 10% along the way.",
+  "Las {dias} veces que estuvo bajo su promedio, a los {h} días había subido {sube} de cada 100 veces (en promedio {medio}) y en {cae} de cada 100 cayó más de 10 % en el camino.": "Of the {dias} times it was below its average, {h} days later it was up {sube} times in 100 (on average {medio}), and in {cae} of every 100 it fell more than 10% along the way.",
+  "Acertar si sube o baja es casi tirar una moneda: 51 a 58 de cada 100 veces, con o sin noticias. La ventaja de la tendencia está en otra parte: sobre el promedio, la ganancia media fue mayor y las caídas grandes, menos seguidas.": "Guessing up or down is close to a coin flip: 51 to 58 times in 100, with or without news. The trend's edge is elsewhere: above the average, the mean gain was higher and big drops were less frequent.",
+  "Noticias de personas influyentes": "News from influential people",
+  "Ninguna con fecha y fuente en los últimos {n} días.": "None with a date and a source in the last {n} days.",
+  "Son contexto, no una señal: el salto de un post pasa en minutos y muchas veces se borra el mismo día. Datos al {fecha}.": "They are context, not a signal: the jump from a post happens in minutes and often fades the same day. Data as of {fecha}."
  }
 }

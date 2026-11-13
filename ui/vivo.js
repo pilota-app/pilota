@@ -431,7 +431,33 @@ window.PilotaVivo = (() => {
             <span class="radar-estado" data-estado="${f.sobre ? "casi" : "nada"}">${f.sobre
               ? frase("Sobre su promedio ({media}): tengo {pct}", { media: usdt(f.media), pct: porcentaje(f.reparto, 0) })
               : frase("Bajo su promedio ({media}): su {pct} espera en USDT", { media: usdt(f.media), pct: porcentaje(f.reparto, 0) })}</span></li>`).join("")}</ol>
-        <p class="ayuda">El número es cuánto está el precio sobre o bajo su promedio de los últimos 50 días. Cuando pasa de un lado al otro, compro o vendo esa parte.</p></div>`;
+        <p class="ayuda">El número es cuánto está el precio sobre o bajo su promedio de los últimos 50 días. Cuando pasa de un lado al otro, compro o vendo esa parte.</p></div>
+        ${quePaso(filas)}
+        ${noticias(v.noticias)}`;
+    }
+    // Lo que pasó antes cuando cada moneda estaba del mismo lado de su promedio que hoy (lib_tendencia.historia_cruce).
+    function quePaso(filas) {
+      const con = filas.filter((f) => f.historia);
+      if (!con.length) return "";
+      const de100 = (x) => numero(Math.round(x * 100), 0);
+      return `<div class="tarjeta pronostico"><h3>¿Qué pasó antes en un día como hoy?</h3>
+        <ul class="pronostico-filas">${con.map((f) => { const h = f.historia; return `<li>
+          <strong data-sin-traducir>${esc(moneda(f.par))}</strong> ${frase(h.sobre
+            ? "Las {dias} veces que estuvo sobre su promedio, a los {h} días había subido {sube} de cada 100 veces (en promedio {medio}) y en {cae} de cada 100 cayó más de 10 % en el camino."
+            : "Las {dias} veces que estuvo bajo su promedio, a los {h} días había subido {sube} de cada 100 veces (en promedio {medio}) y en {cae} de cada 100 cayó más de 10 % en el camino.",
+            { dias: numero(h.dias, 0), h: numero(h.horizonte, 0), sube: de100(h.sube), medio: conSigno(h.medio, (x) => porcentaje(x, 1)), cae: de100(h.cae) })}</li>`; }).join("")}</ul>
+        <p class="ayuda">Acertar si sube o baja es casi tirar una moneda: 51 a 58 de cada 100 veces, con o sin noticias. La ventaja de la tendencia está en otra parte: sobre el promedio, la ganancia media fue mayor y las caídas grandes, menos seguidas.</p></div>`;
+    }
+    // Las noticias de las personas que mueven el precio (bin/influencia.json, del repo pilota-app/influencia).
+    function noticias(N) {
+      if (!N) return "";
+      const lista = N.eventos || [];
+      return `<div class="tarjeta noticias"><h3>Noticias de personas influyentes</h3>
+        ${lista.length ? `<ul class="noticias-filas">${lista.map((e) => `<li><span class="suave" data-sin-traducir>${esc(e.fecha)}</span>
+            <strong data-sin-traducir>${esc(e.persona || "")}</strong> <span data-sin-traducir>${esc(e.que)}</span>
+            ${e.dia == null ? "" : `<span class="ranking-cambio" data-signo="${signo(e.dia)}" data-sin-traducir>${esc(e.activo)} ${esc(conSigno(e.dia, (x) => porcentaje(x, 1)))}</span>`}</li>`).join("")}</ul>`
+          : `<p class="suave">${frase("Ninguna con fecha y fuente en los últimos {n} días.", { n: numero(N.dias || 30, 0) })}</p>`}
+        <p class="ayuda">${frase("Son contexto, no una señal: el salto de un post pasa en minutos y muchas veces se borra el mismo día. Datos al {fecha}.", { fecha: esc(N.al || "–") })}</p></div>`;
     }
     function radar(E) {
       const v = E.vivo || {};

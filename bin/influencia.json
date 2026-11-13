@@ -1,0 +1,432 @@
+{
+ "formato": 1,
+ "al": "2026-11-13",
+ "fuente": "https://github.com/pilota-app/influencia",
+ "personas": [
+  {
+   "id": "donald-trump",
+   "nombre": "Donald Trump"
+  },
+  {
+   "id": "kevin-warsh",
+   "nombre": "Kevin Warsh"
+  },
+  {
+   "id": "jerome-powell",
+   "nombre": "Jerome Powell"
+  },
+  {
+   "id": "scott-bessent",
+   "nombre": "Scott Bessent"
+  },
+  {
+   "id": "paul-atkins",
+   "nombre": "Paul Atkins"
+  },
+  {
+   "id": "michael-selig",
+   "nombre": "Michael Selig"
+  },
+  {
+   "id": "elon-musk",
+   "nombre": "Elon Musk"
+  },
+  {
+   "id": "richard-teng",
+   "nombre": "Richard Teng"
+  },
+  {
+   "id": "changpeng-zhao",
+   "nombre": "Changpeng Zhao (CZ)"
+  },
+  {
+   "id": "kevin-hassett",
+   "nombre": "Kevin Hassett"
+  },
+  {
+   "id": "jensen-huang",
+   "nombre": "Jensen Huang"
+  },
+  {
+   "id": "michael-saylor",
+   "nombre": "Michael Saylor"
+  },
+  {
+   "id": "larry-fink",
+   "nombre": "Larry Fink"
+  },
+  {
+   "id": "brian-armstrong",
+   "nombre": "Brian Armstrong"
+  },
+  {
+   "id": "vitalik-buterin",
+   "nombre": "Vitalik Buterin"
+  },
+  {
+   "id": "cathie-wood",
+   "nombre": "Cathie Wood"
+  },
+  {
+   "id": "sam-altman",
+   "nombre": "Sam Altman"
+  },
+  {
+   "id": "sam-bankman-fried",
+   "nombre": "Sam Bankman-Fried"
+  }
+ ],
+ "eventos": [
+  {
+   "persona": "donald-trump",
+   "fecha": "2019-07-12",
+   "que": "Tuit: «no soy fan de bitcoin»",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": 0.037,
+    "d1": 0.001,
+    "d5": -0.148,
+    "d20": -0.085,
+    "d60": -0.11
+   }
+  },
+  {
+   "persona": "elon-musk",
+   "fecha": "2021-02-08",
+   "que": "Tesla compró 1.500 millones de USD en BTC",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": 0.195,
+    "d1": 0.197,
+    "d5": 0.215,
+    "d20": 0.163,
+    "d60": 0.499
+   }
+  },
+  {
+   "persona": "elon-musk",
+   "fecha": "2021-05-09",
+   "que": "Musk en SNL llama a Dogecoin «a hustle»",
+   "activo": "DOGE",
+   "movimiento": {
+    "dia": -0.104,
+    "d1": -0.292,
+    "d5": -0.121,
+    "d20": -0.525,
+    "d60": -0.675
+   }
+  },
+  {
+   "persona": "elon-musk",
+   "fecha": "2021-05-12",
+   "que": "Tesla deja de aceptar BTC por el gasto de energía",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": -0.124,
+    "d1": -0.124,
+    "d5": -0.232,
+    "d20": -0.353,
+    "d60": -0.395
+   }
+  },
+  {
+   "persona": "sam-bankman-fried",
+   "fecha": "2022-11-08",
+   "que": "Se cae FTX",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": -0.099,
+    "d1": -0.227,
+    "d5": -0.207,
+    "d20": -0.213,
+    "d60": -0.177
+   }
+  },
+  {
+   "persona": null,
+   "fecha": "2024-01-10",
+   "que": "Aprueban los ETF de BTC al contado",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": 0.012,
+    "d1": 0.005,
+    "d5": -0.078,
+    "d20": -0.069,
+    "d60": 0.495
+   }
+  },
+  {
+   "persona": null,
+   "fecha": "2024-11-05",
+   "que": "Gana Trump (prometió apoyar cripto)",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": 0.022,
+    "d1": 0.114,
+    "d5": 0.185,
+    "d20": 0.371,
+    "d60": 0.448
+   }
+  },
+  {
+   "persona": null,
+   "fecha": "2024-11-06",
+   "que": "Gana Trump",
+   "activo": "SPY",
+   "movimiento": {
+    "dia": 0.025,
+    "d1": 0.033,
+    "d5": 0.036,
+    "d20": 0.052,
+    "d60": 0.051
+   }
+  },
+  {
+   "persona": null,
+   "fecha": "2025-01-27",
+   "que": "Modelo chino barato: Nvidia cae",
+   "activo": "NVDA",
+   "movimiento": {
+    "dia": -0.17,
+    "d1": -0.096,
+    "d5": -0.182,
+    "d20": -0.112,
+    "d60": -0.28
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2025-03-02",
+   "que": "Post: reserva estratégica cripto con BTC y ETH",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": 0.095,
+    "d1": 0.002,
+    "d5": 0.009,
+    "d20": -0.026,
+    "d60": 0.121
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2025-04-03",
+   "que": "«Liberation Day»: aranceles a todo el mundo",
+   "activo": "SPY",
+   "movimiento": {
+    "dia": -0.049,
+    "d1": -0.105,
+    "d5": -0.071,
+    "d20": 0.004,
+    "d60": 0.097
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2025-04-03",
+   "que": "«Liberation Day»: aranceles a todo el mundo",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": 0.008,
+    "d1": 0.017,
+    "d5": -0.075,
+    "d20": 0.135,
+    "d60": 0.283
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2025-04-09",
+   "que": "Post «GREAT TIME TO BUY» y pausa de 90 días",
+   "activo": "SPY",
+   "movimiento": {
+    "dia": 0.105,
+    "d1": 0.057,
+    "d5": 0.059,
+    "d20": 0.138,
+    "d60": 0.253
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2025-04-09",
+   "que": "Post «GREAT TIME TO BUY» y pausa de 90 días",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": 0.082,
+    "d1": 0.043,
+    "d5": 0.108,
+    "d20": 0.235,
+    "d60": 0.385
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2025-10-10",
+   "que": "Post: arancel de 100 % a China",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": -0.073,
+    "d1": -0.091,
+    "d5": -0.09,
+    "d20": -0.11,
+    "d60": -0.238
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2025-10-23",
+   "que": "Indulto a Changpeng Zhao (fundador de Binance)",
+   "activo": "BNB",
+   "movimiento": {
+    "dia": 0.051,
+    "d1": 0.035,
+    "d5": 0.03,
+    "d20": -0.111,
+    "d60": -0.199
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2025-10-10",
+   "que": "Post: arancel de 100 % a China",
+   "activo": "SPY",
+   "movimiento": {
+    "dia": -0.027,
+    "d1": -0.012,
+    "d5": -0.01,
+    "d20": -0.0,
+    "d60": 0.03
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2026-01-20",
+   "que": "Amenaza de aranceles a Europa por Groenlandia",
+   "activo": "SPY",
+   "movimiento": {
+    "dia": -0.02,
+    "d1": -0.009,
+    "d5": 0.006,
+    "d20": -0.008,
+    "d60": 0.017
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2026-01-20",
+   "que": "Amenaza de aranceles a Europa por Groenlandia",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": -0.045,
+    "d1": -0.034,
+    "d5": -0.064,
+    "d20": -0.243,
+    "d60": -0.256
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2026-01-21",
+   "que": "Post: no habrá aranceles, hay «marco de acuerdo»",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": 0.012,
+    "d1": 0.013,
+    "d5": -0.001,
+    "d20": -0.221,
+    "d60": -0.233
+   }
+  },
+  {
+   "persona": "elon-musk",
+   "fecha": "2026-02-03",
+   "que": "Post «Maybe next year» sobre llevar Dogecoin a la Luna",
+   "activo": "DOGE",
+   "movimiento": {
+    "dia": -0.018,
+    "d1": -0.038,
+    "d5": -0.105,
+    "d20": -0.141,
+    "d60": -0.147
+   }
+  },
+  {
+   "persona": null,
+   "fecha": "2026-02-05",
+   "que": "BTC cae 15 % en un día (liquidaciones, salida de los ETF)",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": -0.14,
+    "d1": -0.035,
+    "d5": -0.059,
+    "d20": -0.071,
+    "d60": -0.059
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2026-03-30",
+   "que": "Post: «conversaciones serias» con Irán",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": 0.012,
+    "d1": 0.034,
+    "d5": 0.02,
+    "d20": 0.118,
+    "d60": 0.113
+   }
+  },
+  {
+   "persona": "donald-trump",
+   "fecha": "2026-04-14",
+   "que": "Post contra los bancos por la ley Clarity",
+   "activo": "BTC",
+   "movimiento": {
+    "dia": -0.004,
+    "d1": 0.005,
+    "d5": -0.008,
+    "d20": 0.073,
+    "d60": -0.134
+   }
+  },
+  {
+   "persona": null,
+   "fecha": "2026-06-05",
+   "que": "Empleo fuerte y caída de tecnológicas",
+   "activo": "SPY",
+   "movimiento": {
+    "dia": -0.026,
+    "d1": -0.024,
+    "d5": -0.02,
+    "d20": -0.01,
+    "d60": 0.009
+   }
+  },
+  {
+   "persona": null,
+   "fecha": "2026-11-05",
+   "que": "Venta del sector IA: peor día del S&P 500 en valor",
+   "activo": "SPY",
+   "movimiento": {
+    "dia": -0.044,
+    "d1": -0.041,
+    "d5": -0.013,
+    "d20": null,
+    "d60": null
+   }
+  },
+  {
+   "persona": null,
+   "fecha": "2026-11-05",
+   "que": "Venta del sector IA",
+   "activo": "NVDA",
+   "movimiento": {
+    "dia": -0.093,
+    "d1": -0.067,
+    "d5": -0.17,
+    "d20": null,
+    "d60": null
+   }
+  }
+ ]
+}

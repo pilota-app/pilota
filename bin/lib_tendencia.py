@@ -98,6 +98,33 @@ def filas_cruce(tramos, reparto, media=50):
     return filas
 
 
+def historia_cruce(cierres, media=50, horizonte=20, caida=0.10):
+    """Lo que pasó antes cuando la moneda estaba del mismo lado de su media que hoy: en cuántos de esos días el precio
+    subió `horizonte` días después, cuánto en promedio y en cuántos cayó más de `caida` en el camino. `cierres` son los
+    cierres diarios de toda la historia guardada, el último es hoy. `None` si hay menos de 100 días comparables."""
+    if len(cierres) < media + horizonte + 100:
+        return None
+    sumas = [0.0]
+    for x in cierres:
+        sumas.append(sumas[-1] + x)
+    lado_hoy = cierres[-1] > (sumas[-1] - sumas[-1 - media]) / media
+    n = sube = cae = 0
+    total = 0.0
+    for i in range(media - 1, len(cierres) - horizonte):
+        if (cierres[i] > (sumas[i + 1] - sumas[i + 1 - media]) / media) != lado_hoy:
+            continue
+        futuro = cierres[i + horizonte] / cierres[i] - 1
+        peor = min(cierres[i + 1:i + horizonte + 1]) / cierres[i] - 1
+        n += 1
+        sube += futuro > 0
+        cae += peor < -caida
+        total += futuro
+    if n < 100:
+        return None
+    return {"sobre": lado_hoy, "dias": n, "horizonte": horizonte, "sube": sube / n, "medio": total / n,
+            "cae": cae / n, "caida": caida}
+
+
 def pesos_cruce(tramos, reparto, media=50):
     """La regla del perfil tendencia: cada moneda con su parte del reparto mientras cierra sobre su media de `media` días;
     bajo la media, esa parte espera en USDT."""

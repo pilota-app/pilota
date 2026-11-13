@@ -69,6 +69,7 @@ cuentas ni publicidad; nada personal en el código (Ana Pérez, Matías Soto). B
 | `bin/lib_holding.py` | Las formas de holdear: comprar por partes y guardar, con una variante cada una (`reparto`, `partes`, `descuento`, `rebalanceo`, `cosecha`). `paso` es un día y lo usan igual la comparación (`simular`) y el robot en vivo (`lib_piloto._vuelta_holding_v`). Puro. No es una acción. |
 | `bin/simular.py` | Las acciones de «Comparar»: `estado`, `correr` (todos los perfiles con un monto y un período), `mapa` (el mapa de inicios, `simularMapa`) y `probabilidades` (qué tan seguido sale bien, `simularProbabilidades`). |
 | `bin/lib_tendencia.py` | Seguir la tendencia y ajustar el tamaño por volatilidad (`en_tendencia`, `volatilidad`, `tamano`, `pesos_tendencia`, `pesos_rotacion`), la regla del perfil tendencia (`pesos_cruce`, `filas_cruce`), un día (`paso`, el mismo en la comparación y en vivo) y su recorrido por el pasado día por día (`simular`). Puro. No es una acción. |
+| `bin/lib_influencia.py` | Las noticias de las personas que mueven el precio (`cargar`, `recientes`), leídas de `bin/influencia.json`: la copia del repo [pilota-app/influencia](https://github.com/pilota-app/influencia) que viaja en la app (se pone al día con `herramientas/traer_influencia.py`, a mano, antes de una versión). No toca la red y no decide nada: es contexto. No es una acción. |
 | `bin/lib_candado.py` | Una sola cosa a la vez entre procesos: un solo trabajo de cada tipo (`unico`, `YaCorriendo`), una revisión a la vez (`candado`) y el trabajo que quedó sin app (`huerfano`). No es una acción. |
 | `ui/grafico.js` | El gráfico de velas en vivo en un `<canvas>` (`PilotaGrafico.crear`): 1 m, 5 m, 1 h y 4 h, Bollinger, medias, volumen y RSI con un botón, las flechas de compra y venta, las líneas de entrada, stop y objetivo, el precio que se mueve cada segundo y el destello de color de cada operación. |
 | `bin/lib_simulacion.py` | «Si hubiera puesto X»: el historial como una cartera con tamaño y frenos (`cartera`, con `perfil` y sus `movimientos`), comprar BTC y esperar, el holding por partes (`holding`), las señales sobre 5 m (`ops_rapidas`), la rotación (`rotacion`) y los perfiles que se ofrecen lado a lado (`comparar`). No es una acción (la corre `bin/simular.py`). |
@@ -666,7 +667,12 @@ en cuántas ventanas terminó ganando, le ganó a comprar BTC o perdió más de 
 
 **La tendencia decide una vez al día** (`lib_piloto._vuelta_tendencia`): con la vela diaria de ayer cerrada y el precio de 1 m
 fresco, lleva el libro a `lib_tendencia.pesos_cruce` con `lib_tendencia.paso`. Cada movimiento queda como `tendencia_compra` o
-`tendencia_venta`. Sin la vela de ayer no decide (`sin_datos`) y con un freno de la cuenta vende todo.
+`tendencia_venta`. Sin la vela de ayer no decide (`sin_datos`) y con un freno de la cuenta vende todo. Cada día deja
+también lo que pasó antes en un día como hoy (`lib_tendencia.historia_cruce`: del mismo lado de la media, en cuántos días
+subió a los 20 días, cuánto en promedio y en cuántos cayó más de 10 % en el camino), y `estado` suma las noticias de
+influencia de los últimos 30 días (`lib_influencia.recientes`). Las noticias no entran en la decisión: en el estudio no
+cambiaron la probabilidad de subir (una regresión logística sobre 15 indicadores y las noticias acertó si BTC subía en 7
+días 54 de cada 100 veces; a 20 y 60 días, menos que decir siempre el promedio).
 
 Las variantes de holding (`variante` en `lib_perfiles`) se deciden una vez por día, al cerrar la vela diaria, con
 `lib_holding.paso`: el mismo paso que mide la comparación. En vivo compran y venden con el precio de 1 m de ahora y la orden

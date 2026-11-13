@@ -7,6 +7,10 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- Tendencia ahora muestra qué pasó antes en un día como hoy (cuántas veces subió a 20 días y cuántas cayó más de 10 %) y
+  las noticias de personas influyentes de los últimos 30 días. *Trend now shows what happened before on a day like today
+  (how often it was up after 20 days and how often it fell more than 10%) and news from influential people in the last 30
+  days.*
 - Nuevo perfil Tendencia (experimento): BTC y ETH solo mientras están sobre su promedio de 50 días. Y en «Comparar», «¿Qué
   tan seguido sale bien?»: el mismo período repetido con cientos de fechas de inicio, con cuántas veces ganó, le ganó a BTC o
   perdió más de 20 %. *New Trend profile (experiment): BTC and ETH only while they are above their 50-day average. And in

@@ -324,6 +324,8 @@ class TendenciaEnVivo(Base):
         e = piloto.estado(AHORA, minutos={})
         self.assertAlmostEqual(e["efectivo"], 80, delta=0.5, msg="ETH bajo su media: su 40 % espera en USDT")
         self.assertEqual([f["sobre"] for f in e["tendencia"]["filas"]], [True, False])
+        self.assertIsNone(e["tendencia"]["filas"][0]["historia"], "70 días no alcanzan para decir un porcentaje")
+        self.assertIn("eventos", e["noticias"])
         r = self.vuelta(AHORA + self.DIA, {"BTCUSDT": -0.01, "ETHUSDT": -0.01})
         self.assertEqual(r["vende"], ["BTCUSDT"])
         self.assertEqual((self.razones().count("tendencia_compra"), self.razones().count("tendencia_venta")), (1, 1))

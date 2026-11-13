@@ -34,6 +34,7 @@ import lib_modos
 import lib_perfiles
 import lib_registro
 import lib_rotacion
+import lib_influencia
 import lib_tendencia
 import lib_tamano
 import lib_universo
@@ -327,12 +328,13 @@ def _vuelta_tendencia(d, ms, f, perfil=None):
     dia = ms // lib_tendencia.DIA_MS * lib_tendencia.DIA_MS
     if int(t.get("dia_ms") or 0) >= dia:
         return {"decision": "esperando", "proxima_ms": dia + lib_tendencia.DIA_MS}
-    tramos = {}
+    tramos, historia = {}, {}
     for par in p["reparto"]:
         velas = [v for v in _diaria(par) if v[0] + lib_tendencia.DIA_MS <= dia]
         if not velas or velas[-1][0] != dia - lib_tendencia.DIA_MS:      # sin la vela de ayer no se decide
             return {"decision": "sin_datos", "faltan": [par]}
         tramos[par] = [v[4] for v in velas[-p["media"] - 5:]]
+        historia[par] = lib_tendencia.historia_cruce([v[4] for v in velas], p["media"])
     filas = lib_tendencia.filas_cruce(tramos, p["reparto"], p["media"])
     if filas is None:
         return {"decision": "sin_datos"}
@@ -355,7 +357,8 @@ def _vuelta_tendencia(d, ms, f, perfil=None):
                                        "monto": m["monto"], "estado": "llenada"},
                                 resultado={"precio": m["precio"], "neto": m["ganancia"], "comision": m["comision"]})
     t["dia_ms"] = dia
-    t["filas"] = [{k: x[k] for k in ("par", "precio", "media", "sobre", "parte", "reparto")} for x in filas]
+    t["filas"] = [{**{k: x[k] for k in ("par", "precio", "media", "sobre", "parte", "reparto")}, "historia": historia.get(x["par"])}
+                  for x in filas]
     t["frenado"] = not puerta["puede"]
     d["tendencia"] = t
     if movs:
@@ -565,6 +568,8 @@ def estado(ahora_ms=None, minutos=None):
             else next((x.get("rotacion") for x in (d.get("mezcla") or {}).values() if x.get("rotacion")), None),
             "mezcla": mezcla,
             "tendencia": d.get("tendencia") if perfil and perfil["tipo"] == "tendencia" else None,
+            "noticias": (lib_influencia.recientes(ms, [lib_universo.MONEDA.get(x, x) for x in perfil["reparto"]])
+                         if perfil and perfil["tipo"] == "tendencia" else None),
             "pares": list(lib_perfiles.pares_de(d.get("perfil"))) if perfil else [],
             # Las reglas del perfil puesto, para que la pantalla diga su plan con los mismos números.
             "reglas": {k: (list(x) if isinstance(x, tuple) else x) for k, x in (perfil or {}).items()},

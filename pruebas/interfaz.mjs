@@ -95,6 +95,9 @@ await page.waitForSelector("#descargar");
   assert.equal(await ten.locator(".ranking-fila").count(), 2, "BTC y ETH");
   assert.match(await ten.textContent(".ranking"), /Sobre su promedio[\s\S]*tengo 60 %[\s\S]*Bajo su promedio[\s\S]*su 40 % espera en USDT/);
   assert.match(await ten.textContent(".vivo-piensa"), /Tengo BTC: está sobre su promedio\. ETH está bajo el suyo/);
+  // Lo que pasó antes en un día como hoy, con sus porcentajes, y las noticias como contexto.
+  assert.match(await ten.textContent(".pronostico"), /Las 1\.?630 veces que estuvo sobre su promedio, a los 20 días había subido 54 de cada 100 veces[\s\S]*en 26 de cada 100 cayó más de 10 %/);
+  assert.match(await ten.textContent(".noticias"), /Persona de ejemplo[\s\S]*BTC \+3,1 %[\s\S]*Datos al 2026-11-13/);
   assert.match(await ten.textContent("#pestana-vivo"), /BTCUSDT|BTC cerró sobre su promedio de 50 días: compré/);
   await ten.close();
 }

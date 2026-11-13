@@ -89,6 +89,14 @@ class Cruce(unittest.TestCase):
         self.assertEqual(libro["cantidad"], {})
         self.assertLess(movs[0]["ganancia"], 0, "vendió más barato de lo que compró, con costos")
 
+    def test_la_historia_cuenta_los_dias_del_mismo_lado_de_la_media(self):
+        cierres = [100 * (1.002 ** i) for i in range(400)]
+        h = T.historia_cruce(cierres, 50, 20)
+        self.assertTrue(h["sobre"])
+        self.assertEqual((h["sube"], h["cae"]), (1.0, 0.0), "si siempre sube, siempre subió y nunca cayó")
+        self.assertGreater(h["dias"], 300)
+        self.assertIsNone(T.historia_cruce(cierres[:150], 50, 20), "con poca historia no se dice un porcentaje")
+
     def test_simular_con_la_regla_de_cruce_sale_en_la_caida(self):
         cierres = subida(120) + subida(80, ritmo=-0.02)[1:]
         r = T.simular(100, {"BTCUSDT": velas([c * 1 for c in cierres]), "ETHUSDT": velas(cierres)}, INICIO, INICIO + 400 * DIA,

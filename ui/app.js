@@ -2758,10 +2758,14 @@
       const tenencias = [{ par: "BTCUSDT", cantidad: parte / 96100, gastado: m * 0.6, precio_ahora: btc, valor: parte / 96100 * btc, precio_medio: 96100 }];
       const valor = m * 0.4 + tenencias[0].valor;
       const tendencia = { dia_ms: hoy, frenado: false, filas: [
-        { par: "BTCUSDT", precio: btc, media: btc / 1.042, sobre: true, parte: 0.6, reparto: 0.6 },
-        { par: "ETHUSDT", precio: precio("ETHUSDT"), media: precio("ETHUSDT") / 0.971, sobre: false, parte: 0, reparto: 0.4 }] };
+        { par: "BTCUSDT", precio: btc, media: btc / 1.042, sobre: true, parte: 0.6, reparto: 0.6,
+          historia: { sobre: true, dias: 1630, horizonte: 20, sube: 0.54, medio: 0.045, cae: 0.26, caida: 0.1 } },
+        { par: "ETHUSDT", precio: precio("ETHUSDT"), media: precio("ETHUSDT") / 0.971, sobre: false, parte: 0, reparto: 0.4,
+          historia: { sobre: false, dias: 1474, horizonte: 20, sube: 0.45, medio: 0.004, cae: 0.44, caida: 0.1 } }] };
+      const noticias = { al: "2026-11-13", dias: 30, eventos: [
+        { fecha: "2026-11-02", persona: "Persona de ejemplo", que: "Noticia inventada para la vista previa", activo: "BTC", dia: 0.031 }] };
       return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
-        ganancia_relativa: valor / m - 1, efectivo: m * 0.4, posiciones: [], tenencias, tendencia,
+        ganancia_relativa: valor / m - 1, efectivo: m * 0.4, posiciones: [], tenencias, tendencia, noticias,
         ultima: { decision: "mantiene", tiene: ["BTCUSDT"] },
         movimientos: [linea(t0 + 60000, "tendencia_compra", "BTCUSDT", { precio: 96100, monto: m * 0.6 }, {}),
           linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m })], flujo, radar, jugadas: {} };
