@@ -24,7 +24,19 @@
     estado: null, reiniciando: false, tamano: null, frenos: null, pausando: false, desbloqueando: false,
     ejecutor: null, ejecutando: false, motor: null, revisandoMotor: false, encendiendoMotor: false,
     modos: null, decision: null, decidiendo: false, respondiendo: "", cambiandoModo: "",
-    panel: null, guardandoLocal: false, pidiendoPanel: false };
+    panel: null, guardandoLocal: false, pidiendoPanel: false,
+    // El centro de operaciones: la pestaña de arriba, la simulación con monto y el paso a real.
+    pestana: "vivo", sim: { monto: 100, dias: 90, corriendo: false, ultima: null }, simVivo: false,
+    real: null, realOcupado: false, campos: {},
+    // El robot en vivo (bin/vivo.py), el perfil que se está eligiendo y la película de la comparación.
+    vivo: null, vivoPerfil: "holding", vivoMonto: 100, vivoOcupado: false, vivoElegir: false, peli: null,
+    // El gráfico en vivo (ui/grafico.js) y el flujo de Binance (bin/vivo.py encender): conectado o no.
+    graf: null, flujo: null,
+    // Lo que Pilota prepara sola al abrir: cada cosa se pide una sola vez por sesión.
+    auto: {} };
+  // La llave y el secreto mientras se escriben: solo en memoria, nunca en E (que se puede mirar en las pruebas) ni en
+  // el HTML. Se borran apenas se mandan.
+  const secretos = { "real-llave": "", "real-secreto": "", "alpaca-llave": "", "alpaca-secreto": "" };
   const raiz = document.getElementById("app");
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => "&#" + c.charCodeAt(0) + ";");
 
@@ -50,15 +62,17 @@
     retener: (...a) => bv.retener(...a),               // mientras se elige el idioma, los avisos esperan
     elegirIA: (id) => { E.config.ia = id; host.enviar("config", { ia: id }); },
   });
-  const toast = (frase_, o) => ui.aviso(frase_, o);
+  // Los avisos de la app llegan ya traducidos (Tp): `traducido` evita traducirlos dos veces. Las piezas (MCP, bienvenida)
+  // mandan su texto en español y ui.aviso lo traduce.
+  const toast = (frase_, o) => ui.aviso(frase_, { ...o, traducido: true });
 
   // ── Conectar a tu IA (MCP): pieza «mcp». Solo lectura y apagada hasta que la persona conecta su IA en Ajustes. ──
-  const mcpUI = PiezaMCP.crear({ i18n, host, pintar, app: NOMBRE, aviso: (t, o) => toast(t, o),
+  const mcpUI = PiezaMCP.crear({ i18n, host, pintar, app: NOMBRE, aviso: (t, o) => ui.aviso(t, o),
     ejemplo: "¿Qué decidió Pilota hoy y con qué puntaje?" });
 
   // ── Bienvenida: pieza «bienvenida». El idioma siempre primero y solo en la pantalla; después, los pasos de la app. ──
   const bv = PiezaBienvenida.crear({
-    i18n, pintar, mostrarAviso: (...a) => toast(...a),
+    i18n, pintar, mostrarAviso: (...a) => ui.aviso(...a),
     guardarIdioma: (c) => { E.config.idioma_ui = c; host.enviar("config", { idioma_ui: c }); },
     cargarIdioma: (c) => cargarIdioma(c),
     terminar: () => { E.config.bienvenida = true; host.enviar("config", { bienvenida: true }); },
@@ -696,8 +710,8 @@
       neto: () => frase("deja {hay} por operación", { hay: porcentaje(x.hay, 2) }),
       usdt: () => frase("rendimiento {hay}", { hay: porcentaje(x.hay, 1) }),
       caida: () => frase("cayó {hay} y el piso está en {pide}", { hay: porcentaje(x.hay, 1), pide: porcentaje(x.pide, 0) }),
-      plan: () => esc(Tp(ETIQUETA_PLAN[x.hay] || x.hay)),
-      nueva: () => esc(x.hay ? Tp("es la primera vez con este tramo") : Tp("este tramo ya se había usado")),
+      plan: () => frase(ETIQUETA_PLAN[x.hay] || "sin casos suficientes"),
+      nueva: () => (x.hay ? frase("es la primera vez con este tramo") : frase("este tramo ya se había usado")),
     };
     return `<li class="tramo"><span class="tramo-nombre">${ETIQUETA_CRITERIO[x.que] || x.que}</span>
       <span class="serie-estado" data-estado="${x.pasa ? "listo" : "incompleto"}">${x.pasa ? "Pasa" : "No pasa"}</span>
@@ -781,6 +795,21 @@
     piso_absoluto: "el piso absoluto", piso: "el piso del capital de referencia", diario: "el freno del día",
     racha: "la racha de pérdidas", comision: "la comisión maker", fdusd: "el precio de FDUSD",
     esperando: "las 24 horas de espera",
+    // Lo que deja escrito una propuesta, el tamaño o el conector real.
+    no_claro: "puntaje no claramente alto", monto_mayor: "monto sobre tu tope", sin_disponible: "sin disponible en USDT",
+    bajo_minimo: "bajo el mínimo de Binance", sin_proteccion: "Binance no aceptó la protección", cruzaria: "el precio ya pasó",
+    sin_saldo: "sin saldo en Binance", sin_llave: "sin llave de Binance", sin_conexion: "sin conexión con Binance",
+    binance: "Binance dijo que no", rechazada: "dijiste que no", vencida: "nadie respondió",
+    llave_insegura: "la llave ya no es segura", ocupado: "otra revisión en curso", cambio_ambiente: "era de la otra cuenta",
+    polvo: "bajo el mínimo de Binance, quedó en tu cuenta",
+    // Por qué el robot en vivo no entró (bin/lib_ejecutor_prueba.py: RECHAZOS).
+    posiciones_llenas: "posiciones llenas", repetida: "esa señal ya estaba puesta", sin_capital: "sin capital",
+    sin_minimos: "sin minimos de Binance", sin_filtros: "sin filtros de Binance",
+    tick: "la protección no cabe en los mínimos de Binance", paso: "la protección no cabe en los mínimos de Binance",
+    cantidad_minima: "la protección no cabe en los mínimos de Binance",
+    nocional_compra: "la protección no cabe en los mínimos de Binance",
+    nocional_stop: "la protección no cabe en los mínimos de Binance",
+    nocional_objetivo: "la protección no cabe en los mínimos de Binance",
   };
   // Por qué quedó anotada una línea (bin/lib_registro.py: RAZONES). Cada paso usa las suyas; el registro acepta solo
   // estos códigos, así que nunca hay una línea sin palabras.
@@ -796,6 +825,7 @@
     freno_diario: "Freno del día", freno_racha: "Freno por racha de pérdidas", freno_piso: "Freno del piso",
     freno_piso_absoluto: "Freno del piso absoluto", freno_comision: "Freno por la comisión",
     freno_fdusd: "Freno por FDUSD", pausa: "Pusiste todo en pausa", reanudar: "Quitaste la pausa",
+    perfil_empezado: "Empezó el robot en vivo", perfil_detenido: "Detuviste el robot", compra_holding: "Compra por partes",
   };
   const ETIQUETA_CIERRE = { objetivo: "el objetivo", stop: "el stop", stop_movil: "el stop móvil", manual: "tu decisión" };
   // Lo que se puede decir de una línea: solo las claves que conocemos (del Python vienen números y códigos, nunca
@@ -808,7 +838,7 @@
     if (r.por) partes.push(frase("cerró por {que}", { que: Tp(ETIQUETA_CIERRE[r.por] || r.por) }));
     if (typeof r.neto === "number") partes.push(frase("dejó {n}", { n: usdt(r.neto) }));
     if (typeof r.saldo === "number") partes.push(frase("saldo {n}", { n: usdt(r.saldo) }));
-    if (r.motivo) partes.push(frase("motivo: {que}", { que: Tp(MOTIVO_CORTO[r.motivo] || r.motivo) }));
+    if (r.motivo) partes.push(frase("motivo: {que}", { que: Tp(MOTIVO_CORTO[r.motivo] || "otro motivo") }));
     return partes.join(" · ");
   }
   function filaRegistro(l) {
@@ -1062,7 +1092,7 @@
       ${d.pausado ? `<p class="indicadores-linea">${frase("Sigues con {n} posiciones protegidas: «Pausar» cancela las entradas y no toca ninguna protección automática.", { n: numero(d.protegidas, 0) })}</p>` : ""}
       <ul class="tramos" aria-label="Los frenos">${lista.map((f) => filaFreno(f, c)).join("")}</ul>
       <ul class="tramos" aria-label="Los frenos de siempre">
-        ${pasoTamano("Sin apalancamiento", "listo", frase("{n}x", { n: numero(p.apalancamiento, 0) }),
+        ${pasoTamano("Sin apalancamiento", "listo", `${numero(p.apalancamiento, 0)}x`,
           "Pilota solo compra al contado y con lo que hay: una orden con apalancamiento no se pone nunca.", true)}
         ${pasoTamano("Las posiciones a la vez", (c.posiciones || {}).quedan > 0 ? "listo" : "incompleto",
           frase("{n} de {maximas}", { n: numero((c.posiciones || {}).abiertas, 0), maximas: numero(p.posiciones, 0) }),
@@ -1238,7 +1268,7 @@
     if (m.estado === "error") return frase(ERRORES[m.error] || "No se pudo.");
     if (!hace) return "Todavía no he hecho ninguna revisión: Pilota solo trabaja con el equipo encendido.";
     return `${hace} · ${m.estado === "interrumpido"
-      ? Tp("se cortó al cerrarse la app") : Tp("apagado: nadie está mirando los cruces")}`;
+      ? frase("se cortó al cerrarse la app") : frase("apagado: nadie está mirando los cruces")}`;
   }
   // Una ventana sin cobertura: el rato en que un stop no se habría aplicado. Queda escrita en vez de taparse.
   function ventanaMotor(v) {
@@ -1246,7 +1276,7 @@
       <span class="tramo-nombre">${frase("{n} min sin cubrir", { n: numero(v.min, 0) })}</span>
       <span class="serie-estado" data-estado="${v.abierto ? "incompleto" : "vacio"}">${v.abierto ? "Abierta" : "Cerrada"}</span>
       <span class="serie-detalle">${frase("desde el {cuando}", { cuando: fechaHora(v.desde) })}</span>
-      <span class="serie-detalle">${Tp(VENTANAS_MOTOR[v.motivo] || "sin cobertura")}</span></li>`;
+      <span class="serie-detalle">${frase(VENTANAS_MOTOR[v.motivo] || "sin cobertura", {})}</span></li>`;
   }
   function botonMotor(m) {
     if (m.corriendo) {
@@ -1285,6 +1315,7 @@
   };
   // Por qué un modo está apagado. Los códigos los pone el Python (lib_modos, lib_frenos).
   const MOTIVOS_MODO = {
+    cambio_ambiente: "Esa propuesta era de la otra cuenta (prueba o real): la dejo vencer.",
     sin_calibracion: "Hasta que el modelo esté calibrado, cada entrada la decides tú.",
     faltan_confirmaciones: "El automático se activa confirmando dos veces.",
     modo: "Ese modo no existe.",
@@ -1315,7 +1346,7 @@
     return `<li class="tramo"><span class="tramo-nombre">${ETIQUETA_MODO[m.modo] || m.modo}</span>
       <span class="serie-estado" data-estado="${estado}">${etiqueta}</span>
       <span class="serie-detalle">${QUE_HACE_MODO[m.modo] || ""}</span>
-      ${m.puede ? "" : `<span class="serie-detalle freno">${Tp(MOTIVOS_MODO[m.motivo] || MOTIVOS_FRENOS[m.motivo] || "Este modo no se puede usar ahora.")}</span>`}
+      ${m.puede ? "" : `<span class="serie-detalle freno">${frase(MOTIVOS_MODO[m.motivo] || MOTIVOS_FRENOS[m.motivo] || "Este modo no se puede usar ahora.")}</span>`}
       ${m.actual || !m.puede ? "" : `<span class="serie-detalle"><button type="button" class="pz-boton" data-modo="${esc(m.modo)}"${E.cambiandoModo ? " disabled" : ""}>${m.modo === "automatico" ? "Activar el automático" : "Usar este modo"}</button></span>`}</li>`;
   }
   // Una propuesta esperando: el puntaje, la razón, el monto en USDT, el stop y cuánto le queda antes de vencer.
@@ -1325,12 +1356,12 @@
     return `<li class="serie">
       <span class="serie-par" data-sin-traducir>${esc(donde)}</span>
       <span class="serie-estado" data-estado="listo">${frase("Puntaje {n}", { n: numero(p.puntaje, 0) })}</span>
-      <span class="serie-detalle">${Tp(ETIQUETA_ESTRATEGIA[p.estrategia] || p.estrategia)}</span>
+      <span class="serie-detalle">${frase(ETIQUETA_ESTRATEGIA[p.estrategia] || p.estrategia)}</span>
       <span class="serie-detalle">${frase("Compro {monto} a {precio}, con stop en {stop} y objetivo en {objetivo}: arriesgo {arriesgado}.", {
         monto: usdt(p.monto), precio: numero(p.entrada), stop: numero(p.stop), objetivo: numero(p.objetivo),
         arriesgado: usdt(p.arriesgado) })}</span>
       <span class="serie-detalle">${frase("Vence en {tiempo}: si no me respondes, la dejo pasar.", { tiempo: duracion(p.queda_ms / 1000) })}</span>
-      ${p.motivo ? `<span class="serie-detalle">${Tp(MOTIVOS_PREGUNTA[p.motivo] || "Te pregunto antes de abrir esto.")}</span>` : ""}
+      ${p.motivo ? `<span class="serie-detalle">${frase(MOTIVOS_PREGUNTA[p.motivo] || "Te pregunto antes de abrir esto.")}</span>` : ""}
       <span class="serie-detalle">
         <button type="button" class="pz-boton pz-principal" data-propuesta="${esc(p.id)}" data-si="1"${esperando ? " disabled" : ""}>${esperando ? "Un momento…" : "Sí, ábrela"}</button>
         <button type="button" class="pz-boton" data-propuesta="${esc(p.id)}" data-si="0"${esperando ? " disabled" : ""}>No, me quedo en USDT</button></span></li>`;
@@ -1358,15 +1389,15 @@
           <ul class="series" aria-label="Propuestas esperando">${esperan.map(filaPropuesta).join("")}</ul>`
         : `<p class="indicadores-linea">${frase("No tengo nada propuesto. La mejor oportunidad de ahora puntúa {n} y la exigencia es {exigencia}.", {
             n: numero((d.mejor || {}).puntaje, 0), exigencia: numero(d.exigencia, 0) })}</p>`}
-      ${dec ? `<p class="indicadores-linea">${Tp(TEXTO_DECISION[dec.decision] || "Todavía no he decidido nada.")}</p>` : ""}
+      ${dec ? `<p class="indicadores-linea">${frase(TEXTO_DECISION[dec.decision] || "Todavía no he decidido nada.")}</p>` : ""}
       ${dec && dec.motivo && MOTIVOS_PREGUNTA[dec.motivo]
-        ? `<p class="indicadores-linea">${Tp(MOTIVOS_PREGUNTA[dec.motivo])}</p>` : ""}
+        ? `<p class="indicadores-linea">${frase(MOTIVOS_PREGUNTA[dec.motivo])}</p>` : ""}
       <p class="indicadores-linea">${frase("Hoy vencieron {n} propuestas: una que nadie responde vence siempre, y eso también queda en el registro.", { n: numero(d.vencidas_hoy, 0) })}</p>
       <h3>Cuánto espera una propuesta</h3>
       <div class="pz-seg" role="group" aria-label="Cuánto espera una propuesta">${venc}</div>
       <h3>Hasta cuánto opero solo en semiautomático</h3>
       <div class="pz-seg" role="group" aria-label="Hasta cuánto opero solo">${montos}</div>
-      ${(d.motivos || []).map((m) => `<p class="indicadores-linea freno">${Tp(MOTIVOS_MODO[m.codigo] || MOTIVOS_FRENOS[m.codigo] || TEXTO_DECISION[m.codigo] || "Ahora no abro ninguna entrada nueva.")}</p>`).join("")}
+      ${(d.motivos || []).map((m) => `<p class="indicadores-linea freno">${frase(MOTIVOS_MODO[m.codigo] || MOTIVOS_FRENOS[m.codigo] || TEXTO_DECISION[m.codigo] || "Ahora no abro ninguna entrada nueva.")}</p>`).join("")}
       <p class="suave">Tras cualquier freno vuelvo a manual, y mientras el modelo no esté calibrado el semiautomático y el automático quedan apagados: lo que el modelo promete todavía no está probado.</p>
       <div class="pz-pie">
         <button type="button" class="pz-boton" id="modos-decidir"${E.decidiendo ? " disabled" : ""}>${E.decidiendo ? "Mirando…" : "Mirar ahora"}</button></div></div>`;
@@ -1380,15 +1411,49 @@
       motivoCorto: MOTIVO_CORTO, motivosFrenos: MOTIVOS_FRENOS, motivosTamano: MOTIVOS_TAMANO,
       pregunta: MOTIVOS_PREGUNTA, cosasMotor: COSAS_MOTOR },
   });
-  function principal() {
+  // ── «Cómo pienso»: cada pieza por separado, con sus números (la pestaña de lo técnico) ──
+  const centroUI = PilotaCentro.crear({ i18n, esc, numero, usdt, porcentaje, fechaHora });
+  const graficoUI = PilotaGrafico.crear({ i18n, esc, numero, usdt, robot: panelUI.robot,
+    estadoDe: (par, t) => vivoUI.estadoFila(E, par, t) });
+  // Si «Lo que ve el robot» sumó un gráfico nuevo (cambió lo que mira), se piden sus velas.
+  function graficosAlDia() {
+    if (graficoUI.visibles(E.graf).some((P) => !P.datos && !P.cargando)) pedirGrafico();
+  }
+  E.graf = graficoUI.estadoInicial();
+  const vivoUI = PilotaVivo.crear({ i18n, esc, numero, usdt, porcentaje, fechaHora, robot: panelUI.robot,
+    motivoCorto: (c) => MOTIVO_CORTO[c] || "otro motivo", grafico: () => graficoUI.html(E) });
+  // Pide las velas del gráfico (las cerradas, las marcas y las líneas de lo abierto) del par y la temporalidad elegidos.
+  function pedirGrafico() {
+    for (const P of graficoUI.visibles(E.graf)) { P.cargando = !P.datos; P.minutos = {}; }
+    for (const q of graficoUI.pedidos(E)) host.enviar("vivoGrafico", q);
+  }
+  // Lo que Pilota prepara sola con la app abierta, en una lista: así nadie cree que tiene que apretar algo para que funcione.
+  function soloCorre() {
+    const h = E.historial || {}, m = E.muestreo || {}, v = E.vivo || {};
+    const filas = [
+      ["Datos del mercado", E.datos && E.datos.puede_operar ? ["listo", Tp("Listo")]
+        : (E.descargando ? ["haciendo", Tp("Bajando…")] : ["haciendo", Tp("Empieza solo")])],
+      ["Historial de 3 años", Number(h.pct) >= 100 ? ["listo", Tp("Listo")]
+        : (h.corriendo ? ["haciendo", Tp("Bajando · {pct} %", { pct: numero(Number(h.pct) || 0, 0) })] : ["haciendo", Tp("Empieza solo")])],
+      ["Muestras del mercado", m.corriendo ? ["listo", Tp("Encendido")] : ["haciendo", Tp("Se enciende solo")]],
+      ["Precios en vivo", v.flujo && v.flujo.corriendo ? ["listo", Tp("Conectado")] : ["haciendo", Tp("Conectando…")]],
+      ["Mínimos de Binance", E.minimo && E.minimo.calculado ? ["listo", Tp("Listo")] : ["haciendo", Tp("Calculando…")]],
+    ];
+    const todo = filas.every(([, [e]]) => e === "listo");
+    return `<section class="tarjeta solo-corre" id="solo-corre" aria-labelledby="solo-corre-titulo">
+      <h2 id="solo-corre-titulo">${todo ? "Todo listo" : "Me estoy preparando sola"}</h2>
+      <p class="solo-corre-dice">${frase("**No tienes que apretar nada.** Con la app abierta, Pilota prepara todo esto sola y lo mantiene al día.")}</p>
+      <ul class="solo-corre-lista">${filas.map(([nombre, [estado, dice]]) => `<li data-estado="${estado}">
+        <span class="estacion-luz" aria-hidden="true"></span><span>${nombre}</span>
+        <span class="solo-corre-estado" data-sin-traducir>${esc(dice)}</span></li>`).join("")}</ul>
+      <p class="ayuda">Más abajo está cada pieza por dentro, para quien quiera mirar. Sus botones son solo para hacer algo antes de tiempo: el backtest y la calibración sirven para estudiar, el robot funciona sin ellos.</p></section>`;
+  }
+  function comoPienso() {
     const series = (E.datos && Array.isArray(E.datos.series)) ? E.datos.series : [];
-    return `<header class="barra"><h1 data-sin-traducir>${esc(NOMBRE)}</h1>
-      <button type="button" class="pz-boton" id="abrir-ajustes">Ajustes</button></header>
-      ${banda()}
-      <main class="contenido">
-        ${panelUI.html(E.panel, { respondiendo: E.respondiendo })}
+    return `
+        ${soloCorre()}
         <h2>Cómo trabaja Pilota, paso a paso</h2>
-        <p class="ayuda">Debajo está cada pieza por separado, con sus números: de dónde salen los datos, cómo se puntúa una oportunidad, cuánto se pone en cada operación y qué la frena. Nada de lo de arriba sale de otra parte.</p>
+        <p class="ayuda">Aquí está cada pieza por separado, con sus números: de dónde salen los datos, cómo se puntúa una oportunidad, cuánto se pone en cada operación y qué la frena. Lo que ves en «En vivo» y en «Cabina» no sale de otra parte.</p>
         <h2>Datos del mercado</h2>
         <p class="suave">${frase("Velas cerradas de Binance de los últimos {n} días. Pilota decide solo con velas cerradas y continuas.", { n: (E.datos && E.datos.dias) || DIAS })}</p>
         ${estadoDatos()}
@@ -1462,6 +1527,38 @@
         <p class="ayuda">${frase("**Propuesta**: una operación que te ofrezco con su puntaje, su razón, su monto en USDT y su stop, y que espera lo que elijas: 5, 15 o 60 minutos. Si nadie responde, vence. Siempre: no hay ningún camino donde el silencio opere.")}</p>
         <p class="ayuda">El modo lo eliges tú, pero no manda sobre nada más: el puntaje, la exigencia, el tamaño y los frenos son los mismos en los tres. Tras cualquier freno vuelvo a manual.</p>
         ${modos()}
+`;
+  }
+  // La cabina es la de los tres modos (puntaje, monto y tu sí): la que manda con dinero real. Con un perfil andando en
+  // prueba decide el perfil, así que la cabina no muestra una cadena vieja: dice quién manda y dónde mirarlo.
+  function cabina() {
+    const v = E.vivo || {};
+    if (v.activo && !(E.real && E.real.activo)) {
+      return `<section id="panel" class="panel cabina">
+        <div class="tarjeta cabina-perfil" id="cabina-perfil">
+          <h2>${frase("Ahora manda el perfil {perfil}", { perfil: Tp(vivoUI.nombre(v.perfil)) })}</h2>
+          <p>Compra y vende solo, con dinero ficticio, y no te pide permiso. Todo lo que mira y lo que hace lo ves en «En vivo».</p>
+          <div class="pz-pie"><button type="button" class="pz-boton pz-principal" data-ir-pestana="vivo">Ir a En vivo</button></div>
+        </div>
+        <h3>¿Para qué sirve la cabina?</h3>
+        <p class="ayuda">Es la pantalla del dinero real. Ahí cada compra pasa por cuatro pasos: datos al día, una oportunidad con buen puntaje, un monto que Binance acepte y, según el modo, tu sí. Cuando pases a real, la vas a ver llena.</p>
+      </section>`;
+    }
+    return panelUI.html(E.panel, { respondiendo: E.respondiendo, datos: E.datos ? !!E.datos.puede_operar : undefined });
+  }
+  function principal() {
+    const real = !!(E.real && E.real.activo);
+    return `<header class="barra"><h1 data-sin-traducir>${esc(NOMBRE)}</h1>
+      ${centroUI.pestanas(E.pestana, { real, esperando: !(E.vivo && E.vivo.activo && !real) && E.panel && E.panel.esperando })}
+      <button type="button" class="pz-boton" id="abrir-ajustes">Ajustes</button></header>
+      ${banda()}
+      <main class="contenido">
+        ${centroUI.panel("vivo", E.pestana, vivoUI.vivo(E))}
+        ${centroUI.panel("comparar", E.pestana, vivoUI.comparar(E))}
+        ${centroUI.panel("movimientos", E.pestana, vivoUI.movimientos(E, panelUI.registro(E.panel)))}
+        ${centroUI.panel("ahora", E.pestana, cabina())}
+        ${centroUI.panel("operar", E.pestana, centroUI.operar(E))}
+        ${centroUI.panel("como", E.pestana, comoPienso())}
       </main>`;
   }
   function ajustes() {
@@ -1479,11 +1576,46 @@
       <h3>Apariencia</h3>${tema.selectorHTML()}
       <h3>Tu IA</h3>${ui.filasIA({ ias: E.ias, elegida: E.config.ia })}
       ${mcpUI.html()}
+      ${noticiasAjustes()}
       <h3>Actualizaciones</h3>${ui.filaActualizacion()}
       <h3>Acerca de</h3>${ui.acercaDe({ version: E.version, enlaces: ENLACES })}`;
   }
+  // Las noticias con su hora exacta (bin/noticias.py, Alpaca). La llave queda en el llavero del Mac; acá solo su pista.
+  const ERRORES_NOTICIAS = {
+    formato: "Revisa la llave: la Key ID son letras mayúsculas y números, y la Secret Key, letras y números.",
+    sin_llavero: "En este equipo no puedo guardar la llave de forma segura. Por ahora, solo en Mac.",
+    rechazada: "Alpaca no aceptó esa llave. Revisa que copiaste las dos partes completas.",
+    sin_red: "No pude hablar con Alpaca. Revisa tu conexión y vuelve a intentar.",
+    respuesta: "Alpaca respondió algo que no entiendo. Vuelve a intentar en un rato.",
+    no_guardo: "No pude guardar la llave en el llavero del Mac.",
+  };
+  function noticiasAjustes() {
+    const N = E.noticias || {};
+    const intro = `<h3>Noticias al minuto</h3>
+      <p class="ayuda">Con una llave de Alpaca (gratis), Pilota lee las noticias de BTC y ETH con su hora exacta. Sirve para medir qué noticias mueven el precio y, si se prueba que sirven, para frenar antes. La llave solo lee: no compra ni vende.</p>`;
+    if (N.conectado) {
+      const ultima = (N.ultimas || [])[0];
+      return `${intro}<div class="llave-conectada">
+        <p><strong>Llave conectada</strong> <span class="pista" data-sin-traducir>${esc(N.pista || "")}</span></p>
+        ${ultima ? `<p class="suave">${frase("Última noticia: {hora}", { hora: esc(new Date(ultima.ms).toLocaleString(i18n.idioma)) })} · <span data-sin-traducir>${esc(ultima.titular)}</span></p>` : ""}
+        ${N.motivo ? `<p class="freno-texto">${Tp(ERRORES_NOTICIAS[N.motivo] || ERRORES_NOTICIAS.respuesta)}</p>` : ""}
+        <div class="pz-pie"><button type="button" class="pz-boton" id="alpaca-desconectar"${E.noticiasOcupado ? " disabled" : ""}>Desconectar la llave</button></div></div>`;
+    }
+    return `${intro}
+      <details class="guia-llave" id="guia-alpaca"><summary>Cómo sacar la llave en Alpaca</summary>
+        <ol class="guia-pasos"><li>Crea una cuenta en alpaca.markets. Basta la cuenta de práctica («Paper»), sin depositar nada.</li>
+          <li>En el panel, busca «API Keys» y genera una llave.</li>
+          <li>Copia la «Key ID» y la «Secret Key» aquí abajo. La Secret Key se muestra una sola vez.</li></ol></details>
+      <div class="campos-llave">
+        <label class="pz-campo"><span>Key ID</span><input id="alpaca-llave" type="text" autocomplete="off" spellcheck="false" maxlength="64"></label>
+        <label class="pz-campo"><span>Secret Key</span><input id="alpaca-secreto" type="password" autocomplete="off" spellcheck="false" maxlength="128"></label>
+        ${N.motivo ? `<p class="freno-texto">${Tp(ERRORES_NOTICIAS[N.motivo] || ERRORES_NOTICIAS.respuesta)}</p>` : ""}
+        <p class="ayuda">Se guardan en el llavero de tu Mac. Pilota no las escribe en ningún archivo ni las manda a ningún lado que no sea Alpaca.</p>
+        <button type="button" class="pz-boton pz-principal" id="alpaca-conectar"${E.noticiasOcupado ? " disabled" : ""}>${E.noticiasOcupado ? "Probando la llave…" : "Conectar y probar"}</button></div>`;
+  }
   function abrirAjustes() {
     E.ajustes = true;
+    host.enviar("noticiasRevisar", {});
     mcpUI.pedirEstado();   // qué IA hay en este computador y cuáles ya pueden consultar a Pilota
     pintar();
   }
@@ -1493,13 +1625,22 @@
       bv.enfocar();
       return;
     }
+    // Lo plegado que la persona abrió sigue abierto al volver a pintar (cada <details> con id).
+    const abiertos = new Set([...raiz.querySelectorAll("details[id][open]")].map((d) => d.id));
     raiz.innerHTML = principal()
       + (bv.activa ? ui.envolver(bv.html(), { id: "t-bv", sinEsc: true }) : "")
       + (E.ajustes ? ui.dialogo({ id: "t-ajustes", titulo: "Ajustes", cuerpo: ajustes(),
         pie: '<button type="button" class="pz-boton pz-principal" data-pz-cerrar>Listo</button>' }) : "")
       + ui.capas();
+    for (const id of abiertos) { const d = raiz.querySelector(`details#${CSS.escape(id)}`); if (d) d.open = true; }
+    // Lo que la persona estaba escribiendo sigue ahí después de volver a pintar.
+    for (const [id, v] of Object.entries({ ...E.campos, ...secretos })) {
+      const el = document.getElementById(id);
+      if (el && v !== "" && v != null) el.value = v;
+    }
     i18n.traducirDOM(raiz);
     ui.despuesDePintar();
+    graficoUI.montar(raiz, E);
   }
 
   // ── Lo que hace la persona ──
@@ -1509,7 +1650,166 @@
     if (mcpUI.manejarClic(ev)) return;
     const b = ev.target.closest("button");
     if (!b) return;
-    if (b.id === "abrir-ajustes") abrirAjustes();
+    if (b.dataset.pestana) irA(b.dataset.pestana);
+    else if (b.dataset.irPestana) irA(b.dataset.irPestana);
+    else if (b.dataset.grafPar || b.dataset.grafT) {
+      const P = E.graf.paneles[Number(b.dataset.grafPanel) || 0];
+      if (b.dataset.grafPar) P.par = b.dataset.grafPar;
+      if (b.dataset.grafT) P.temporalidad = b.dataset.grafT;
+      P.datos = null;
+      pedirGrafico();
+      pintar();
+    } else if (b.id === "mapa-ver") {
+      E.mapaCargando = true;
+      pintar();
+      host.enviar("simularMapa", {});
+    } else if (b.dataset.grafSolo) {
+      // Tocar el precio de una moneda la abre sola y en grande, con las velas que ya estaba mirando.
+      const P = E.graf.paneles[0];
+      if (P.par !== b.dataset.grafSolo) { P.par = b.dataset.grafSolo; P.datos = null; }
+      E.graf.layout = 1;
+      pedirGrafico();
+      pintar();
+    } else if (b.dataset.grafLayout) {
+      E.graf.layout = b.dataset.grafLayout === "robot" ? "robot" : Number(b.dataset.grafLayout);
+      pedirGrafico();
+      pintar();
+    } else if (b.dataset.grafInd) {
+      E.graf.ind[b.dataset.grafInd] = !E.graf.ind[b.dataset.grafInd];
+      pintar();
+    }
+    else if (b.dataset.mercado) {
+      // Cripto o acciones: si el perfil elegido no es de ese mercado, queda el primero que sí es.
+      E.mercado = b.dataset.mercado;
+      const m = vivoUI.mercadoDe(E.vivoPerfil || "holding");
+      if (m !== E.mercado && m !== "mixto") {
+        E.vivoPerfil = E.mercado === "acciones" ? "indice_eeuu" : "holding";
+        E.vivoPerfilTocado = true;
+      }
+      pintar();
+    }
+    else if (b.dataset.perfil) {
+      E.vivoPerfil = b.dataset.perfil;
+      E.vivoPerfilTocado = true;
+      pintar();
+    } else if (b.dataset.vivoMonto) {
+      E.vivoMonto = Number(b.dataset.vivoMonto);
+      delete E.campos["vivo-monto"];
+      pintar();
+    } else if (b.id === "vivo-empezar") {
+      const monto = Math.round(Number(E.campos["vivo-monto"] ?? E.vivoMonto));
+      if (!(monto >= 10 && monto <= 1000000)) { toast(Tp("Elige un monto entre 10 y 1.000.000 USDT."), { error: true }); return; }
+      if (E.vivo && E.vivo.perfil) {
+        const si = await ui.confirmar({ titulo: "¿Empezar de nuevo?",
+          texto: "Tu cuenta de prueba parte de nuevo con {monto} ficticios. Lo que hizo el robot hasta ahora queda en el registro.",
+          valores: { monto: usdt(monto) }, si: "Empezar" });
+        if (!si) return;
+      }
+      E.vivoOcupado = true;
+      E.vivoMonto = monto;
+      pintar();
+      host.enviar("vivoEmpezar", { perfil: E.vivoPerfil, monto });
+    } else if (b.id === "vivo-detener") {
+      E.vivoOcupado = true;
+      pintar();
+      host.enviar("vivoDetener", {});
+    } else if (b.id === "vivo-cambiar") {
+      E.vivoElegir = true;
+      if (E.vivo && E.vivo.perfil) E.vivoPerfil = E.vivo.perfil;
+      pintar();
+    } else if (b.id === "vivo-volver") {
+      E.vivoElegir = false;
+      pintar();
+    } else if (b.dataset.comparar) {
+      const p = (((E.sim.ultima || {}).perfiles) || []).find((x) => x.perfil === b.dataset.comparar);
+      E.peli = { perfil: b.dataset.comparar, i: 0, jugando: true, total: ((p || {}).movimientos || []).length };
+      pintar();
+      document.getElementById("peli")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    } else if (b.id === "peli-play") {
+      const P = E.peli || {};
+      if (P.jugando) P.jugando = false;
+      else { if ((P.i || 0) >= (P.total || 0)) P.i = 0; P.jugando = true; }
+      pintarPeli();
+    } else if (b.dataset.usarPerfil) {
+      E.vivoPerfil = b.dataset.usarPerfil;
+      E.vivoPerfilTocado = true;
+      E.vivoMonto = Math.round(Number(E.campos["sim-monto"] ?? E.sim.monto)) || E.vivoMonto;
+      delete E.campos["vivo-monto"];
+      E.vivoElegir = true;
+      if (E.peli) E.peli.jugando = false;
+      irA("vivo");
+    } else if (b.dataset.simMonto) {
+      E.sim.monto = Number(b.dataset.simMonto);
+      delete E.campos["sim-monto"];
+      pintar();
+    } else if (b.dataset.simDias) {
+      E.sim.dias = Number(b.dataset.simDias);
+      pintar();
+    } else if (b.id === "sim-correr") {
+      const monto = Math.round(Number(E.campos["sim-monto"] ?? E.sim.monto));
+      if (!(monto >= 10 && monto <= 1000000)) { toast(Tp("Elige un monto entre 10 y 1.000.000 USDT."), { error: true }); return; }
+      E.sim = { ...E.sim, monto, corriendo: true };
+      pintar();
+      host.enviar("simularCorrer", { monto, dias: E.sim.dias });
+    } else if (b.id === "real-conectar") {
+      const llave = (secretos["real-llave"] || "").trim(), secreto = (secretos["real-secreto"] || "").trim();
+      if (!/^[A-Za-z0-9]{32,128}$/.test(llave) || !/^[A-Za-z0-9]{32,128}$/.test(secreto)) {
+        toast(Tp(centroUI.ERRORES_REAL.formato), { error: true });
+        return;
+      }
+      E.realOcupado = true;
+      secretos["real-llave"] = "";
+      secretos["real-secreto"] = "";
+      pintar();
+      host.enviar("realConectar", { llave, secreto });
+    } else if (b.id === "alpaca-conectar") {
+      const llave = (secretos["alpaca-llave"] || "").trim(), secreto = (secretos["alpaca-secreto"] || "").trim();
+      if (!/^[A-Z0-9]{16,64}$/.test(llave) || !/^[A-Za-z0-9]{20,128}$/.test(secreto)) {
+        toast(Tp(ERRORES_NOTICIAS.formato), { error: true });
+        return;
+      }
+      E.noticiasOcupado = true;
+      secretos["alpaca-llave"] = "";
+      secretos["alpaca-secreto"] = "";
+      pintar();
+      host.enviar("noticiasConectar", { llave, secreto });
+    } else if (b.id === "alpaca-desconectar") {
+      const si = await ui.confirmar({ titulo: "¿Desconectar la llave de Alpaca?", texto: "Borro la llave del llavero de este equipo. Pilota deja de leer noticias al minuto.", si: "Desconectar", peligro: true });
+      if (!si) return;
+      E.noticiasOcupado = true;
+      pintar();
+      host.enviar("noticiasDesconectar", {});
+    } else if (b.id === "real-revisar") {
+      E.realOcupado = true;
+      pintar();
+      host.enviar("realRevisar", {});
+    } else if (b.id === "real-desconectar") {
+      const si = await ui.confirmar({ titulo: "¿Desconectar la llave?", texto: "Borro la llave del llavero de este equipo. Para volver a operar en real tendrás que conectarla de nuevo.", si: "Desconectar", peligro: true });
+      if (!si) return;
+      host.enviar("realDesconectar", {});
+    } else if (b.id === "real-activar") {
+      const presupuesto = Math.round(Number(E.campos["real-presupuesto"] ?? document.getElementById("real-presupuesto")?.value));
+      const fraseEscrita = String(E.campos["real-frase"] ?? "");
+      const si = await ui.confirmar({ titulo: "¿Encender el dinero real?",
+        texto: "Desde ahora Pilota opera con {monto} de tu cuenta de Binance, con las mismas reglas y frenos de la prueba. Puedes volver a prueba cuando quieras.",
+        valores: { monto: usdt(presupuesto) }, si: "Encender", peligro: true });
+      if (!si) return;
+      E.realOcupado = true;
+      pintar();
+      host.enviar("realActivar", { presupuesto, frase: fraseEscrita });
+    } else if (b.id === "real-desactivar") {
+      E.realOcupado = true;
+      pintar();
+      host.enviar("realDesactivar", {});
+    } else if (b.id === "real-emergencia") {
+      const si = await ui.confirmar({ titulo: "¿Cerrar todo y volver a prueba?",
+        texto: "Cancelo las órdenes de Pilota, vendo a mercado lo que compró y apago el dinero real. Lo tuyo que no es de Pilota no se toca.",
+        si: "Cerrar todo", peligro: true });
+      if (!si) return;
+      E.realOcupado = true;
+      pintar();
+      host.enviar("realEmergencia", {});
+    } else if (b.id === "abrir-ajustes") abrirAjustes();
     else if (b.id === "local-guardar") {
       // Lo que escribe la persona va en el archivo de entrada de la acción (nunca como argumento de un proceso).
       const moneda = (document.getElementById("local-moneda") || {}).value || "";
@@ -1640,7 +1940,38 @@
       host.enviar("modosAjustar", { monto: Number(b.dataset.monto) });
     }
   });
-  document.addEventListener("keydown", (ev) => { if (ui.manejarTecla(ev)) return; bv.manejarTecla(ev); });
+  // ── Las pestañas: un clic o las flechas (←/→, Inicio y Fin), como cualquier lista de pestañas ──
+  function irA(id, enfocar = true) {
+    if (!centroUI.PESTANAS.includes(id)) return;
+    E.pestana = id;
+    if (id === "comparar" && !E.sim.ultima) host.enviar("simularEstado", {});
+    if (id === "vivo" || id === "movimientos") host.enviar("vivoEstado", {});
+    if (id === "vivo") pedirGrafico();
+    if (id !== "comparar" && E.peli) E.peli.jugando = false;
+    if (id === "operar") host.enviar("realEstado", {});
+    pintar();
+    if (enfocar) document.getElementById(`tab-${id}`)?.focus();
+    window.scrollTo?.(0, 0);
+  }
+  document.addEventListener("input", (ev) => {
+    const el = ev.target;
+    if (!el || !el.id) return;
+    if (el.id in secretos) secretos[el.id] = el.value;
+    else if (["sim-monto", "vivo-monto", "real-presupuesto", "real-frase"].includes(el.id)) E.campos[el.id] = el.value;
+  });
+  document.addEventListener("keydown", (ev) => {
+    const tab = ev.target && ev.target.closest && ev.target.closest('[role="tab"]');
+    if (tab && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(ev.key)) {
+      const ids = centroUI.PESTANAS, i = ids.indexOf(tab.dataset.pestana);
+      const j = ev.key === "Home" ? 0 : ev.key === "End" ? ids.length - 1
+        : (i + (ev.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length;
+      ev.preventDefault();
+      irA(ids[j]);
+      return;
+    }
+    if (ui.manejarTecla(ev)) return;
+    bv.manejarTecla(ev);
+  });
   // La cuenta atrás de las propuestas, una vez por segundo: solo cambia ese texto (no se vuelve a pintar la pantalla).
   // Cuando se le acaba el tiempo a la última, se le pregunta a la app: la propuesta vence allá, no acá.
   setInterval(() => {
@@ -1650,6 +1981,88 @@
       host.enviar("panelEstado", {});
     }
   }, 1000);
+
+  // El avance de un trabajo. La app de escritorio junta las líneas de progreso en {eventos: […]}; la vista previa manda una
+  // sola. Devuelve los avances en orden, del más viejo al más nuevo.
+  function avances(e) {
+    const lista = e && Array.isArray(e.eventos) ? e.eventos : [e];
+    return lista.map((x) => x && x.trabajo && x.trabajo.avance).filter(Boolean);
+  }
+  // ── Lo que Pilota prepara sola al abrir ──
+  // La persona no tiene que saber qué es el muestreo, el historial o el capital mínimo: si falta, se pide solo, una vez
+  // por sesión. En la vista previa no (ahí cada botón se prueba a mano), salvo con ?auto.
+  function prepararSola() {
+    const enDemo = host.plataforma === "web" && !new URLSearchParams(location.search).has("auto");
+    if (!E.iniciada) return;
+    // Una vez, y otra más si a los 3 minutos sigue sin correr (pudo haber quedado uno a medio cerrar al abrir).
+    const una = (clave, accion, datos = {}) => {
+      if (E.auto[clave] && Date.now() - E.auto[clave] < 180000) return;
+      E.auto[clave] = Date.now();
+      host.enviar(accion, datos);
+    };
+    // El flujo de Binance en vivo: el gráfico y el robot reaccionan al segundo. Es de solo lectura y va siempre.
+    if (E.vivo && !(E.vivo.flujo && E.vivo.flujo.corriendo)) una("flujo", "vivoEncender");
+    if (enDemo) return;
+    if (E.minimo && !E.minimo.calculado) una("minimo", "minimoCalcular", { capital: CAPITAL_PRUEBA });
+    if (E.muestreo && !E.muestreo.corriendo) una("muestreo", "muestreoEncender");
+    // Los datos con que se calcula el puntaje: si no están completos, se bajan solos (una vez cada media hora como mucho).
+    if (E.datos && !E.datos.puede_operar && !E.descargando && !(E.auto.velas && Date.now() - E.auto.velas < 1800000)) {
+      E.auto.velas = Date.now();
+      E.descargando = true;
+      host.enviar("velasDescargar", { dias: DIAS });
+    }
+    const h = E.historial;
+    if (h && !h.corriendo && !(Number(h.pct) >= 100 && h.continuo !== false)) una("historial", "historialDescargar");
+  }
+  // Una compra o una venta que acaba de pasar, en una frase de color (verde compra o ganó, rojo perdió).
+  function avisoEvento(l) {
+    const o = l.orden || {}, r = l.resultado || {}, moneda = String(l.par || "").replace(/^(SPY|QQQ|AAPL|MSFT|NVDA|AMZN|GOOGL|META|TSLA|AVGO)BUSDT$/, "$1").replace(/(FDUSD|USDT)$/, "");
+    if (["entrada_ruptura", "entrada_rebote", "compra_holding"].includes(l.razon) && (l.razon === "compra_holding" || o.estado === "llenada")) {
+      return { tipo: "compra", texto: Tp("Compré {moneda} a {precio}", { moneda, precio: usdt(o.precio) }),
+        marca: { par: l.par, ms: l.ms, tipo: "compra", precio: o.precio } };
+    }
+    if (["objetivo", "stop", "stop_movil", "cierre_manual"].includes(l.razon)) {
+      const neto = Number(r.neto) || 0;
+      return { tipo: neto > 0 ? "gana" : "pierde",
+        texto: Tp(neto > 0 ? "Vendí {moneda} a {precio}: gané {neto}" : "Vendí {moneda} a {precio}: perdí {neto}",
+          { moneda, precio: usdt(r.precio), neto: usdt(Math.abs(neto)) }),
+        marca: { par: l.par, ms: l.ms, tipo: "venta", precio: r.precio, neto } };
+    }
+    if (["entrada_ruptura", "entrada_rebote"].includes(l.razon)) {
+      return { tipo: "espera", texto: Tp("Dejé una compra de {moneda} esperando en {precio}", { moneda, precio: usdt(o.precio) }),
+        marca: { par: "", ms: l.ms } };
+    }
+    return null;
+  }
+  window.addEventListener("resize", () => graficoUI.dibujar());
+  // La película de la comparación: solo se vuelve a pintar su recuadro, no la pantalla entera.
+  function pintarPeli() {
+    const el = document.getElementById("peli");
+    if (!el) return;
+    el.innerHTML = vivoUI.pelicula(E);
+    i18n.traducirDOM(el);
+  }
+  setInterval(() => {
+    const P = E.peli;
+    if (!P || !P.jugando || E.pestana !== "comparar") return;
+    P.i = Math.min((P.i || 0) + 1, P.total || 0);
+    if (P.i >= (P.total || 0)) P.jugando = false;
+    pintarPeli();
+  }, 450);
+  // Cada minuto se revisa que lo que corre solo siga corriendo (el muestreo y el flujo); si no, `prepararSola` lo vuelve a pedir.
+  setInterval(() => {
+    if (bv.activa || !E.iniciada || host.plataforma === "web") return;
+    host.enviar("muestreoEstado", {});
+    if (!(E.flujo && E.flujo.corriendo)) host.enviar("vivoEstado", {});
+  }, 60000);
+  // El robot en vivo se mira de nuevo cada 30 segundos mientras su pestaña está a la vista (el motor decide cada 5 min).
+  setInterval(() => {
+    if (bv.activa || !E.vivo || !E.vivo.activo || !["vivo", "movimientos"].includes(E.pestana)) return;
+    if (E.flujo && E.flujo.conectado) return;     // con el flujo conectado, lo nuevo llega solo
+
+    host.enviar("vivoEstado", {});
+    host.enviar("motorEstado", {});
+  }, 30000);
 
   // ── Lo que manda la app ──
   host.responder({
@@ -1678,6 +2091,124 @@
         host.enviar("motorEstado", {});      // y hace cuánto fue la última revisión del motor, sin reconciliar nada
         host.enviar("modosEstado", {});      // y en qué modo quedó la cuenta y qué propuestas esperan un «Sí»
         host.enviar("panelEstado", {});      // y todo eso junto, como se ve en la pantalla principal
+        host.enviar("simularEstado", {});    // la última simulación con monto, si hay
+        host.enviar("realEstado", {});       // y si hay llave de Binance, los requisitos y si el dinero real está encendido
+        host.enviar("vivoEstado", {});       // y el robot en vivo: con qué perfil, cuánto vale y qué hizo
+        pedirGrafico();                      // y las velas del gráfico en vivo
+        const q = new URLSearchParams(location.search).get("pestana");
+        if (q && centroUI.PESTANAS.includes(q)) E.pestana = q;
+      }
+      pintar();
+    },
+    // ── El robot en vivo ──
+    vivoListo(r) {
+      const antes = E.vivo;
+      E.vivoOcupado = false;
+      if (r && r.datos) E.vivo = r.datos;
+      if (r && r.datos && r.datos.flujo) E.flujo = { ...(E.flujo || {}), ...r.datos.flujo };
+      graficosAlDia();
+      if (r && r.ok === false) toast(Tp(vivoUI.ERRORES_VIVO[r.error] || "No se pudo."), { error: true });
+      else if (E.vivo && E.vivo.activo && !(antes && antes.activo && antes.desde_ms === E.vivo.desde_ms)) {
+        if (antes !== null) {
+          E.vivoElegir = false;
+          toast(Tp("Listo: el robot empezó con {monto} ficticios. Te cuento cada cosa que haga.", { monto: usdt(E.vivo.monto) }));
+          host.enviar("estadoArrancar", {});
+          host.enviar("panelEstado", {});
+          host.enviar("realEstado", {});
+          // Sin el flujo de Binance, nadie mira: se conecta al empezar (uno solo: el Python no deja abrir dos).
+          if (!(E.flujo && E.flujo.corriendo)) host.enviar("vivoEncender", {});
+        }
+      }
+      prepararSola();
+      pintar();
+    },
+    // El flujo en vivo: cada segundo, la vela en curso; al cerrar una vela, la revisión y lo que pasó.
+    vivoProgreso(e) {
+      // Pueden llegar varios avances juntos: los eventos de todos y, para el precio, el último.
+      const lista = avances(e);
+      if (!lista.length) return;
+      const a = { ...lista[lista.length - 1], eventos: lista.flatMap((x) => x.eventos || []),
+        vivo: [...lista].reverse().find((x) => x.vivo)?.vivo };
+      const antes = E.flujo || {};
+      E.flujo = { ...antes, corriendo: true, conectado: !!a.conectado, error: a.error || "", revision_ms: a.revision_ms };
+      for (const [par, v] of Object.entries(a.velas || {})) graficoUI.vela(E, par, v);
+      let repintar = antes.conectado !== E.flujo.conectado;
+      if (a.vivo) { E.vivo = a.vivo; repintar = true; graficosAlDia(); }
+      for (const l of a.eventos || []) {
+        const aviso = avisoEvento(l);
+        if (!aviso) continue;
+        graficoUI.marca(E, aviso.marca);
+        repintar = true;
+        setTimeout(() => graficoUI.destello(aviso.texto, aviso.tipo), 0);
+        toast(aviso.texto);
+      }
+      if (a.eventos && a.eventos.length) pedirGrafico();     // las marcas y las líneas, como quedaron en disco
+      if (repintar && ["vivo", "movimientos"].includes(E.pestana)) pintar();
+    },
+    vivoTerminado(r) {
+      E.flujo = { ...(E.flujo || {}), corriendo: r && r.error === "ya_corriendo", conectado: false };
+      if (r && r.datos) E.vivo = r.datos;
+      pintar();
+    },
+    graficoListo(r) {
+      if (!(r && r.ok && r.datos)) return;
+      // Va a cada gráfico de ese par y esa temporalidad; si ya nadie lo mira (cambiaste), no va a ninguno.
+      if (graficoUI.datos(E, r.datos)) pintar(); else graficoUI.dibujar();
+    },
+    // ── El centro de operaciones: la simulación con monto y el paso a real ──
+    simularEstadoListo(r) {
+      if (r && r.ok && r.datos && r.datos.ultima && r.datos.ultima.formato) {
+        E.sim = { ...E.sim, ultima: r.datos.ultima, monto: r.datos.ultima.monto || E.sim.monto,
+          dias: r.datos.ultima.dias || E.sim.dias };
+      }
+      pintar();
+    },
+    mapaListo(r) {
+      E.mapaCargando = false;
+      if (r && r.ok && r.datos) E.mapa = r.datos;
+      else toast(Tp("No pude armar el mapa de inicios."), { error: true });
+      pintar();
+    },
+    simularListo(r) {
+      E.sim = { ...E.sim, corriendo: false, ultima: (r && r.datos && r.datos.ultima) || E.sim.ultima };
+      if (!(r && r.ok)) toast(Tp("No pude simular."), { error: true });
+      host.enviar("realEstado", {});        // simular es uno de los requisitos para pasar a real
+      // Las probabilidades del mismo período: se piden solas, al lado del resultado.
+      const dias = Number((E.sim.ultima || {}).dias) || Number(E.sim.dias) || 90;
+      if (r && r.ok && !(E.prob && E.prob.dias === dias && (E.prob.datos || E.prob.cargando))) {
+        E.prob = { dias, cargando: true };
+        host.enviar("simularProbabilidades", { dias });
+      }
+      pintar();
+    },
+    probabilidadesListo(r) {
+      E.prob = { ...(E.prob || {}), cargando: false, datos: r && r.ok ? r.datos : null, error: !(r && r.ok) };
+      pintar();
+    },
+    noticiasListo(r) {
+      E.noticiasOcupado = false;
+      E.noticias = r && r.datos ? r.datos : { motivo: "respuesta" };
+      if (r && r.ok && E.noticias.conectado && E.noticias.ultimas) toast(Tp("Llave de Alpaca conectada y probada."));
+      pintar();
+    },
+    realEstadoListo(r) {
+      if (r && r.ok && r.datos) E.real = r.datos;
+      pintar();
+    },
+    realListo(r) {
+      E.realOcupado = false;
+      const antes = !!(E.real && E.real.activo);
+      if (r && r.datos) E.real = r.datos;
+      if (r && r.ok) {
+        delete E.campos["real-frase"];
+        const ahora = !!(E.real && E.real.activo);
+        if (ahora && !antes) toast(Tp("Listo: Pilota opera con dinero real. Lo ves en «Cabina»."));
+        else if (!ahora && antes) toast(Tp("Listo: volviste a prueba."));
+        else toast(Tp("Listo."));
+        host.enviar("estadoArrancar", {});
+        host.enviar("panelEstado", {});
+      } else {
+        toast(Tp(centroUI.ERRORES_REAL[r && r.error] || "No se pudo."), { error: true });
       }
       pintar();
     },
@@ -1719,6 +2250,7 @@
     },
     minimoEstadoListo(r) {
       if (r && r.ok && r.datos) E.minimo = r.datos;
+      prepararSola();
       pintar();
     },
     minimoCalculoListo(r) {
@@ -1731,10 +2263,11 @@
     // ── Los dos trabajos en segundo plano: el avance llega en los eventos de progreso, el final en la respuesta ──
     historialEstadoListo(r) {
       if (r && r.ok && r.datos) E.historial = r.datos;
+      prepararSola();
       pintar();
     },
     historialProgreso(e) {
-      const avance = e && e.trabajo && e.trabajo.avance;
+      const avance = avances(e).pop();
       if (!avance) return;                 // los otros eventos del trabajo no dicen nada de la descarga
       E.historial = avance;
       E.bajando = false;
@@ -1755,10 +2288,11 @@
     },
     muestreoEstadoListo(r) {
       if (r && r.ok && r.datos) E.muestreo = r.datos;
+      prepararSola();
       pintar();
     },
     muestreoProgreso(e) {
-      const avance = e && e.trabajo && e.trabajo.avance;
+      const avance = avances(e).pop();
       if (!avance) return;
       E.muestreo = avance;
       E.muestreando = false;
@@ -1880,6 +2414,7 @@
     // `motorRevisar` reconcilia la ventana que nadie miró, así que después de él el estado y los frenos cambiaron.
     motorEstadoListo(r) {
       if (r && r.ok && r.datos) E.motor = r.datos;
+      prepararSola();
       pintar();
     },
     motorRevisado(r) {
@@ -1897,7 +2432,7 @@
       pintar();
     },
     motorProgreso(e) {
-      const avance = e && e.trabajo && e.trabajo.avance;
+      const avance = avances(e).pop();
       if (!avance) return;
       E.motor = avance;
       E.encendiendoMotor = false;
@@ -1996,7 +2531,15 @@
         host.enviar("panelEstado", {});
         const esta = ((r.datos || {}).cuentas || []).find((c) => c.ambiente === (r.datos || {}).activo) || {};
         toast(Tp("Listo: el saldo de prueba quedó en {monto}, y el reinicio quedó en el registro.", { monto: usdt(esta.saldo) }));
+        if (E.simVivo) {                     // «Empezar la prueba en vivo»: con el saldo nuevo, el motor empieza a mirar
+          E.simVivo = false;
+          E.encendiendoMotor = true;
+          host.enviar("motorEncender", {});
+          host.enviar("realEstado", {});
+          E.pestana = "vivo";
+        }
       } else {
+        E.simVivo = false;
         toast(Tp(ERRORES[r && r.error] || "No se pudo."), { error: true });
       }
       pintar();
@@ -2095,6 +2638,277 @@
       if (listo && i === pasos.length - 1) c.responder(listo, { ok: true, datos: paso, error: "" });
     }));
   }
+  // ── La vista previa del centro de operaciones: números inventados, siempre los mismos para el mismo monto ──
+  function simulacionDemo(monto, dias) {
+    const hasta = Date.parse("2026-02-10T00:00:00Z"), desde = hasta - dias * 86400000;
+    const pasos = Math.max(6, Math.round(dias / 6));
+    let saldo = monto, techo = monto, caida = 0, ganadas = 0, perdidas = 0;
+    const curva = [[desde, monto]], btc = [[desde, monto]];
+    for (let i = 1; i <= pasos; i++) {
+      const x = desde + (hasta - desde) * i / pasos;
+      const r = Math.sin(i * 1.7) * 0.009 + 0.0022;
+      saldo *= 1 + r;
+      r > 0 ? ganadas++ : perdidas++;
+      techo = Math.max(techo, saldo);
+      caida = Math.max(caida, (techo - saldo) / techo);
+      curva.push([x, saldo]);
+      btc.push([x, monto * (1 + Math.sin(i / 3) * 0.08 + i / pasos * 0.05)]);
+    }
+    const b = btc[btc.length - 1][1];
+    return { formato: 1, listo: true, motivo: "", monto, dias, dias_reales: dias,
+      desde: new Date(desde).toISOString(), hasta: new Date(hasta).toISOString(), desde_ms: desde, hasta_ms: hasta,
+      pilota: { saldo, ganancia: saldo - monto, rendimiento: (saldo - monto) / monto, caida_maxima: caida, curva,
+        operaciones: pasos, ganadas, perdidas, mejor: monto * 0.011, peor: -monto * 0.007,
+        saltadas: { diario: 0, racha: 1, piso: 0, posiciones: 2, tamano: 0 } },
+      usdt: { saldo: monto, rendimiento: 0 }, btc: { saldo: b, rendimiento: (b - monto) / monto, caida_maxima: 0.12, curva: btc },
+      sin_exigencia: true, topado: true, tope: 15, perfiles: perfilesDemo(monto, desde, hasta), sugerido: "holding" };
+  }
+  // Los perfiles que se ofrecen, en la vista previa: números inventados, con la forma que devuelve lib_simulacion.comparar.
+  function perfilesDemo(monto, desde, hasta) {
+    const ritmo = { holding: 0, holding_ocho: 0, compra_semanal: 0, rebalanceo: 0, cosecha: 0, indice_eeuu: 0, indice_semanal: 0,
+      acciones_ocho: 0, semanal_rotacion: 0, nucleo_satelite: 0, cripto_acciones: 0, tendencia: 6, rotacion: 8 };
+    // Cuánto deja cada holding en la vista previa, por semana de compra (números inventados, con la forma de los reales).
+    const RUMBO = { holding: 0.004, holding_ocho: 0.0034, compra_semanal: 0.0045, rebalanceo: 0.0028, cosecha: 0.0036,
+      indice_eeuu: 0.003, indice_semanal: 0.0025, acciones_ocho: 0.0035, semanal_rotacion: 0.0042, nucleo_satelite: 0.0038,
+      cripto_acciones: 0.0033 };
+    const ACCIONES_DEMO = ["indice_eeuu", "indice_semanal", "acciones_ocho", "cripto_acciones"];
+    return Object.keys(ritmo).map((perfil, k) => {
+      // Las acciones llegaron a Binance en junio de 2026: su comparación empieza ahí (como en lib_simulacion.inicio_posible).
+      const d0 = ACCIONES_DEMO.includes(perfil) ? Math.max(desde, hasta - 150 * 86400000) : desde;
+      let saldo = monto, techo = monto, caida = 0;
+      const curva = [[d0, monto]], movimientos = [];
+      const familia = perfil in RUMBO;
+      const n = familia ? 12 : ritmo[perfil];
+      for (let i = 1; i <= n; i++) {
+        const x = d0 + (hasta - d0) * i / (n + 1);
+        const par = i % 3 ? "BTCFDUSD" : "ETHFDUSD", precio = par === "BTCFDUSD" ? 95000 + i * 120 : 3500 + i * 6;
+        if (perfil === "rotacion") {
+          const nueva = ["SOLUSDT", "TRXUSDT", "BNBUSDT", "XRPUSDT"][i % 4], r = Math.sin(i * 1.7) * 0.06 + 0.012;
+          if (i > 1) movimientos.push({ ms: x, que: "venta", par: ["SOLUSDT", "TRXUSDT", "BNBUSDT", "XRPUSDT"][(i + 2) % 4], precio: 100, monto: saldo / 2, por: "rotacion", estrategia: "rotacion", ganancia: saldo / 2 * r, saldo: saldo + saldo / 2 * r });
+          saldo += saldo / 2 * r;
+          movimientos.push({ ms: x, que: "compra", par: nueva, precio: 100, monto: saldo / 2, estrategia: "rotacion", temporalidad: "1d" });
+        } else if (perfil === "tendencia") {
+          const p2 = i % 2 ? "BTCUSDT" : "ETHUSDT", r = Math.sin(i * 1.1) * 0.08 + 0.03;
+          movimientos.push({ ms: x - 9 * 86400000, que: "compra", par: p2, precio: 100, monto: saldo * 0.6, estrategia: "tendencia", temporalidad: "1d" });
+          saldo += saldo * 0.6 * r;
+          movimientos.push({ ms: x, que: "venta", par: p2, precio: 100 * (1 + r), monto: saldo * 0.6, por: "tendencia", ganancia: saldo * 0.6 * r, saldo });
+        } else if (familia) {
+          movimientos.push({ ms: x, que: "compra", par, precio, monto: monto / 12, estrategia: "holding", temporalidad: "1d" });
+          if (perfil === "cosecha" && i === 9) movimientos.push({ ms: x, que: "venta", par, precio: precio * 1.3, monto: monto / 20, por: "cosecha", ganancia: monto / 80, saldo });
+          if (perfil === "rebalanceo" && i === 10) movimientos.push({ ms: x, que: "venta", par, precio: precio * 1.2, monto: monto / 25, por: "rebalanceo", ganancia: monto / 100, saldo });
+          saldo = monto * (1 + Math.sin(i / 2 + k) * 0.03 + i * RUMBO[perfil]);
+        } else {
+          // Como en la realidad: los perfiles de señales rápidas pierden de a poco (comisiones y jugadas que ganan poco).
+          const sesgo = { equilibrado: -0.006, trader: -0.005, scalper: -0.004 }[perfil] || 0.0015;
+          const r = Math.sin(i * (1.3 + k / 5)) * 0.012 + sesgo, nocional = saldo * 0.3;
+          movimientos.push({ ms: x - 3600000, que: "compra", par, precio, monto: nocional, stop: precio * 0.99, objetivo: precio * 1.015, estrategia: "rebote", temporalidad: "1h" });
+          saldo += nocional * r;
+          movimientos.push({ ms: x, que: "venta", par, precio: precio * (r > 0 ? 1.015 : 0.99), monto: nocional, por: r > 0 ? "objetivo" : "stop", ganancia: nocional * r, saldo });
+        }
+        techo = Math.max(techo, saldo);
+        caida = Math.max(caida, (techo - saldo) / techo);
+        curva.push([x, saldo]);
+      }
+      curva.push([hasta, saldo]);
+      return { perfil, listo: true, motivo: "", desde_ms: d0, hasta_ms: hasta, recortado: d0 > desde, recorte: d0 > desde ? "acciones" : "", saldo,
+        ganancia: saldo - monto, rendimiento: (saldo - monto) / monto, caida_maxima: caida, curva,
+        operaciones: familia ? movimientos.length : n, movimientos, movimientos_total: movimientos.length };
+    });
+  }
+  // El gráfico de la vista previa: una caminata al azar, siempre la misma para el mismo par, que termina en el precio de
+  // ahora; el flujo de la vista previa la sigue moviendo cada segundo y, de vez en cuando, compra o vende.
+  const PRECIO_DEMO = { BTCFDUSD: 71780, ETHFDUSD: 2027, BTCUSDT: 71790, ETHUSDT: 2027.4, BNBUSDT: 612.3, SOLUSDT: 168.42,
+    XRPUSDT: 0.5821, ADAUSDT: 0.4512, TRXUSDT: 0.1873, DOGEUSDT: 0.13472 };
+  function azar(semilla) {
+    let x = semilla >>> 0;
+    return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+  }
+  function graficoDemo(par, t) {
+    const paso = { "1m": 60000, "5m": 300000, "1h": 3600000, "4h": 14400000 }[t] || 60000;
+    const r = azar(par.length * 7919 + paso / 1000), n = 260, fin = Math.floor(Date.now() / paso) * paso;
+    const vol = (PRECIO_DEMO[par] || 100) * 0.0009 * Math.sqrt(paso / 60000);
+    const velas = [];
+    let p = (DEMO.precio && DEMO.precio[par]) || PRECIO_DEMO[par];
+    // Se camina hacia atrás desde el precio de ahora: la última vela cierra justo ahí.
+    for (let i = 1; i <= n; i++) {
+      const c = p, o = c - (r() - 0.5) * vol * 2, h = Math.max(o, c) + r() * vol, l = Math.min(o, c) - r() * vol;
+      velas.unshift([fin - i * paso, o, h, l, c, 2 + r() * 8]);
+      p = o;
+    }
+    const v = (k) => velas[n - k];
+    const marcas = [{ ms: v(40)[0], tipo: "compra", precio: v(40)[3] }, { ms: v(26)[0], tipo: "venta", precio: v(26)[2], neto: 0.75 },
+      { ms: v(14)[0], tipo: "compra", precio: v(14)[3] }];
+    const ultimo = velas[n - 1][4];
+    const niveles = DEMO.vivo && DEMO.vivo.activo && DEMO.vivo.perfil !== "holding"
+      ? [{ tipo: "entrada", precio: ultimo * 0.998 }, { tipo: "stop", precio: ultimo * 0.988 }, { tipo: "objetivo", precio: ultimo * 1.012 }] : [];
+    DEMO.precio = { ...(DEMO.precio || {}), [par]: ultimo };
+    return { par, temporalidad: t, paso_ms: paso, velas, marcas, niveles };
+  }
+  function flujoDemo(c) {
+    if (DEMO.flujo) return;
+    const r = azar(42), velas = {};
+    let tic = 0;
+    DEMO.flujo = setInterval(() => {
+      tic++;
+      const ahora = Date.now(), minuto = Math.floor(ahora / 60000) * 60000;
+      for (const par of Object.keys(PRECIO_DEMO)) {
+        const p0 = (DEMO.precio && DEMO.precio[par]) || PRECIO_DEMO[par];
+        const p = p0 * (1 + (r() - 0.5) * 0.0008);
+        DEMO.precio = { ...(DEMO.precio || {}), [par]: p };
+        const v = velas[par] && velas[par][0] === minuto ? velas[par] : [minuto, p0, p0, p0, p0, 0];
+        velas[par] = [minuto, v[1], Math.max(v[2], p), Math.min(v[3], p), p, v[5] + r() * 0.4];
+      }
+      const eventos = [];
+      if (DEMO.vivo && DEMO.vivo.activo && tic % 20 === 0) {
+        const p = DEMO.precio.BTCUSDT, ms = Date.now();
+        eventos.push((tic / 20) % 2
+          ? { ms, fecha: new Date(ms).toISOString(), par: "BTCUSDT", razon: "entrada_rebote", orden: { precio: p, monto: 60, estado: "llenada" }, resultado: {} }
+          : { ms, fecha: new Date(ms).toISOString(), par: "BTCUSDT", razon: "objetivo", orden: {}, resultado: { precio: p, neto: 0.42 } });
+      }
+      c.responder("vivoProgreso", { t: "estado", trabajo: { id: "20260210T140500-f1u70", tipo: "vivo",
+        avance: { conectado: true, error: "", ms: Date.now(), velas, eventos, ...(eventos.length ? { vivo: vivoDemo() } : {}) } } });
+    }, 1000);
+  }
+  // El robot en vivo de la vista previa: parte sin perfil; al empezar, ya hizo unas cosas en las últimas horas.
+  function vivoDemo() {
+    const v = DEMO.vivo;
+    const flujo = { corriendo: !!DEMO.flujo, conectado: !!DEMO.flujo };
+    // Lo que espera el robot en la vista previa: BTC cerca de su gatillo de rebote, ETH lejos y la ruptura frenada por el día.
+    const precio = (par) => (DEMO.precio && DEMO.precio[par]) || PRECIO_DEMO[par];
+    const fila = (par, t, precio, dist) => ({ par, temporalidad: t, precio, adx: 14, volumen_relativo: 0.8, espera: "rebote", cerca: dist < 0.0025,
+      estrategias: [
+        { estrategia: "rebote", motivo: "lejos", gatillo: precio * (1 - dist), distancia: dist, entrada: precio * (1 - dist),
+          stop: precio * (1 - dist) * 0.994, objetivo: precio * (1 - dist) * 1.0072, rr: 1.2, rr_pide: 1, sirve: true, adx_maximo: 20,
+          historia: { n: 214, ganadas: 92, gana: 0.43, neto_medio: 0.0004 } },
+        { estrategia: "ruptura", motivo: "dia_no_al_alza", gatillo: precio * 1.004, distancia: 0.004, rr: 1, rr_pide: 1, sirve: true } ] });
+    const t = (v && v.perfil === "scalper") ? "5m" : "1h";
+    const MONEDAS_DEMO = { conservador: ["BTC", "ETH", "BNB"], equilibrado: ["BTC", "ETH", "BNB", "SOL", "XRP"],
+      scalper: ["BTC", "ETH", "SOL", "XRP", "DOGE"] };
+    const suyas = MONEDAS_DEMO[(v && v.perfil) || "equilibrado"] || ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "TRX", "DOGE"];
+    const DISTANCIA = { BTC: 0.0018, ETH: 0.0091, BNB: 0.0052, SOL: 0.0123, XRP: 0.0034, ADA: 0.0167, TRX: 0.0071, DOGE: 0.0208 };
+    const radar = { perfil: (v && v.perfil) || "equilibrado", filtro: { pasa: true, motivo: "" },
+      filas: (v && v.perfil) || !v ? [] : suyas.map((m) => fila(`${m}USDT`, t, precio(`${m}USDT`), DISTANCIA[m])) };
+    // La rotación de la vista previa: las 8 ordenadas por fuerza, con SOL y TRX en la mano.
+    const FUERZA = [["SOLUSDT", 1.62, 0.214], ["TRXUSDT", 1.31, 0.118], ["BNBUSDT", 0.94, 0.087], ["BTCUSDT", 0.71, 0.064],
+      ["XRPUSDT", 0.33, 0.041], ["ETHUSDT", 0.12, 0.016], ["ADAUSDT", -0.28, -0.052], ["DOGEUSDT", -0.61, -0.133]];
+    const hoy = Math.floor(Date.now() / 86400000) * 86400000;
+    const rotacion = { dia_ms: hoy, pasa_btc: true, ranking: FUERZA.map(([par, fuerza, retorno], i) => ({
+      par, puesto: i + 1, fuerza, retorno, elegible: retorno > 0 && i !== 4 })) };
+    if (!v) return { formato: 1, activo: false, perfil: "", monto: 0, movimientos: [], posiciones: [], tenencias: [], flujo, radar };
+    const h = 3600000, t0 = v.desde_ms, m = v.monto;
+    const linea = (ms, razon, par, orden, resultado) => ({ ms, fecha: new Date(ms).toISOString(), par, razon, orden, resultado });
+    if (v.perfil === "rotacion") {
+      const sol = precio("SOLUSDT"), trx = precio("TRXUSDT"), mitad = m / 2 * 0.9985;
+      const tenencias = [
+        { par: "SOLUSDT", cantidad: mitad / 166.1, gastado: m / 2, precio_ahora: sol, valor: mitad / 166.1 * sol, precio_medio: 166.1 },
+        { par: "TRXUSDT", cantidad: mitad / 0.1861, gastado: m / 2, precio_ahora: trx, valor: mitad / 0.1861 * trx, precio_medio: 0.1861 }];
+      const valor = tenencias.reduce((a, x) => a + x.valor, 0);
+      return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
+        ganancia_relativa: valor / m - 1, efectivo: 0, posiciones: [], tenencias, rotacion,
+        ultima: { decision: "mantiene", tiene: ["SOLUSDT", "TRXUSDT"] },
+        movimientos: [linea(t0 + 60000, "rotacion_compra", "TRXUSDT", { precio: 0.1861, monto: m / 2 }, { puesto: 2 }),
+          linea(t0 + 60000, "rotacion_compra", "SOLUSDT", { precio: 166.1, monto: m / 2 }, { puesto: 1 }),
+          linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m })], flujo, radar, jugadas: {} };
+    }
+    if (v.perfil === "tendencia") {
+      // La tendencia de la vista previa: BTC sobre su promedio (lo tiene) y ETH bajo el suyo (su parte en USDT).
+      const btc = precio("BTCUSDT"), parte = m * 0.6 * 0.9985;
+      const tenencias = [{ par: "BTCUSDT", cantidad: parte / 96100, gastado: m * 0.6, precio_ahora: btc, valor: parte / 96100 * btc, precio_medio: 96100 }];
+      const valor = m * 0.4 + tenencias[0].valor;
+      const tendencia = { dia_ms: hoy, frenado: false, filas: [
+        { par: "BTCUSDT", precio: btc, media: btc / 1.042, sobre: true, parte: 0.6, reparto: 0.6,
+          historia: { sobre: true, dias: 1630, horizonte: 20, sube: 0.54, medio: 0.045, cae: 0.26, caida: 0.1 } },
+        { par: "ETHUSDT", precio: precio("ETHUSDT"), media: precio("ETHUSDT") / 0.971, sobre: false, parte: 0, reparto: 0.4, motivo: "bajo_media",
+          historia: { sobre: false, dias: 1474, horizonte: 20, sube: 0.45, medio: 0.004, cae: 0.44, caida: 0.1 } }] };
+      const noticias = { al: "2026-11-13", dias: 30, eventos: [
+        { fecha: "2026-11-02", persona: "Persona de ejemplo", que: "Noticia inventada para la vista previa", activo: "BTC", dia: 0.031 }],
+        ranking: [{ nombre: "Persona de ejemplo", puntaje: 3.9, eventos: 14, ultimo: "2026-11-02", duro: 0.43 },
+          { nombre: "Otra persona de ejemplo", puntaje: 0.6, eventos: 4, ultimo: "2026-02-03", duro: 1 }] };
+      const alpaca = { conectado: true, horas: 24, traido_ms: Date.now(), noticias: [
+        { id: 1, ms: Date.now() - 12 * 60000, titular: "Titular inventado para la vista previa", simbolos: ["BTCUSD"], tipos: ["fed"] }] };
+      return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
+        ganancia_relativa: valor / m - 1, efectivo: m * 0.4, posiciones: [], tenencias, tendencia, noticias, alpaca,
+        ultima: { decision: "mantiene", tiene: ["BTCUSDT"] },
+        movimientos: [linea(t0 + 120000, "tendencia_espera", "ETHUSDT", {}, { por: "noticia", motivo: "persona-de-ejemplo", fecha: "2026-11-02" }),
+          linea(t0 + 60000, "tendencia_compra", "BTCUSDT", { precio: 96100, monto: m * 0.6 }, { por: "sobre_media" }),
+          linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m })], flujo, radar, jugadas: {} };
+    }
+    const familia = ["holding", "holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "indice_eeuu", "indice_semanal",
+      "acciones_ocho"].includes(v.perfil);
+    const movs = familia
+      ? [linea(t0 + 60000, "compra_holding", "BTCFDUSD", { precio: 97250, cantidad: m / 12 * 0.6 / 97250, monto: m / 12 * 0.6 }, {}),
+        linea(t0 + 60000, "compra_holding", "ETHFDUSD", { precio: 3610, cantidad: m / 12 * 0.4 / 3610, monto: m / 12 * 0.4 }, {})]
+      : [linea(t0 + 0.5 * h, "entrada_rebote", "BTCUSDT", { precio: 97250, monto: m * 0.3, stop: 96400, objetivo: 98600, estado: "puesta" }, {}),
+        linea(t0 + 0.9 * h, "entrada_rebote", "BTCUSDT", { precio: 97250, monto: m * 0.3, stop: 96400, objetivo: 98600, estado: "llenada" }, {}),
+        linea(t0 + 2.2 * h, "objetivo", "BTCUSDT", {}, { precio: 98600, neto: m * 0.3 * 0.0125, saldo: m * 1.0037 }),
+        linea(t0 + 2.6 * h, "rechazo", "SOLUSDT", {}, { motivo: "bajo_minimo" }),
+        linea(t0 + 2.8 * h, "entrada_ruptura", "ETHUSDT", { precio: 3610, monto: m * 0.25, stop: 3560, objetivo: 3665, estado: "llenada" }, {})];
+    movs.push(linea(t0, "perfil_empezado", "", {}, { perfil: v.perfil, saldo: m }));
+    movs.sort((a, b) => b.ms - a.ms);
+    const holding = familia;
+    const tenencias = holding ? [
+      { par: "BTCFDUSD", cantidad: m / 12 * 0.6 / 97250, gastado: m / 12 * 0.6, precio_ahora: 97800, valor: m / 12 * 0.6 / 97250 * 97800, precio_medio: 97250 },
+      { par: "ETHFDUSD", cantidad: m / 12 * 0.4 / 3610, gastado: m / 12 * 0.4, precio_ahora: 3592, valor: m / 12 * 0.4 / 3610 * 3592, precio_medio: 3610 }] : [];
+    const posiciones = holding || !v.activo ? [] : [{ par: "ETHUSDT", estado: "abierta", precio: 3610, precio_ahora: 3622,
+      stop: 3560, objetivo: 3665, monto: m * 0.25, ganancia: m * 0.25 * (12 / 3610) }];
+    const valor = holding ? m * 11 / 12 + tenencias.reduce((a, x) => a + x.valor, 0) : m * 1.0037 + (posiciones[0] ? posiciones[0].ganancia : 0);
+    return { formato: 1, activo: v.activo, perfil: v.perfil, monto: m, desde_ms: t0, valor, ganancia: valor - m,
+      ganancia_relativa: valor / m - 1, efectivo: holding ? m * 11 / 12 : m * 1.0037 - m * 0.25, posiciones, tenencias,
+      ultima: holding ? { decision: "esperando", proxima_ms: t0 + 7 * 24 * h } : { decision: "sin_senal" },
+      movimientos: movs, flujo, radar, jugadas: {},
+      // Las reglas y el libro del holding (bin/lib_perfiles.py y bin/lib_holding.py), para «Mi plan».
+      reglas: holding ? REGLAS_DEMO[v.perfil] : {}, holding: holding ? { partes: 1, ultima_ms: t0 + 60000, guardado: {},
+        pendiente: v.perfil === "compra_semanal" ? { BTCUSDT: { limite: 71000, monto: m / 52 * 0.6 } } : {} } : null };
+  }
+  // El mapa de inicios de la vista previa: números inventados, con la forma de lib_simulacion.mapa.
+  let alpacaDemo = null;   // la pista de la llave de Alpaca en la vista previa
+  // Las probabilidades de la vista previa: números inventados, con la forma de lib_simulacion.probabilidades.
+  function probDemo(dias) {
+    const r = azar(dias), acciones = /indice|acciones/;
+    const fila = (perfil, k) => {
+      if (acciones.test(perfil)) return { perfil, n: 0, listo: false };
+      const gana = 0.55 + r() * 0.3, tipico = 0.02 + r() * 0.25 * Math.sqrt(dias / 365);
+      return { perfil, n: Math.round((3000 - dias) / 14), listo: true, gana, pierde_grande: 0.05 + r() * 0.2, gana_btc: 0.25 + r() * 0.4,
+        malo: -0.15 - r() * 0.3, tipico, bueno: tipico + 0.4 + k * 0.03 };
+    };
+    const perfiles = ["holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "indice_eeuu", "indice_semanal", "acciones_ocho",
+      "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "tendencia", "rotacion"];
+    return { formato: 1, dias, cada_dias: 14, perdida_grande: 0.2, filas: perfiles.map(fila),
+      btc: { n: 200, listo: true, gana: 0.66, pierde_grande: 0.21, malo: -0.42, tipico: 0.31, bueno: 1.9 } };
+  }
+  function mapaDemo() {
+    const inicios = [], perfiles = ["holding_ocho", "compra_semanal", "rebalanceo", "cosecha", "indice_eeuu", "indice_semanal",
+      "acciones_ocho", "semanal_rotacion", "nucleo_satelite", "cripto_acciones", "tendencia", "rotacion"];
+    for (let a = 2018, m = 6; a < 2026 || (a === 2026 && m <= 1); m += 6) { if (m > 12) { m -= 12; a += 1; continue; } inicios.push(Date.UTC(a, m - 1, 1)); }
+    const r = azar(7), forma = (k, i) => (6 - i * 0.7) * (0.5 + 0.15 * Math.sin(i + k)) - 0.35 + r() * 0.2;
+    return { formato: 1, hasta_ms: Date.now(), inicios, monto: 100,
+      filas: perfiles.map((perfil, k) => ({ perfil, valores: inicios.map((_, i) => (/indice|acciones|cripto_acciones/.test(perfil) ? null : Number(forma(k, i).toFixed(3)))) })),
+      btc: inicios.map((_, i) => Number(((6 - i * 0.7) * 0.55 - 0.45).toFixed(3))) };
+  }
+  const REGLAS_DEMO = {
+    holding: { tipo: "acumular", partes: 12, cada_ms: 604800000 },
+    holding_ocho: { tipo: "acumular", partes: 12, cada_ms: 604800000 },
+    compra_semanal: { tipo: "acumular", partes: 52, cada_ms: 604800000, descuento: 0.01 },
+    rebalanceo: { tipo: "acumular", partes: 12, cada_ms: 604800000, rebalanceo: { cripto: 0.5, banda: 0.1 } },
+    cosecha: { tipo: "acumular", partes: 12, cada_ms: 604800000, cosecha: { sube: 0.3, vende: 0.25, recompra: 0.15 } },
+  };
+  function realDemo() {
+    DEMO.real = DEMO.real || { conectado: false, pista: "", conexion: { ok: false }, activo: false, cuenta: { existe: false } };
+    const c = DEMO.real.conexion || {}, libres = c.libres || {};
+    const fondos = (libres.USDT || 0) + (libres.FDUSD || 0);
+    const requisitos = [
+      { id: "simulacion", cumple: !!(DEMO.simulacion && DEMO.simulacion.listo), n: DEMO.simulacion && DEMO.simulacion.monto },
+      { id: "prueba", cumple: false, dias: 3, operaciones: 2, dias_pedidos: 7, operaciones_pedidas: 5 },
+      { id: "llave", cumple: !!(c.ok && c.lectura && c.spot && !c.retiro && c.ip), ok: !!c.ok, lectura: !!c.lectura,
+        spot: !!c.spot, retiro: !!c.retiro, ip: !!c.ip, motivo: "" },
+      { id: "minimos", cumple: true, minimo: 40 },
+      { id: "fondos", cumple: !!c.ok && fondos >= 40, fondos, minimo: 40 },
+    ];
+    if (new URLSearchParams(location.search).has("listo")) requisitos.forEach((q) => { q.cumple = true; });
+    return { formato: 1, llavero: true, conectado: DEMO.real.conectado, pista: DEMO.real.pista, conexion: c, requisitos,
+      listo: requisitos.every((q) => q.cumple), activo: DEMO.real.activo, frase: "OPERAR CON DINERO REAL",
+      cuenta: DEMO.real.cuenta, ejecutor: {} };
+  }
   function simular(accion, d, c) {
     if (!DEMO) return;
     switch (accion) {
@@ -2105,6 +2919,53 @@
         const cliente = mcpDemo().clientes.find((x) => x.id === d.cliente);
         if (cliente) Object.assign(cliente, { conectado: d.orden === "conectar", al_dia: true });
         c.responder("mcpListo", { ok: true, ...mcpDemo(), orden: d.orden, cliente: d.cliente });
+      });
+      case "vivoEstado": return c.responder("vivoListo", { ok: true, datos: vivoDemo() });
+      case "vivoGrafico": return c.luego(120, () => c.responder("graficoListo", { ok: true, datos: graficoDemo(d.par, d.temporalidad) }));
+      case "vivoEncender": return flujoDemo(c);
+      case "vivoEmpezar": return c.luego(400, () => {
+        DEMO.vivo = { perfil: d.perfil, monto: Number(d.monto), activo: true, desde_ms: Date.now() - 3 * 3600000 };
+        c.responder("vivoListo", { ok: true, datos: vivoDemo() });
+      });
+      case "vivoDetener": return c.luego(200, () => {
+        if (DEMO.vivo) DEMO.vivo.activo = false;
+        c.responder("vivoListo", { ok: true, datos: vivoDemo() });
+      });
+      case "simularMapa": return c.responder("mapaListo", { ok: true, datos: mapaDemo() });
+      case "simularProbabilidades": return c.luego(300, () => c.responder("probabilidadesListo", { ok: true, datos: probDemo(Number(d.dias)) }));
+      case "simularEstado": return c.responder("simularEstadoListo", { ok: true, datos: { ultima: DEMO.simulacion || {} } });
+      case "simularCorrer": return c.luego(700, () => {
+        DEMO.simulacion = simulacionDemo(Number(d.monto), Number(d.dias));
+        c.responder("simularListo", { ok: true, datos: { ultima: DEMO.simulacion } });
+      });
+      case "realEstado": return c.responder("realEstadoListo", { ok: true, datos: realDemo() });
+      case "noticiasRevisar": return c.responder("noticiasListo", { ok: true, datos: { llavero: true, conectado: !!alpacaDemo, pista: alpacaDemo || "" } });
+      case "noticiasConectar": return c.luego(300, () => {
+        alpacaDemo = `${String(d.llave).slice(0, 4)}…${String(d.llave).slice(-4)}`;
+        c.responder("noticiasListo", { ok: true, datos: { llavero: true, conectado: true, pista: alpacaDemo,
+          ultimas: [{ id: 1, ms: Date.now() - 600000, titular: "Titular inventado para la vista previa", simbolos: ["BTCUSD"] }] } });
+      });
+      case "noticiasDesconectar": alpacaDemo = null; return c.responder("noticiasListo", { ok: true, datos: { llavero: true, conectado: false, pista: "" } });
+      case "realConectar": case "realRevisar": return c.luego(500, () => {
+        DEMO.real.conectado = true;
+        DEMO.real.pista = "dEmO…a1b2";
+        DEMO.real.conexion = { ok: true, lectura: true, spot: true, retiro: false, ip: true, libres: { USDT: 260, FDUSD: 0 } };
+        c.responder("realListo", { ok: true, datos: realDemo() });
+      });
+      case "realDesconectar": return c.luego(300, () => {
+        Object.assign(DEMO.real, { conectado: false, pista: "", conexion: { ok: false } });
+        c.responder("realListo", { ok: true, datos: realDemo() });
+      });
+      case "realActivar": return c.luego(500, () => {
+        const r = realDemo();
+        if (!r.listo) return c.responder("realListo", { ok: false, datos: r, error: "requisitos" });
+        if (String(d.frase || "").trim().toUpperCase() !== r.frase) return c.responder("realListo", { ok: false, datos: r, error: "frase" });
+        Object.assign(DEMO.real, { activo: true, cuenta: { existe: true, saldo: d.presupuesto, aportado: d.presupuesto, operaciones: 0, posiciones: 0 } });
+        c.responder("realListo", { ok: true, datos: realDemo() });
+      });
+      case "realDesactivar": case "realEmergencia": return c.luego(500, () => {
+        DEMO.real.activo = false;
+        c.responder("realListo", { ok: true, datos: realDemo() });
       });
       case "velasEstado": return c.responder("velasEstadoListo", { ok: true, datos: DEMO.velas });
       case "velasDescargar": return c.luego(400, () => {

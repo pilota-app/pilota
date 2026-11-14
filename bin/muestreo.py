@@ -10,7 +10,8 @@ recuperar nunca. Por eso este trabajo parte desde el primer día: cada 5 minutos
 la diferencia entre las dos y los últimos trades) de los dos pares que se operan. Con 60 días de muestras propias, el backtest
 reajusta su modelo de spread y de no llenado; hasta entonces usa un modelo conservador (eso es cosa de su propio paso).
 
-Además mantiene al día las velas de 1 m de los últimos 30 días, que son las que ven los cruces de stop y objetivo en el modo
+Además mantiene al día las velas de 1 h, 4 h y 1 d (`velas_al_dia`: las que mira la prueba en vivo) y las de 1 m de los
+últimos 30 días, que son las que ven los cruces de stop y objetivo en el modo
 prueba y las que se recorren al despertar para reconciliar.
 
 Lo que no se negocia aquí:
@@ -30,6 +31,7 @@ y las velas de 1 m, donde siempre (`<datos>/mercado/velas/<PAR>-1m.json`).
 """
 import time
 
+import lib_candado
 import lib_datos
 import lib_trabajo
 import nucleo
@@ -172,6 +174,20 @@ def _anotar(serie, antes, avance, al_avanzar, pagina=True):
 
 # ── Las acciones ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+def velas_al_dia(cliente, ahora_ms):
+    """Las velas de 1 h, 4 h y 1 d de los cuatro pares, al día: solo se pide la serie que ya tiene una vela nueva cerrada.
+    Así la prueba en vivo decide con la última vela de verdad, no con la del día en que se bajó el historial."""
+    nuevas = 0
+    for par in lib_datos.PARES:
+        for t in lib_datos.TEMPORALIDADES:
+            paso = lib_datos.PASO_MS[t]
+            velas = lib_datos.leer_serie(par, t)
+            if velas and velas[-1][0] + 2 * paso > ahora_ms:
+                continue                       # la última cerrada ya está guardada
+            nuevas += lib_datos.bajar_serie(cliente, par, t, ahora_ms=ahora_ms)
+    return nuevas
+
+
 def estado(d=None, ahora_ms=None):
     """En qué quedó, sin tocar la red."""
     guardado = lib_trabajo.mirar(TIPO, lib_trabajo.leer_plan(TIPO))
@@ -183,6 +199,15 @@ def estado(d=None, ahora_ms=None):
 
 
 def encender(d=None, cliente=None, ahora_ms=None, dias=lib_datos.DIAS_MINUTOS, dormir=time.sleep, ciclos=0, latir=True):
+    """Uno solo a la vez: si ya hay uno corriendo (otra ventana de la app, o uno que quedó vivo), este no parte."""
+    try:
+        with lib_candado.unico(TIPO):
+            return _encender(d, cliente, ahora_ms, dias, dormir, ciclos, latir)
+    except lib_candado.YaCorriendo:
+        return {"ok": False, "datos": estado(d)["datos"], "error": "ya_corriendo"}
+
+
+def _encender(d=None, cliente=None, ahora_ms=None, dias=lib_datos.DIAS_MINUTOS, dormir=time.sleep, ciclos=0, latir=True):
     """Muestrea cada `CICLO_SEGUNDOS` hasta que le pidan parar. Todo lo que no es `d` solo se pasa en las pruebas (`ciclos`
     corta después de unas vueltas; la acción no corta sola: la corta «Detener» o el cierre de la app)."""
     cliente = cliente or lib_datos.Binance()
@@ -203,7 +228,7 @@ def encender(d=None, cliente=None, ahora_ms=None, dias=lib_datos.DIAS_MINUTOS, d
         lib_trabajo.publicar(t, resumen(plan))
 
     error = ""
-    while not t.detenido() and not (ciclos and vuelta >= ciclos):
+    while not t.detenido() and not (ciclos and vuelta >= ciclos) and not lib_candado.huerfano():
         vuelta += 1
         guardadas, muestreada = [], False
         try:
@@ -219,6 +244,7 @@ def encender(d=None, cliente=None, ahora_ms=None, dias=lib_datos.DIAS_MINUTOS, d
             plan["etapa"] = t.x["etapa"]
             anotar(pagina=False)
             minutos_al_dia(cliente, plan, al_avanzar=anotar, detener=t.detenido)
+            plan["velas_nuevas"] = velas_al_dia(cliente, ahora)
             plan["etapa"] = ETAPAS[1] if all(s["listo"] for s in plan["minutos"]) else ETAPAS[0]
             anotar(pagina=False)
         except (lib_datos.Limitado, lib_datos.Temporal, lib_datos.Respuesta) as e:
@@ -240,7 +266,7 @@ def encender(d=None, cliente=None, ahora_ms=None, dias=lib_datos.DIAS_MINUTOS, d
                 break
         if ciclos and vuelta >= ciclos:
             break
-        lib_trabajo.esperar(CICLO_SEGUNDOS, dormir=dormir, detenido=t.detenido)
+        lib_trabajo.esperar(CICLO_SEGUNDOS, dormir=dormir, detenido=lambda: t.detenido() or lib_candado.huerfano())
     detenido = t.detenido()
     plan.update({"error": error, "corriendo": False, "deteniendo": False,
                  "estado": lib_trabajo.terminar(t, error, detenido)})

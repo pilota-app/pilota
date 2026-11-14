@@ -48,6 +48,7 @@ import lib_frenos
 import lib_registro
 import lib_resolucion
 import lib_tamano
+import lib_universo
 import minimo_viable
 import nucleo
 
@@ -288,7 +289,7 @@ def entrar(opcion, ahora_ms=None, tamano_=None, frenos=None, com=None, calibraci
         return _rechazo(o, "repetida", ms)
     pares, md = lib_tamano.filtros_de()
     filtros = pares.get(o.get("par")) or {}
-    com = lib_tamano.comisiones(com if com is not None else lib_costos.comisiones())
+    com = lib_universo.comisiones_de(o.get("par"), lib_tamano.comisiones(com if com is not None else lib_costos.comisiones()))
     abiertas, comprometido = lib_tamano.posiciones_de(cuenta)
     if isinstance(tamano_, dict):
         t = tamano_
@@ -404,11 +405,12 @@ def _lado_costo(por):
     return OBJETIVO if por == OBJETIVO else STOP
 
 
-def neto_de(entrada, salida, cantidad, por, spread=None, com=None):
+def neto_de(entrada, salida, cantidad, por, spread=None, com=None, par=None):
     """Lo que deja en USDT cerrar `cantidad` de una posición, con los costos de los dos lados adentro (la comisión de
     cada lado, la conversión USDT↔FDUSD y, si sale a mercado, la diferencia entre compra y venta)."""
     hoja = lib_costos.SPREAD_SUPUESTO if spread is None else _numero(spread, lib_costos.SPREAD_SUPUESTO)
-    r = lib_costos.resultado(_numero(entrada), _numero(salida), _lado_costo(por), hoja, lib_tamano.comisiones(com))
+    c = lib_universo.comisiones_de(par, lib_tamano.comisiones(com))     # contra USDT no hay conversión
+    r = lib_costos.resultado(_numero(entrada), _numero(salida), _lado_costo(por), hoja, c)
     cantidad = _numero(cantidad)
     return {"neto": cantidad * (r["recibido"] - r["pagado"]), "neto_relativo": r["neto"],
             "precio": r["precio_salida"], "costos": cantidad * r["pagado"] * r["costos"]}
@@ -417,8 +419,18 @@ def neto_de(entrada, salida, cantidad, por, spread=None, com=None):
 # ── Revisar: las velas de 1 m que faltaban, aplicadas ────────────────────────────────────────────────────────────────
 
 def minutos_de(pares=None):
-    """Las velas de 1 m guardadas de cada par que se opera: son las que dicen qué se cruzó."""
-    return {p: lib_datos.leer_serie(p, lib_datos.MINUTO) for p in (pares or lib_datos.PARES_OPERADOS)}
+    """Las velas de 1 m guardadas de cada par que se opera y de las monedas del robot con algo abierto o esperando: son las
+    que dicen qué se cruzó. Las demás no se leen: son ocho archivos de un mes de minutos, y la revisión es cada minuto."""
+    if pares:
+        return {p: lib_datos.leer_serie(p, lib_datos.MINUTO) for p in pares}
+    salida = {p: lib_datos.leer_serie(p, lib_datos.MINUTO) for p in lib_datos.PARES_OPERADOS}
+    suyas = {x.get("par") for x in (guardado().get("posiciones") or []) if isinstance(x, dict)}
+    for p in lib_datos.UNIVERSO:
+        if p in suyas and p not in salida:
+            velas = lib_datos.leer_serie(p, lib_datos.MINUTO)
+            if velas:
+                salida[p] = velas
+    return salida
 
 
 def _anotar_eventos(p, eventos, cuerpo, spread, com):
@@ -433,7 +445,7 @@ def _anotar_eventos(p, eventos, cuerpo, spread, com):
             lib_registro.anotar(AMBIENTE, RAZON_VENCIDA, par=p["par"], puntaje=p.get("puntaje"), ms=ev["ms"],
                                 orden=_orden_registro(p, ev.get("estado") or VENCIDA))
         elif ev["que"] == CIERRE:
-            r = neto_de(p["precio"], ev["precio"], ev["cantidad"], ev["por"], spread, com)
+            r = neto_de(p["precio"], ev["precio"], ev["cantidad"], ev["por"], spread, com, par=p.get("par"))
             cuerpo = lib_frenos.con_cierre(cuerpo, r["neto"], ev["ms"])
             llenada = ev.get("llenada_ms") or _entero(p.get("llenada_ms"))
             vividos = max(0, ev["ms"] - llenada) // lib_datos.PASO_MS[lib_datos.MINUTO]

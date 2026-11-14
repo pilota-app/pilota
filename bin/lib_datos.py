@@ -32,10 +32,22 @@ import nucleo
 PARES = ("BTCFDUSD", "ETHFDUSD", "BTCUSDT", "ETHUSDT")
 #: Los dos que se compran: solo de ellos se guardan velas de 1 m y muestras del libro.
 PARES_OPERADOS = ("BTCFDUSD", "ETHFDUSD")
+#: Las monedas que mira el robot en prueba (`lib_universo`), todas contra USDT. Sus series se guardan igual que las de
+#: siempre (1 h, 4 h, 1 d y 1 m), pero no entran en el estado de los datos ni en el historial de los 3 años: las prepara
+#: `lib_universo` y las mantiene al día el flujo en vivo.
+UNIVERSO = ("BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "TRXUSDT", "DOGEUSDT")
+#: Acciones y fondos de EE. UU. tokenizados en Binance (bStocks, contra USDT): cada uno respaldado 1:1 por la acción en un
+#: custodio. Están en Binance desde junio de 2026, así que su historia es corta. SPY es el S&P 500 y QQQ el Nasdaq 100.
+ACCIONES = ("SPYBUSDT", "QQQBUSDT", "AAPLBUSDT", "MSFTBUSDT", "NVDABUSDT", "AMZNBUSDT", "GOOGLBUSDT", "METABUSDT",
+            "TSLABUSDT", "AVGOBUSDT")
+#: Todo lo que mira el robot en prueba: las ocho monedas y las acciones.
+ACTIVOS = UNIVERSO + ACCIONES
+CONOCIDOS = PARES + tuple(p for p in ACTIVOS if p not in PARES)
 TEMPORALIDADES = ("1h", "4h", "1d")
 #: El minuto va aparte: solo de los pares que se operan y solo los últimos días (el ejecutor de prueba y reconciliar).
 MINUTO = "1m"
-PASO_MS = {MINUTO: 60_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+PASO_MS = {MINUTO: 60_000, "5m": 300_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+#: «5m» no se baja ni se guarda: se arma con las de 1 m (lib_perfiles.agrupar), para el perfil más rápido.
 DIA_MS = 86_400_000
 #: Lo primero que se baja para poder calcular: 90 días. Los 3 años vienen después, en segundo plano.
 DIAS_MINIMOS = 90
@@ -166,9 +178,9 @@ class Binance:
 
     def info_pares(self, pares):
         """Los símbolos de `pares` como los da exchangeInfo: sus filtros vigentes (tick, paso de cantidad, mínimos) y si
-        aceptan protección automática. Los nombres salen de PARES, nunca de afuera."""
+        aceptan protección automática. Los nombres salen de PARES o del universo, nunca de afuera."""
         for par in pares:
-            if par not in PARES:
+            if par not in CONOCIDOS:
                 raise ValueError(f"No conozco ese par: {par!r}")
         d = self.obtener("/api/v3/exchangeInfo", {"symbols": json.dumps(list(pares), separators=(",", ":"))})
         if not isinstance(d, dict) or not isinstance(d.get("symbols"), list):
@@ -243,7 +255,10 @@ def carpeta_mercado():
 
 
 def serie_valida(par, temporalidad):
-    """Las series que Pilota guarda: las 12 de siempre (4 pares × 1 h, 4 h, 1 d) y, solo de los pares que se operan, la de 1 m."""
+    """Las series que Pilota guarda: las 12 de siempre (4 pares × 1 h, 4 h, 1 d), la de 1 m de los pares que se operan, y las
+    del universo del robot (1 h, 4 h, 1 d y 1 m)."""
+    if par in ACTIVOS:
+        return temporalidad in TEMPORALIDADES or temporalidad == MINUTO
     return par in PARES and (temporalidad in TEMPORALIDADES or (temporalidad == MINUTO and par in PARES_OPERADOS))
 
 

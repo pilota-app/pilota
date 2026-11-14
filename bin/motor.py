@@ -29,8 +29,9 @@ ellos proponen y esperan el «Sí» (manual), operan solo si el puntaje es clara
 """
 import time
 
+import lib_candado
 import lib_datos
-import lib_modos
+import lib_piloto
 import lib_reconciliar
 import lib_trabajo
 import nucleo
@@ -44,10 +45,19 @@ def estado(d=None, ahora_ms=None):
 def revisar(d=None, ahora_ms=None):
     """Una revisión ahora mismo: reconcilia la ventana que nadie miró, deja aplicado lo que pasó y, con el mundo al día,
     los tres modos deciden (`lib_modos.decidir`)."""
-    return {"ok": True, "datos": lib_reconciliar.reconciliar(ahora_ms, decidir=lib_modos.decidir)}
+    return {"ok": True, "datos": lib_reconciliar.reconciliar(ahora_ms, decidir=lib_piloto.decidir)}
 
 
 def encender(d=None, ahora_ms=None, dormir=time.sleep, ciclos=0, latir=True):
+    """Uno solo a la vez: si ya hay uno corriendo (otra ventana de la app, o uno que quedó vivo), este no parte."""
+    try:
+        with lib_candado.unico(lib_reconciliar.TIPO):
+            return _encender(d, ahora_ms, dormir, ciclos, latir)
+    except lib_candado.YaCorriendo:
+        return {"ok": False, "datos": estado(d)["datos"], "error": "ya_corriendo"}
+
+
+def _encender(d=None, ahora_ms=None, dormir=time.sleep, ciclos=0, latir=True):
     """Revisa cada `CICLO_SEGUNDOS` hasta que le pidan parar. Todo lo que no es `d` solo se pasa en las pruebas (`ciclos`
     corta después de unas vueltas; la acción no corta sola: la corta «Detener» o el cierre de la app)."""
     inicial = ahora_ms if ahora_ms is not None else lib_datos.ahora_local_ms()
@@ -56,10 +66,10 @@ def encender(d=None, ahora_ms=None, dormir=time.sleep, ciclos=0, latir=True):
                           {"ciclo_segundos": lib_reconciliar.CICLO_SEGUNDOS}, latir=latir)
     plan.update({"estado": "corriendo", "trabajo": t.id, "error": "", "corriendo": True})
     error, vuelta = "", 0
-    while not t.detenido() and not (ciclos and vuelta >= ciclos):
+    while not t.detenido() and not (ciclos and vuelta >= ciclos) and not lib_candado.huerfano():
         vuelta += 1
         try:
-            datos = lib_reconciliar.reconciliar(ahora_ms, plan=plan, decidir=lib_modos.decidir)
+            datos = lib_reconciliar.reconciliar(ahora_ms, plan=plan, decidir=lib_piloto.decidir)
             plan.update(lib_reconciliar.armar(datos["ultima_ms"], lib_trabajo.leer_plan(lib_reconciliar.TIPO)))
             plan.update({"estado": "corriendo", "trabajo": t.id, "fallos": 0, "error": "", "corriendo": True})
             # La primera vuelta es la que reconcilia lo que nadie miró; de ahí en adelante solo vigila.
@@ -79,7 +89,8 @@ def encender(d=None, ahora_ms=None, dormir=time.sleep, ciclos=0, latir=True):
                 break
         if ciclos and vuelta >= ciclos:
             break
-        lib_trabajo.esperar(lib_reconciliar.CICLO_SEGUNDOS, dormir=dormir, detenido=t.detenido)
+        lib_trabajo.esperar(lib_reconciliar.CICLO_SEGUNDOS, dormir=dormir,
+                            detenido=lambda: t.detenido() or lib_candado.huerfano())
     detenido = t.detenido()
     plan.update({"error": error, "corriendo": False, "deteniendo": False,
                  "estado": lib_trabajo.terminar(t, error, detenido)})
