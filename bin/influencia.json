@@ -1,6 +1,6 @@
 {
  "formato": 1,
- "al": "2026-11-13",
+ "al": "2026-11-14",
  "fuente": "https://github.com/pilota-app/influencia",
  "personas": [
   {
@@ -427,6 +427,19 @@
     "d20": null,
     "d60": null
    }
+  },
+  {
+   "persona": "jensen-huang",
+   "fecha": "2026-11-12",
+   "que": "Jensen Huang renuncia como director de Nvidia",
+   "activo": "NVDA",
+   "movimiento": {
+    "dia": -0.043,
+    "d1": -0.063,
+    "d5": null,
+    "d20": null,
+    "d60": null
+   }
   }
  ],
  "ranking": [
@@ -440,6 +453,14 @@
   },
   {
    "puesto": 2,
+   "id": "jensen-huang",
+   "puntaje": 1.43,
+   "eventos": 1,
+   "ultimo_evento": "2026-11-12",
+   "duro_20d": null
+  },
+  {
+   "puesto": 3,
    "id": "elon-musk",
    "puntaje": 0.64,
    "eventos": 4,
@@ -447,7 +468,7 @@
    "duro_20d": 1.0
   },
   {
-   "puesto": 3,
+   "puesto": 4,
    "id": "sam-bankman-fried",
    "puntaje": 0.2,
    "eventos": 1,
