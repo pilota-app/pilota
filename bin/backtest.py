@@ -331,7 +331,7 @@ def ventana_de(empalmes):
             "dias": ((fin - inicio) // lib_datos.DIA_MS) if (inicio and fin) else 0}
 
 
-def correr(ahora_ms=None, factor=None, filtrar=None, sensibilidad=True):
+def correr(ahora_ms=None, factor=None, filtrar=None, sensibilidad=True, con_todas=False):
     """El recorrido completo: las cuatro series de entrada (los dos pares operados en 1 h y 4 h), la compuerta y el reporte.
 
     `filtrar(senal)` es el gancho de la calibración (su paso): sin él no se filtra nada y esto es el backtest de señales
@@ -383,6 +383,7 @@ def correr(ahora_ms=None, factor=None, filtrar=None, sensibilidad=True):
     if ventana["desde"] is not None:
         btc_velas = [v for v in btc_velas if ventana["desde"] <= v[0] <= ventana["hasta"]]
     cerradas = sorted([o for o in todas if not o["motivo"]], key=lambda o: o["salida_ms"])
+    todas_ops = list(todas)
     return {"formato": 1, "corrido": True, "cuando": lib_datos.iso(ahora), "modelo": modelo, "comisiones": com,
             "parametros": parametros(principal), "ventana": ventana, "series": filas, "empalmes": empalmes,
             "resumen": resumen(todas), "compuerta": compuerta(todas),
@@ -393,7 +394,9 @@ def correr(ahora_ms=None, factor=None, filtrar=None, sensibilidad=True):
             "supuestos": {"ambiguas": validar_ambiguas(todas), "spread": modelo["origen"],
                           "empalme": any(e["empalmada"] for e in empalmes), "sin_exigencia": filtrar is None,
                           "calentamiento": lib_indicadores.VELAS_CALENTAMIENTO},
-            "operaciones": cerradas[-OPERACIONES_GUARDADAS:], "motivos": motivos, "listo": not motivos}
+            "operaciones": cerradas[-OPERACIONES_GUARDADAS:], "motivos": motivos, "listo": not motivos,
+            # Todas las operaciones, solo para la simulación con monto (`lib_simulacion`): no van al archivo.
+            **({"todas": todas_ops} if con_todas else {})}
 
 
 def vacio():

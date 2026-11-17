@@ -1,4 +1,6 @@
-# Publica una versión de Pilota sola: basta con subir «version» en app.json y hacer push a main. Compila con Tauri en cada
+# Publica una versión de Pilota. Por ahora NO se publica sola al cambiar app.json: el modo con dinero real todavía no se
+# prueba contra Binance (ver bin/lib_ejecutor_real.py). Para publicar, sube un tag vX.Y.Z o corre este workflow a mano.
+# Cuando la prueba real esté hecha, vuelve a poner el disparador `push: branches [main], paths ["app.json"]`. Compila con Tauri en cada
 # sistema (Mac ), arma cada descarga con su huella SHA-256 y crea el Release vX.Y.Z con nombres fijos (los
 # usan instalar.sh, instalar.ps1 y el actualizador de la app): Pilota-macOS.zip (+ .sha256).
 # Si la versión ya existe, no hace nada. Actions fijadas por SHA (Dependabot las sube), permisos mínimos, sin credenciales guardadas
@@ -7,8 +9,6 @@
 name: Publicar versión
 on:
   push:
-    branches: [main]
-    paths: ["app.json"]
     tags: ["v*"]
   workflow_dispatch:
 concurrency:

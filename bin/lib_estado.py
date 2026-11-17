@@ -79,7 +79,9 @@ DEPOSITO, RETIRO = "deposito", "retiro"
 #: entra al archivo ni a la huella. `cuerpo_de` deja un estado leído listo para volver a guardarse.
 CAMPOS = ("formato", "ambiente", "cuando", "cuando_ms", "desde", "desde_ms", "modo", "saldo", "referencia", "aportado",
           "aportes", "posiciones", "operaciones", "racha", "dia", "desbloqueos", "desbloqueo", "pausado", "frenos",
-          "reinicios")
+          "reinicios", "usadas", "conversiones")
+#: Cuántas oportunidades usadas (y conversiones anotadas) del conector real se recuerdan: sus ids no se reusan nunca.
+USADAS_MAXIMAS = 400
 #: Lo más largo que puede ser la lista de frenos anotados: son códigos cortos de `lib_frenos.FRENOS`, no texto.
 FRENOS_MAXIMOS = 16
 
@@ -126,7 +128,7 @@ def nuevo(ambiente, saldo=0.0, ahora_ms=None):
               "saldo": 0.0, "referencia": 0.0, "aportado": 0.0, "aportes": [], "posiciones": [], "operaciones": 0,
               # El estado de los frenos (`bin/lib_frenos.py`): nace en cero, sin pausa y sin ningún freno puesto.
               "racha": 0, "dia": {"fecha": "", "inicio": 0.0, "aportado": 0.0}, "desbloqueos": 0, "desbloqueo": {},
-              "pausado": False, "frenos": [], "reinicios": 0}
+              "pausado": False, "frenos": [], "reinicios": 0, "usadas": [], "conversiones": {}}
     return con_aporte(cuerpo, saldo, ahora_ms=ms) if _monto(saldo, "saldo") > 0 else cuerpo
 
 
@@ -182,6 +184,8 @@ def sanear(cuerpo, ambiente, ahora_ms=None):
     dia = cuerpo.get("dia") if isinstance(cuerpo.get("dia"), dict) else {}
     des = cuerpo.get("desbloqueo") if isinstance(cuerpo.get("desbloqueo"), dict) else {}
     frenos = [f for f in cuerpo.get("frenos", []) if isinstance(f, str) and lib_registro.CODIGO.fullmatch(f)]
+    usadas = cuerpo.get("usadas") if isinstance(cuerpo.get("usadas"), list) else []
+    conversiones = cuerpo.get("conversiones") if isinstance(cuerpo.get("conversiones"), dict) else {}
     return {**base, "cuando": str(cuerpo.get("cuando", base["cuando"]))[:32], "cuando_ms": _entero(cuerpo.get("cuando_ms")),
             "desde": str(cuerpo.get("desde", base["desde"]))[:32], "desde_ms": _entero(cuerpo.get("desde_ms")),
             "modo": cuerpo.get("modo") if cuerpo.get("modo") in MODOS else MODO_FRENADO,
@@ -195,7 +199,9 @@ def sanear(cuerpo, ambiente, ahora_ms=None):
             "desbloqueo": {"n": _entero(des.get("n")), "pedido_ms": _entero(des.get("pedido_ms")),
                            "hasta_ms": _entero(des.get("hasta_ms"))} if des else {},
             "pausado": bool(cuerpo.get("pausado")), "frenos": frenos[:FRENOS_MAXIMOS],
-            "reinicios": _entero(cuerpo.get("reinicios"))}
+            "reinicios": _entero(cuerpo.get("reinicios")),
+            "usadas": [u for u in usadas if isinstance(u, str)][-USADAS_MAXIMAS:],
+            "conversiones": dict([(k, _entero(v)) for k, v in conversiones.items() if isinstance(k, str)][-USADAS_MAXIMAS:])}
 
 
 def cuerpo_de(cuenta):
@@ -271,10 +277,30 @@ def cargar(ambiente, ahora_ms=None):
 
 # ── Lo que hace la app ───────────────────────────────────────────────────────────────────────────────────────────────
 
+def ruta_interruptor():
+    return os.path.join(carpeta(), "interruptor.json")
+
+
 def activo():
-    """Con qué dinero se está jugando. Hoy siempre prueba: pasar a real es su propio paso y hasta que esté cerrado el
-    interruptor no existe (la banda de la pantalla sale de acá)."""
-    return PRUEBA
+    """Con qué dinero se está jugando. Real solo si el interruptor está escrito, firmado y dice real; cualquier otra cosa
+    (no está, no cuadra la huella, no se entiende) es prueba. Lo enciende y lo apaga `lib_real` (la banda de la pantalla
+    sale de acá)."""
+    d = nucleo.leer_json(ruta_interruptor(), {}, maximo=64 * 1024)
+    cuerpo = d.get("interruptor") if isinstance(d, dict) else None
+    if not isinstance(cuerpo, dict) or cuerpo.get("real") is not True:
+        return PRUEBA
+    if not hmac.compare_digest(str(d.get("huella") or ""), huella(cuerpo, "interruptor")):
+        return PRUEBA
+    return REAL
+
+
+def poner_interruptor(real, ahora_ms=None, presupuesto=None):
+    """Enciende o apaga el dinero de verdad. Solo lo llama `lib_real`, después de revisar todos los requisitos."""
+    ms = int(ahora_ms if ahora_ms is not None else lib_datos.ahora_local_ms())
+    cuerpo = {"real": bool(real), "cuando": lib_datos.iso(ms), "cuando_ms": ms, "presupuesto": presupuesto}
+    nucleo.escribir_json(ruta_interruptor(), {"formato": FORMATO, "huella": huella(cuerpo, "interruptor"),
+                                             "interruptor": cuerpo})
+    return activo()
 
 
 def arrancar(ahora_ms=None):

@@ -242,6 +242,11 @@ def filtros_de(minimo=None):
     d = minimo_viable.guardado() if minimo is None else (minimo if isinstance(minimo, dict) else {})
     pares = {p["par"]: p for p in (d.get("pares") or [])
              if isinstance(p, dict) and p.get("par") in lib_datos.PARES_OPERADOS}
+    if minimo is None:
+        # Las monedas del robot en prueba traen sus propios mínimos (`lib_universo.filtros`), pedidos a Binance igual.
+        import lib_universo
+        for par, f in lib_universo.filtros_guardados().items():
+            pares.setdefault(par, f)
     return pares, d
 
 

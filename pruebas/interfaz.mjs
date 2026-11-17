@@ -40,11 +40,19 @@ const BASE = `http://127.0.0.1:${servidor.address().port}/index.html`;
 
 const navegador = await chromium.launch();
 const errores = [];
-async function abrir(consulta, ancho = 1280) {
+async function abrir(consulta, ancho = 1280, { plegado = false } = {}) {
   const page = await navegador.newPage({ viewport: { width: ancho, height: 800 } });
   page.on("pageerror", (e) => errores.push(`${consulta}: ${e.message}`));
   page.on("console", (m) => { if (m.type() === "error") errores.push(`${consulta}: ${m.text()}`); });
   await page.addInitScript(() => document.addEventListener("securitypolicyviolation", (e) => console.error(`CSP: ${e.violatedDirective}`)));
+  // Las pruebas de cada pieza miran la pestaña «Cómo pienso»: se elige apenas aparece (y la app se queda en ella al volver
+  // a pintar). Las demás pestañas se revisan aparte, con `abrir(consulta, ancho, { plegado: true })`.
+  if (!plegado) {
+    await page.addInitScript(() => new MutationObserver(() => {
+      const t = document.getElementById("tab-como");
+      if (t && t.getAttribute("aria-selected") !== "true" && !window.__comoElegida) { window.__comoElegida = true; t.click(); }
+    }).observe(document, { childList: true, subtree: true }));
+  }
   await page.goto(BASE + consulta);
   return page;
 }
@@ -75,8 +83,199 @@ for (let i = 0; i < 10 && await page.locator(".pieza-bv [data-bv-ir].pz-principa
 await page.click(".pieza-bv [data-bv-fin]:not([data-bv-fin=despues])");
 await page.waitForSelector("#descargar");
 
+// 1b. El centro de operaciones: seis pestañas, el robot en vivo con un perfil, la comparación de los perfiles con su
+// película, la cabina con dibujos (sin style="" en línea: la CSP lo bloquearía) y el paso a real con sus requisitos.
+{
+  // La tendencia en vivo: BTC y ETH, cada una sobre o bajo su promedio de 50 días.
+  const ten = await abrir("?demo&idioma=es", 1280, { plegado: true });
+  await ten.waitForSelector("#pestana-vivo .perfiles");
+  await ten.click('[data-perfil="tendencia"]');
+  await ten.click("#vivo-empezar");
+  await ten.waitForSelector(".vivo-saldo");
+  assert.equal(await ten.locator(".ranking-fila").count(), 2, "BTC y ETH");
+  assert.match(await ten.textContent(".ranking"), /Sobre su promedio[\s\S]*tengo 60 %[\s\S]*Bajo su promedio[\s\S]*su 40 % espera en USDT/);
+  assert.match(await ten.textContent(".vivo-piensa"), /Tengo BTC: está sobre su promedio\. ETH está bajo el suyo/);
+  // Lo que pasó antes en un día como hoy, con sus porcentajes, y las noticias como contexto.
+  assert.match(await ten.textContent(".pronostico"), /Las 1\.?630 veces que estuvo sobre su promedio, a los 20 días había subido 54 de cada 100 veces[\s\S]*en 26 de cada 100 cayó más de 10 %/);
+  assert.match(await ten.textContent(".noticias"), /Persona de ejemplo[\s\S]*BTC \+3,1 %[\s\S]*Datos al 2026-11-13/);
+  assert.match(await ten.textContent(".noticias"), /Quién mueve más el precio hoy[\s\S]*14 noticias medidas/);
+  assert.match(await ten.textContent(".noticias-ahora"), /hace 12 min[\s\S]*Fed y tasas[\s\S]*Titular inventado/);
+  assert.match(await ten.textContent("#pestana-vivo"), /No compré ETH: hubo una mala noticia de Persona De Ejemplo \(2026-11-02\)/);
+  assert.match(await ten.textContent(".como-decido"), /Mala noticia de una persona influyente[\s\S]*Las tres juntas[\s\S]*67 de cada 100/);
+  assert.match(await ten.textContent("#pestana-vivo"), /BTCUSDT|BTC cerró sobre su promedio de 50 días: compré/);
+  await ten.close();
+}
+{
+  const cab = await abrir("?demo&idioma=es", 1280, { plegado: true });
+  await cab.waitForSelector("#pestana-vivo .perfiles");
+  assert.equal(await cab.locator('.pestanas [role="tab"]').count(), 6, "seis pestañas");
+  assert.equal(await cab.locator('.pestanas [role="tab"][aria-selected="true"]').getAttribute("id"), "tab-vivo", "parte en «En vivo»");
+  // Se ofrecen la familia holding y la rotación, agrupados; los de señales quedaron retirados.
+  // Cripto y acciones van aparte; la mezcla de los dos sale en ambos lados.
+  assert.equal(await cab.getAttribute('[data-mercado="cripto"]', "aria-pressed"), "true", "parte en cripto");
+  assert.equal(await cab.locator(".perfil").count(), 10, "los holding, las mezclas, la tendencia y la rotación");
+  assert.equal(await cab.locator(".perfiles-grupo").count(), 3, "en tres grupos");
+  assert.match(await cab.textContent('.perfil[data-perfil="tendencia"]'), /promedio de 50 días[\s\S]*BTC · ETH/);
+  assert.equal(await cab.locator('.perfil[data-perfil="indice_eeuu"]').count(), 0, "sin acciones en cripto");
+  await cab.click('[data-mercado="acciones"]');
+  assert.equal(await cab.locator(".perfil").count(), 4, "las tres de acciones y la mezcla");
+  assert.match(await cab.textContent(".mercado-elegir"), /En Binance existen desde junio de 2026/);
+  assert.match(await cab.textContent('.perfil[data-perfil="indice_eeuu"]'), /S&P 500[\s\S]*SPY · QQQ/);
+  assert.equal(await cab.getAttribute('.perfil[data-perfil="indice_eeuu"]', "aria-checked"), "true", "queda elegido uno de acciones");
+  await cab.click('[data-mercado="cripto"]');
+  assert.equal(await cab.getAttribute('.perfil[data-perfil="holding"]', "aria-checked"), "true", "y de vuelta, el holding");
+  assert.equal(await cab.locator('.perfiles-grupo[data-grupo="guardar"] .perfil').count(), 5, "la familia holding junta");
+  assert.match(await cab.textContent('.perfil[data-perfil="holding_ocho"]'), /BTC · ETH · BNB · SOL · XRP · ADA · TRX · DOGE/);
+  assert.equal(await cab.locator('.perfil[data-perfil="scalper"]').count(), 0, "el scalper ya no se ofrece");
+  assert.match(await cab.textContent('.perfil[data-perfil="rotacion"]'), /Experimento[\s\S]*BTC · ETH · BNB · SOL · XRP · ADA · TRX · DOGE/,
+    "la rotación dice que es un experimento y sus monedas");
+  assert.equal(await cab.getAttribute('.perfil[data-perfil="holding"]', "aria-checked"), "true", "el sugerido viene elegido");
+  assert.ok(await cab.locator("#pestana-como").isHidden(), "lo técnico vive en su pestaña");
+  // En vivo: el perfil y el monto, y el robot cuenta lo que hace.
+  await cab.click('[data-perfil="rotacion"]');
+  await cab.fill("#vivo-monto", "300");
+  await cab.click('[data-perfil="rotacion"]');
+  assert.equal(await cab.inputValue("#vivo-monto"), "300", "lo escrito sigue ahí al volver a pintar");
+  await cab.click("#vivo-empezar");
+  await cab.waitForSelector(".vivo-saldo");
+  // Con un perfil andando, la cabina no muestra una cadena vieja: dice quién manda y lleva a «En vivo».
+  await cab.click("#tab-ahora");
+  assert.match(await cab.textContent("#cabina-perfil"), /Ahora manda el perfil Rotación/);
+  assert.equal(await cab.locator(".cabina .cadena").count(), 0, "sin la cadena de los modos");
+  await cab.click('#cabina-perfil [data-ir-pestana="vivo"]');
+  assert.equal(await cab.getAttribute("#tab-vivo", "aria-selected"), "true");
+  // La rotación no espera un precio: ordena las 8 monedas por fuerza y dice cuáles tiene.
+  assert.equal(await cab.locator(".ranking-fila").count(), 8, "las ocho monedas en el ranking");
+  assert.equal(await cab.locator('.ranking-fila[data-estado="tengo"]').count(), 2, "y las dos que tiene");
+  assert.match(await cab.textContent(".vivo-piensa"), /Tengo SOL y TRX/);
+  // El gráfico en vivo: velas en un lienzo, el precio de las ocho que se mueve solo y los indicadores con un botón.
+  await cab.waitForSelector("#grafico-lienzo-0");
+  assert.equal(await cab.locator(".grafico-pares .graf-par").count(), 8, "el precio de las ocho, en vivo");
+  await cab.waitForFunction(() => /\d/.test(document.getElementById("precio-BTCUSDT").textContent), null, { timeout: 10000 });
+  const precio1 = await cab.textContent("#precio-BTCUSDT");
+  await cab.waitForFunction((p) => document.getElementById("precio-BTCUSDT").textContent !== p, precio1, { timeout: 10000 });
+  assert.match(await cab.textContent("#pestana-vivo .conexion"), /En vivo: conectado a Binance/);
+  assert.equal(await cab.getAttribute('[data-graf-ind="bb"]', "aria-pressed"), "true", "Bollinger viene prendido");
+  await cab.click('[data-graf-ind="rsi"]');
+  assert.ok(await cab.locator(".grafico-caja.con-rsi").count() >= 1, "el RSI suma su panel");
+  // «Lo que ve el robot»: las cuatro primeras del ranking, con su carita y lo que piensa de cada una.
+  assert.equal(await cab.getAttribute('[data-graf-layout="robot"]', "aria-pressed"), "true");
+  assert.equal(await cab.locator(".graf-robot").count(), 4, "la carita del robot sobre cada gráfico");
+  assert.match(await cab.textContent(".graf-robot"), /La tengo: es la número 1/);
+  await cab.click('[data-graf-layout="4"]');
+  assert.equal(await cab.locator(".grafico-lienzo").count(), 4, "cuatro gráficos a la vez");
+  await cab.click('[data-graf-solo="SOLUSDT"]');
+  assert.equal(await cab.getAttribute('[data-graf-layout="1"]', "aria-pressed"), "true", "tocar un precio abre esa moneda sola");
+  await cab.click('[data-graf-panel="0"][data-graf-t="1h"]');
+  assert.equal(await cab.getAttribute('[data-graf-panel="0"][data-graf-t="1h"]', "aria-pressed"), "true");
+  await cab.waitForFunction(() => {           // el gráfico de 1 h se dibujó (llega un momento después)
+    const c = document.getElementById("grafico-lienzo-0");
+    if (!c || !c.width) return false;
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i]) return true;
+    return false;
+  }, null, { timeout: 5000 });
+  assert.match(await cab.textContent(".vivo-perfil"), /Perfil Rotación/);
+  assert.match(await cab.textContent(".vivo-saldo"), /Pusiste 300 USDT ficticios/);
+  assert.equal(await cab.locator(".vivo .robot").count(), 1, "el robot está dibujado");
+  assert.ok(await cab.locator(".vivo .mov").count() >= 3, "lo último que hizo, en palabras");
+  assert.match(await cab.textContent(".vivo .movs"), /Pasé a SOL/);
+  await cab.click("#tab-movimientos");
+  assert.match(await cab.textContent("#pestana-movimientos"), /Empecé con 300 USDT ficticios, en perfil Rotación/);
+  await cab.click("#tab-vivo");
+  await cab.click("#vivo-detener");
+  await cab.waitForSelector("#vivo-cambiar >> text=Empezar de nuevo");
+  // Las flechas mueven entre pestañas, como en cualquier lista de pestañas.
+  await cab.focus("#tab-vivo");
+  await cab.keyboard.press("ArrowRight");
+  assert.equal(await cab.evaluate(() => document.activeElement.id), "tab-comparar");
+  assert.ok(await cab.locator("#pestana-comparar").isVisible());
+  // Comparar: el monto, el período y los perfiles al lado de quedarse en USDT y de comprar BTC y esperar.
+  await cab.fill("#sim-monto", "250");
+  await cab.click('[data-sim-dias="365"]');
+  assert.equal(await cab.inputValue("#sim-monto"), "250", "lo escrito sigue ahí al volver a pintar");
+  await cab.click("#sim-correr");
+  await cab.waitForSelector(".comp-grilla");
+  assert.equal(await cab.locator(".comp-perfil").count(), 10, "los perfiles de cripto lado a lado");
+  // Cada perfil dice si le ganó a quedarse en USDT y a comprar BTC.
+  assert.equal(await cab.locator(".comp-veredicto").count(), 10, "cada perfil con su veredicto");
+  // Qué tan seguido sale bien: el mismo período repetido con cientos de inicios, se pide solo al comparar.
+  await cab.waitForSelector(".prob-tabla");
+  assert.equal(await cab.locator(".prob-tabla tbody tr").count(), 9, "los ocho de cripto con ventanas y comprar BTC");
+  assert.match(await cab.textContent("#prob"), /esperando 1 año: \d+ inicios distintos[\s\S]*Terminó ganando[\s\S]*Tendencia\s*\d+ de 100/);
+  // El mapa de inicios: cuánto tendrías hoy según cuándo empezaste, y qué perfil aguanta un mal comienzo.
+  await cab.click("#mapa-ver");
+  await cab.waitForSelector("#mapa .mapa-tabla");
+  assert.equal(await cab.locator("#mapa .mapa-tabla tbody tr").count(), 9, "los ocho de cripto y comprar BTC");
+  assert.match(await cab.textContent("#mapa .mapa-tabla"), /Peor inicio:[\s\S]*le ganó a BTC en \d+ de \d+/);
+  await cab.click('#pestana-comparar [data-mercado="acciones"]');
+  assert.equal(await cab.locator(".comp-perfil").count(), 4, "en acciones, las tres y la mezcla");
+  assert.match(await cab.textContent('[data-comparar="indice_eeuu"]'), /las acciones llegaron a Binance en junio de 2026/);
+  assert.equal(await cab.locator("#mapa .mapa-tabla").count(), 0, "sin mapa: no hay historia");
+  assert.match(await cab.textContent("#mapa"), /Con acciones todavía no se puede medir/);
+  assert.match(await cab.textContent("#prob"), /Con acciones todavía no se puede: llevan muy poco tiempo/);
+  await cab.click('#pestana-comparar [data-mercado="cripto"]');
+  assert.match(await cab.textContent(".sim-resultado"), /365 días\) con 250 USDT[\s\S]*Quedarte en USDT[\s\S]*Comprar BTC y esperar/);
+  // La película: tocar un perfil la pone a andar, movimiento por movimiento.
+  await cab.click('[data-comparar="cosecha"]');
+  await cab.waitForSelector(".peli .mov");
+  await cab.waitForFunction(() => /Movimiento (\d+) de \1\b/.test(document.querySelector(".peli").textContent), null, { timeout: 20000 });
+  assert.equal(await cab.locator(".peli svg polyline").count(), 2, "al final, las dos curvas enteras");
+  assert.match(await cab.textContent(".peli"), /Coseché ETH/, "la película cuenta la venta de la cosecha");
+  await cab.click('[data-usar-perfil="cosecha"]');
+  assert.equal(await cab.getAttribute('.perfil[data-perfil="cosecha"]', "aria-checked"), "true", "pasa el perfil a «En vivo»");
+  assert.equal(await cab.inputValue("#vivo-monto"), "250", "y el monto");
+  // Un holding andando dice su plan: cuántas compras lleva y a qué precio vendería un cuarto.
+  await cab.click("#vivo-empezar");
+  await cab.waitForSelector("[role=alertdialog]");          // ya hubo un robot: empezar de nuevo se confirma
+  await cab.click('[data-pz-confirmar="si"]');
+  await cab.waitForSelector("#plan");
+  assert.match(await cab.textContent("#plan"), /Llevo 1 de 12 compras[\s\S]*Vendo un cuarto de BTC si llega a/);
+  await cab.click("#vivo-detener");
+  await cab.waitForSelector("#vivo-cambiar >> text=Empezar de nuevo");
+  // La cabina sigue: la cadena de los seis agentes, el medidor del saldo y un dial por moneda.
+  await cab.click("#tab-ahora");
+  await cab.waitForSelector(".cabina .cadena");
+  assert.equal(await cab.locator(".cadena .estacion").count(), 6, "la cadena muestra los seis agentes");
+  assert.ok((await cab.textContent("#cadena-explica")).trim().length > 20, "y una frase dice qué falta y quién lo hace");
+  assert.equal(await cab.locator(".cabina .media-luna").count(), 1, "el saldo se ve como medidor");
+  assert.ok(await cab.locator(".cabina .dial").count() >= 1, "cada moneda tiene su dial");
+  assert.equal(await cab.locator("#app [style]").count(), 0, "nada usa style en línea");
+  // Dinero real: los cinco requisitos y la llave; sin cumplirlos, no hay cómo encender.
+  await cab.click("#tab-operar");
+  await cab.waitForSelector(".requisitos");
+  assert.equal(await cab.locator(".requisito").count(), 5);
+  assert.equal(await cab.locator('.requisito[data-cumple="1"] >> text=Simulaste el pasado').count(), 1,
+    "comparar cuenta como requisito cumplido");
+  assert.equal(await cab.locator("#real-activar").count(), 0, "sin los cinco pasos no aparece el botón de encender");
+  assert.equal(await cab.getAttribute("#real-secreto", "type"), "password", "el secreto no se ve al escribirlo");
+  await cab.fill("#real-llave", "Llave9Corta");
+  // El aviso puede quedar tapado por otro del robot en vivo: se anotan todos los avisos que pasan y se busca el de la llave.
+  await cab.evaluate(() => {
+    window.__avisos = [];
+    const el = document.querySelector(".pz-toast") || document.getElementById("pz-toast") || document.getElementById("toast");
+    new MutationObserver(() => window.__avisos.push(el.textContent)).observe(el, { childList: true, subtree: true, characterData: true });
+  });
+  // La pantalla se vuelve a pintar seguido con el robot andando: si el toque cayó justo en un repintado, se toca de nuevo
+  // (tope de 3 vueltas, para que falle y no se cuelgue).
+  for (let vuelta = 0; vuelta < 3; vuelta++) {
+    await cab.click("#real-conectar");
+    const llego = await cab.waitForFunction(() => window.__avisos.some((t) => /solo letras y números/.test(t)), null, { timeout: 2000 })
+      .then(() => true, () => false);
+    if (llego) break;
+  }
+  assert.ok(await cab.evaluate(() => window.__avisos.some((t) => /solo letras y números/.test(t))), "una llave mal copiada se dice antes de mandarla");
+  assert.equal(await cab.evaluate(() => JSON.stringify(window.Pilota._pruebas.E).includes("Llave9Corta")), false,
+    "la llave no se guarda en el estado de la pantalla");
+  assert.deepEqual(await faltantes(cab), [], "textos sin traducir al inglés");
+  await cab.close();
+}
+
 // 2. Los datos del mercado, de punta a punta (en la vista previa responde simular(), como lo haría la app).
 assert.match(await page.textContent(".banda"), /Test mode: play money/, "la banda del modo tiene que estar siempre");
+// Arriba de todo, lo que corre solo: nadie tiene que apretar un botón de esta pantalla para que el robot funcione.
+assert.match(await page.textContent("#solo-corre"), /You do not have to press anything/);
+assert.equal(await page.locator("#solo-corre li").count(), 5, "las cinco cosas que se preparan solas");
 assert.match(await page.textContent("#datos-estado"), /I can't trade yet/, "si falta historial, se dice en vez de operar");
 assert.match(await page.textContent("#datos-estado"), /BTCFDUSD 4 h: 12 candles missing/);
 assert.equal(await page.locator("#datos-series .serie").count(), 12, "el estado va por par y temporalidad (4 × 3)");
@@ -618,7 +817,7 @@ assert.match(await page.textContent("#senales"), /BTC viene bien/, "el filtro de
 assert.match(await page.textContent("#senales"),
   /compra con límite al volver a 94\.830, stop en 93\.869,7 y objetivo en 96\.252,45/, "la ruptura entra en el nivel roto");
 assert.match(await page.textContent("#senales"), /arriesga 1,01 % para ganar 1,5 %/);
-assert.match(await page.textContent("#senales"), /objetivo en la media, 3\.198,4/, "el rebote sale en la media");
+assert.match(await page.textContent("#senales"), /objetivo en la media, 3\.?198,4/, "el rebote sale en la media");
 assert.match(await page.textContent("#senales"), /ETHUSDT 1 d: falta historial para saber si el día viene al alza/);
 assert.match(await page.textContent("#backtest"), /Todavía no he recorrido el historial/, "el backtest parte sin correr");
 await page.click("#backtest-correr");
@@ -704,6 +903,13 @@ await capturar(page, "19-trabajos-390");
 await page.click("#abrir-ajustes");
 await page.waitForSelector("[role=dialog]");
 await sinDesborde(page, "Ajustes a 390 px");
+// La llave de Alpaca para las noticias: se prueba, queda en el llavero y en pantalla solo su pista.
+await page.fill("#alpaca-llave", "PKAAAA1111BBBB2222CC");
+await page.fill("#alpaca-secreto", "secretoInventado1234567890");
+await page.click("#alpaca-conectar");
+await page.waitForFunction(() => /Llave conectada/.test(document.querySelector("[role=dialog]")?.textContent || ""));
+assert.match(await page.textContent("[role=dialog]"), /PKAA…22CC[\s\S]*Titular inventado/);
+assert.doesNotMatch(await page.content(), /secretoInventado/, "el secreto no queda en la pantalla");
 await capturar(page, "20-ajustes-390");
 
 await navegador.close();

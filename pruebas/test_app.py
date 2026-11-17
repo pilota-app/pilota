@@ -284,7 +284,7 @@ class VelasGuardadas(ConCarpeta):
         self.assertEqual(lib_datos.leer_serie("BTCFDUSD", "4h"), [])
 
     def test_no_se_guarda_ninguna_serie_que_no_sea_de_las_nuestras(self):
-        for par, temporalidad in (("DOGEUSDT", "1h"), ("BTCFDUSD", "5m"), ("../otra", "1h")):
+        for par, temporalidad in (("PEPEUSDT", "1h"), ("BTCFDUSD", "5m"), ("../otra", "1h")):
             with self.assertRaises(ValueError):
                 lib_datos.ruta_serie(par, temporalidad)
 
@@ -347,7 +347,7 @@ class TramosResumibles(ConCarpeta):
 
     def test_la_serie_de_un_minuto_solo_es_de_los_pares_que_se_operan(self):
         self.assertTrue(lib_datos.serie_valida("BTCFDUSD", lib_datos.MINUTO))
-        for par, temporalidad in (("BTCUSDT", "1m"), ("ETHUSDT", "1m"), ("BTCFDUSD", "5m")):
+        for par, temporalidad in (("PEPEUSDT", "1m"), ("BTCUSDT", "5m"), ("BTCFDUSD", "5m")):
             self.assertFalse(lib_datos.serie_valida(par, temporalidad))
             with self.assertRaises(ValueError):
                 lib_datos.ruta_serie(par, temporalidad)
@@ -671,7 +671,7 @@ class CapitalMinimoViable(ConCarpeta):
 
     def test_los_filtros_solo_se_piden_de_los_pares_que_conocemos(self):
         with self.assertRaises(ValueError):
-            ApiFalsa().cliente().info_pares(["DOGEUSDT"])
+            ApiFalsa().cliente().info_pares(["PEPEUSDT"])
 
     def test_las_comisiones_de_la_api_mandan_sobre_las_supuestas(self):
         supuestas = minimo_viable.medir(ApiFalsa().cliente())

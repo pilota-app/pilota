@@ -7,6 +7,121 @@ Lo que cambia para quien usa Pilota, en palabras simples. Las descargas de cada 
 ## Sin publicar · Unreleased
 <!-- Una línea por cambio que se nota, en lenguaje de persona («Ahora puedes…»), en español · *e inglés*. Al publicar una
 versión (subir «version» en app.json), estas líneas pasan a «## X.Y.Z». -->
+- Con la llave de Alpaca conectada, Tendencia y Rotación muestran las noticias de BTC y ETH al minuto. *With the Alpaca key
+  connected, Trend and Rotation show BTC and ETH news to the minute.*
+- Ahora puedes conectar una llave gratis de Alpaca en Ajustes para que Pilota lea las noticias de BTC y ETH con su hora
+  exacta. La llave queda en el llavero de tu Mac. *You can now connect a free Alpaca key in Settings so Pilota reads BTC
+  and ETH news with their exact time. The key stays in your Mac keychain.*
+- «Movimientos» ahora dice por qué compró, vendió o esperó cada perfil de tendencia y rotación (por ejemplo, una mala
+  noticia de una persona influyente), y la rotación también frena con caídas fuertes y malas noticias. *"Movements" now
+  says why each trend and rotation profile bought, sold or waited (for example, bad news from an influential person), and
+  rotation also pauses after sharp drops and bad news.*
+- Tendencia ahora usa las noticias para decidir: no compra después de una caída fuerte ni después de una mala noticia de
+  una persona influyente, y te muestra cómo pesa cada cosa y quién mueve más el precio. *Trend now uses news to decide: it
+  doesn't buy after a sharp drop or after bad news from an influential person, and it shows how much each thing weighs and
+  who moves the price most.*
+- Tendencia ahora muestra qué pasó antes en un día como hoy (cuántas veces subió a 20 días y cuántas cayó más de 10 %) y
+  las noticias de personas influyentes de los últimos 30 días. *Trend now shows what happened before on a day like today
+  (how often it was up after 20 days and how often it fell more than 10%) and news from influential people in the last 30
+  days.*
+- Nuevo perfil Tendencia (experimento): BTC y ETH solo mientras están sobre su promedio de 50 días. Y en «Comparar», «¿Qué
+  tan seguido sale bien?»: el mismo período repetido con cientos de fechas de inicio, con cuántas veces ganó, le ganó a BTC o
+  perdió más de 20 %. *New Trend profile (experiment): BTC and ETH only while they are above their 50-day average. And in
+  "Compare", "How often does it go well?": the same period repeated with hundreds of start dates, with how often it won,
+  beat BTC or lost more than 20%.*
+- Cripto y acciones ahora van aparte en «En vivo» y en «Comparar», con lo que cambia entre los dos. La mezcla de los dos
+  sale en ambos lados. *Crypto and stocks are now separate in "Live" and "Compare", with what is different between them.
+  The mix of both shows on both sides.*
+- Acciones de EE. UU.: Índice EE. UU. (S&P 500 y Nasdaq 100), Índice semanal y 8 acciones grandes, con las acciones
+  tokenizadas de Binance. Mezclas: Semanal + Rotación, Núcleo y satélite, y Cripto + Acciones. Y en «Comparar», el mapa de
+  inicios: cuánto tendrías hoy con cada perfil según cuándo empezabas desde 2018. *US stocks: US index (S&P 500 and Nasdaq
+  100), Weekly index and 8 big stocks, with Binance tokenized stocks. Mixes: Weekly + Rotation, Core and satellite, and
+  Crypto + Stocks. And in "Compare", the start map: how much you would have today with each profile depending on when you
+  started since 2018.*
+- Nuevos perfiles de comprar y guardar: Holding 8 monedas, Compra semanal (cada compra un 1 % más abajo), Rebalanceo (mitad en
+  cripto, vende lo que sobra y compra lo que falta) y Cosecha (vende un cuarto cuando sube 30 % y recompra si cae 15 %). Cada
+  uno dice su plan en «Mi plan», y se agrupan en «Comprar y guardar» y «Experimento». *New buy-and-keep profiles: Holding 8
+  coins, Weekly buy (each buy 1 % lower), Rebalance (half in crypto, sells the excess and buys what is missing) and Harvest
+  (sells a quarter when it rises 30 % and buys back if it falls 15 %). Each one shows its plan in "My plan", grouped under
+  "Buy and keep" and "Experiment".*
+- Pilota ahora ofrece solo dos perfiles: Holding (el sugerido) y Rotación (marcada como experimento). Conservador, Equilibrado,
+  Trader y Scalper se retiraron porque perdieron contra quedarse en USDT con datos reales; si tenías uno andando, se detiene
+  solo y lo abierto sigue protegido. *Pilota now offers only two profiles: Holding (the suggested one) and Rotation (marked as
+  an experiment). Conservative, Balanced, Trader and Scalper were retired because they lost against staying in USDT with real
+  data; if you had one running, it stops on its own and anything open stays protected.*
+- «Comparar» dice de cada perfil si le ganó a quedarte en USDT y a comprar BTC, o cuánto perdió. En «En vivo», los perfiles
+  que perdieron quedan aparte, plegados y marcados «solo para experimentar», y el perfil de partida es el que mejor le fue.
+  *"Compare" now says for each profile whether it beat staying in USDT and buying BTC, or how much it lost. In "Live", the
+  profiles that lost are set apart, folded and marked "only to experiment", and the starting profile is the one that did best.*
+- El robot de prueba ahora mira 8 monedas contra USDT: BTC, ETH, BNB, SOL, XRP, ADA, TRX y DOGE. Cada perfil opera las suyas
+  y lo dice en su tarjeta. Arriba del gráfico ves el precio de las 8 en vivo; toca una para abrirla en grande. *The test robot
+  now watches 8 coins against USDT: BTC, ETH, BNB, SOL, XRP, ADA, TRX and DOGE. Each profile trades its own and shows them on
+  its card. Above the chart you see the live price of all 8; tap one to open it large.*
+- Nuevo perfil: Rotación. Una vez al día ordena las 8 monedas por fuerza, tiene las 2 mejores y cambia a la que pasa adelante.
+  Su pantalla muestra el ranking y por qué cambió. *New profile: Rotation. Once a day it ranks the 8 coins by strength, holds
+  the top 2 and switches to the one that moves ahead. Its screen shows the ranking and why it switched.*
+- «Qué estoy esperando» pone primero lo que está más cerca de comprar y guarda el resto en «Ver las otras». *"What I'm
+  waiting for" puts what is closest to buying first and keeps the rest under "See the other".*
+- «Avanzado» dice arriba que todo se prepara solo (datos, historial, muestras, precios en vivo y mínimos) y en qué va cada
+  cosa: no hay que apretar ningún botón para que el robot funcione. Los datos del mercado ahora también se bajan solos.
+  *"Advanced" now says at the top that everything gets ready on its own (data, history, samples, live prices and minimums)
+  and how each one is going: you do not have to press any button for the robot to work. Market data now downloads by itself.*
+- La cabina habla claro: sus pasos se llaman Datos, Oportunidad, Monto, Frenos, Tu sí y Robot, y una frase dice qué falta y
+  si tienes que hacer algo. Con un perfil andando en prueba, dice que manda el perfil y te lleva a «En vivo». *The cockpit
+  speaks plainly: its steps are Data, Opportunity, Amount, Brakes, Your yes and Robot, and one sentence says what is missing
+  and whether you need to do anything. With a profile running in test mode, it says the profile is in charge and takes you
+  to "Live".*
+- Pilota ahora se ordena en seis pestañas: En vivo, Comparar, Movimientos, Cabina, Dinero real y Avanzado (lo técnico). *Pilota
+  is now organized in six tabs: Live, Compare, Moves, Cockpit, Real money and Advanced (the technical part).*
+- Nuevo: «Qué estoy esperando». El robot dice a qué precio compraría cada moneda, cuánto falta («¡Casi casi!»), cómo sería la
+  operación (entrada, stop, objetivo y cuánto gana por cada 1 que arriesga) y cuántas veces ganó esa jugada en el pasado.
+  *New: "What I'm waiting for". The robot says at what price it would buy each coin, how far it is ("Almost there!"), what the
+  trade would look like (entry, stop, target and how much it wins for every 1 it risks) and how often that play won in the past.*
+- Nuevo: «Lo que ve el robot». Un gráfico por cada moneda y vela que está mirando, con su carita encima diciendo qué espera
+  ahí («¡Casi casi!», «Esperando», «En pausa», «Comprado»). *New: "What the robot sees". One chart per coin and candle it is
+  watching, with its face on top saying what it is waiting for there ("Almost there!", "Waiting", "Paused", "Bought").*
+- Arreglado: en la app de Mac los precios en vivo no se veían en el gráfico. *Fixed: live prices didn't show on the chart in the
+  Mac app.*
+- Nuevo: ver 1, 2 o 4 gráficos a la vez, cada uno con su moneda y sus velas, y la línea de «compro aquí» dibujada. *New: view 1,
+  2 or 4 charts at once, each with its own coin and candles, with the "I buy here" line drawn.*
+- Nuevo: «Cómo decide el perfil», con sus reglas en palabras. *New: "How the profile decides", with its rules in plain words.*
+- Nuevo: gráfico de velas en vivo, como el de un trader. El precio se mueve cada segundo, las compras y las ventas del robot
+  aparecen como flechas de color con un aviso al instante, y puedes prender bandas de Bollinger, medias, volumen y RSI con un
+  botón. *New: a live candlestick chart, like a trader's. The price moves every second, the robot's buys and sells show up as
+  colored arrows with an instant alert, and you can turn on Bollinger Bands, moving averages, volume and RSI with one tap.*
+- El robot ahora está conectado a Binance en vivo y reacciona en el segundo en que cierra cada vela (antes revisaba cada 5
+  minutos). *The robot is now connected to Binance live and reacts the second each candle closes (before, it checked every 5
+  minutes).*
+- Arreglado: ya no pueden quedar dos motores corriendo a la vez. *Fixed: two engines can no longer run at the same time.*
+- Nuevo: cinco perfiles para el robot: Holding, Conservador, Equilibrado, Trader y Scalper, del más lento al más rápido. *New: five
+  profiles for the robot: Holding, Conservative, Balanced, Trader and Scalper, from slowest to fastest.*
+- Nuevo: «En vivo». Eliges un perfil y un monto ficticio, y el robot opera solo con precios reales de Binance. Ves cuánto vale,
+  lo que tiene y lo que hizo, en palabras. *New: "Live". Choose a profile and a play-money amount, and the robot trades on its own
+  with real Binance prices. You see what it's worth, what it holds and what it did, in words.*
+- Nuevo: «Comparar». Los cinco perfiles con el mismo monto y período del pasado, lado a lado, con la película de lo que hizo cada
+  uno, movimiento por movimiento. *New: "Compare". The five profiles with the same amount and past period, side by side, with a
+  film of what each one did, move by move.*
+- Pilota prepara sola lo que necesita al abrir (los mínimos de Binance, el historial y el muestreo de precios): ya no hay que
+  apretar botones técnicos. *Pilota now prepares what it needs on its own when it opens (Binance's minimums, the history and the
+  price sampling): no more technical buttons to press.*
+- Nuevo: «Dinero real». Conectas tu llave de Binance (se guarda en el llavero del Mac, nunca en un archivo) y, cuando cumples los cinco
+  requisitos, enciendes el dinero real. Una llave que puede retirar no se acepta nunca. *New: "Real money". Connect your Binance key
+  (stored in the Mac keychain, never in a file) and, once you meet the five requirements, turn on real money. A key that can
+  withdraw is never accepted.*
+- Arreglado: los avisos y algunos textos se traducían dos veces, y el registro podía mostrar un código en vez de un motivo.
+  *Fixed: notices and some texts were translated twice, and the log could show a code instead of a reason.*
+- La pantalla principal ahora es una cabina: el robot te cuenta qué hizo, una cadena de seis luces muestra cómo va cada parte
+  de Pilota (mercado, puntaje, tamaño, frenos, tu sí y motor), el saldo se ve como un medidor entre el piso y tu capital, cada
+  moneda tiene su dial de puntaje y cada propuesta muestra su stop, su entrada y su objetivo en una línea de colores. El detalle
+  técnico sigue ahí, plegado en «Ver cómo lo pensé, paso a paso».
+  *The main screen is now a cockpit: the robot tells you what it did, a chain of six lights shows how each part of Pilota is
+  doing (market, score, size, brakes, your yes and engine), the balance is a gauge between the floor and your capital, each coin
+  has its score dial and each proposal shows its stop, entry and target on a colored line. The technical detail is still there,
+  folded under "See how I thought it through, step by step".*
+- Arreglado: la barra del piso y los medidores de puntaje se veían siempre llenos o vacíos. *Fixed: the floor bar and the score
+  meters always looked full or empty.*
+- Arreglado: en inglés, la fila «Sin apalancamiento» mostraba código en vez de «1x». *Fixed: in English, the "No leverage" row
+  showed code instead of "1x".*
 - Ahora puedes descargar los últimos 90 días de velas cerradas de Binance (BTC y ETH, en 1 h, 4 h y 1 d) y ver, par por par, si
   el historial está completo. Mientras falte historia, Pilota lo dice en vez de operar.
   *You can now download the last 90 days of closed Binance candles (BTC and ETH, in 1 h, 4 h and 1 d) and see, pair by pair,
