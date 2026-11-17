@@ -9,8 +9,9 @@
   real.py desactivar   <entrada.json {}>                      <salida.json>   → {ok, datos, error?}
   real.py emergencia   <entrada.json {}>                      <salida.json>   → {ok, datos, error?}
 
-La llave y el secreto llegan en el archivo de entrada (nunca como argumento) y se guardan en el llavero del sistema
-(`bin/lib_llavero.py`): no se escriben en ningún archivo de Pilota ni vuelven en la respuesta. Ver `bin/lib_real.py`.
+La llave y el secreto llegan en el archivo de entrada temporal que crea la app (nunca como argumento; carpeta solo del
+dueño, borrada al terminar) y se guardan en el llavero del sistema (`bin/lib_llavero.py`): no se escriben en ningún
+archivo de Pilota ni vuelven en la respuesta. Ver `bin/lib_real.py`.
 """
 import lib_real
 import nucleo

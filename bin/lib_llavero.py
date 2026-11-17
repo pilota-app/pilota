@@ -5,7 +5,10 @@ acción.
 Hoy solo en Mac: usa el comando `security` del sistema (el llavero de inicio de sesión de la persona).
 
 Lo que no se negocia aquí:
-- **La llave nunca toca el disco de Pilota** ni el registro: vive en el llavero, con el nombre de servicio `SERVICIO`.
+- **La llave no se guarda en el disco de Pilota** ni en el registro: vive en el llavero, con el nombre de servicio `SERVICIO`.
+  Ojo: al conectar, la app de escritorio la pasa a `real.py` en un archivo de entrada temporal (carpeta solo del dueño,
+  borrada al terminar), porque las acciones de Pieza solo admiten «entrada»: «archivo». Pendiente en Pieza: una entrada
+  por la entrada estándar para los secretos.
 - **El secreto nunca va como argumento de un comando** (los argumentos los ve cualquier programa del equipo): se le pasa a
   `security -i` por la entrada estándar.
 - **Solo letras y números.** Las llaves de Binance (HMAC) son así; cualquier otra cosa se rechaza antes de guardarla, y por

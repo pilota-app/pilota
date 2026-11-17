@@ -53,6 +53,8 @@ class BinanceFalso:
         self.cortar_despues = set()                 # nombres de pedidos que «se cortan» después de hacerse
         self.permisos_extra = {}
         self.siguiente = 1
+        self.ocultas = set()                        # órdenes que Binance todavía no muestra (las muestra tarde)
+        self.perder = set()                         # pedidos que se cortan ANTES de llegar a Binance
 
     def _id(self, cid):
         assert ID_BINANCE.match(cid), f"Binance no acepta este id: {cid!r} ({len(cid)} caracteres)"
@@ -87,6 +89,9 @@ class BinanceFalso:
     def comprar_con(self, par, monto, cid):
         self._id(cid)
         self.llamadas.append(("convertir", par, monto, cid))
+        if "convertir" in self.perder:
+            self.perder.discard("convertir")
+            raise bp.SinRed("timeout")
         m = float(monto)
         self.saldos["USDT"] -= m
         self.saldos["FDUSD"] += m * 0.9995
@@ -114,7 +119,7 @@ class BinanceFalso:
         return next((o["llenos"] for o in self.ordenes.values() if o["orderId"] == orden_id), [])
 
     def orden(self, par, cid):
-        if cid not in self.ordenes:
+        if cid not in self.ordenes or cid in self.ocultas:
             raise bp.ErrorBinance(bp.NO_EXISTE, 400, "/api/v3/order")
         return self.ordenes[cid]
 
@@ -548,6 +553,50 @@ class Cortes(Base):
         self.assertEqual(self.cuerpo()["posiciones"], [])
         self.assertAlmostEqual(b.saldos["BTC"], 1.0, places=8, msg="el BTC de la persona sigue ahí")
 
+
+    def test_venta_que_binance_muestra_tarde_no_se_repite(self):
+        self.en_real()
+        b = BinanceFalso(btc=1.0)
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"])
+        real.revisar(AHORA + 60_000, cliente=b)
+        b.cortar_despues.add("vender")
+        b.ocultas.add(real.ids(r["posicion"]["base"])["salida"])
+        real.cerrar(None, AHORA + HORA, cliente=b)
+        self.assertEqual(self.cuerpo()["posiciones"][0]["fase"], "vendiendo")
+        real.revisar(AHORA + HORA + 60_000, cliente=b)          # Binance aún no la muestra: no se vende de nuevo
+        self.assertEqual([x[0] for x in b.llamadas].count("vender"), 1)
+        self.assertAlmostEqual(b.saldos["BTC"], 1.0, places=8, msg="el BTC de la persona sigue ahí")
+        b.ocultas.clear()
+        real.revisar(AHORA + HORA + 120_000, cliente=b)
+        self.assertEqual([x[0] for x in b.llamadas].count("vender"), 1)
+        self.assertEqual(self.cuerpo()["posiciones"], [])
+        self.assertAlmostEqual(b.saldos["BTC"], 1.0, places=8)
+
+    def test_conversion_cortada_no_se_manda_dos_veces_seguidas(self):
+        self.en_real()
+        b = BinanceFalso(usdt=500.0, fdusd=0.0)
+        b.perder.add("convertir")
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        self.assertEqual(r["motivo"], "sin_conexion")
+        r = real.entrar(OPCION, AHORA + 60_000, frenos=PUEDE, calibracion={}, cliente=b)
+        self.assertFalse(r["puesta"])
+        self.assertEqual([x[0] for x in b.llamadas].count("convertir"), 1, "no se reenvía mientras puede llegar tarde")
+        r = real.entrar(OPCION, AHORA + real.ESPERA_ENVIO_MS + 60_000, frenos=PUEDE, calibracion={}, cliente=b)
+        self.assertEqual([x[0] for x in b.llamadas].count("convertir"), 2)
+        self.assertTrue(r["puesta"])
+
+    def test_una_oportunidad_cerrada_no_se_reabre_con_los_mismos_ids(self):
+        self.en_real()
+        b = BinanceFalso(btc=1.0)
+        r = real.entrar(OPCION, AHORA, frenos=PUEDE, calibracion={}, cliente=b)
+        b.llenar(r["posicion"]["id"])
+        real.revisar(AHORA + 60_000, cliente=b)
+        real.cerrar(None, AHORA + HORA, cliente=b)
+        self.assertEqual(self.cuerpo()["posiciones"], [])
+        self.assertIn(r["posicion"]["base"], self.cuerpo()["usadas"], "las usadas sobreviven al guardar y leer")
+        r = real.entrar(OPCION, AHORA + 2 * HORA, frenos=PUEDE, calibracion={}, cliente=b)
+        self.assertEqual(r["motivo"], "repetida")
 
 class Casos(Base):
     def test_llenada_en_parte_se_protege_en_la_misma_vuelta(self):

@@ -79,7 +79,9 @@ DEPOSITO, RETIRO = "deposito", "retiro"
 #: entra al archivo ni a la huella. `cuerpo_de` deja un estado leído listo para volver a guardarse.
 CAMPOS = ("formato", "ambiente", "cuando", "cuando_ms", "desde", "desde_ms", "modo", "saldo", "referencia", "aportado",
           "aportes", "posiciones", "operaciones", "racha", "dia", "desbloqueos", "desbloqueo", "pausado", "frenos",
-          "reinicios")
+          "reinicios", "usadas", "conversiones")
+#: Cuántas oportunidades usadas (y conversiones anotadas) del conector real se recuerdan: sus ids no se reusan nunca.
+USADAS_MAXIMAS = 400
 #: Lo más largo que puede ser la lista de frenos anotados: son códigos cortos de `lib_frenos.FRENOS`, no texto.
 FRENOS_MAXIMOS = 16
 
@@ -126,7 +128,7 @@ def nuevo(ambiente, saldo=0.0, ahora_ms=None):
               "saldo": 0.0, "referencia": 0.0, "aportado": 0.0, "aportes": [], "posiciones": [], "operaciones": 0,
               # El estado de los frenos (`bin/lib_frenos.py`): nace en cero, sin pausa y sin ningún freno puesto.
               "racha": 0, "dia": {"fecha": "", "inicio": 0.0, "aportado": 0.0}, "desbloqueos": 0, "desbloqueo": {},
-              "pausado": False, "frenos": [], "reinicios": 0}
+              "pausado": False, "frenos": [], "reinicios": 0, "usadas": [], "conversiones": {}}
     return con_aporte(cuerpo, saldo, ahora_ms=ms) if _monto(saldo, "saldo") > 0 else cuerpo
 
 
@@ -182,6 +184,8 @@ def sanear(cuerpo, ambiente, ahora_ms=None):
     dia = cuerpo.get("dia") if isinstance(cuerpo.get("dia"), dict) else {}
     des = cuerpo.get("desbloqueo") if isinstance(cuerpo.get("desbloqueo"), dict) else {}
     frenos = [f for f in cuerpo.get("frenos", []) if isinstance(f, str) and lib_registro.CODIGO.fullmatch(f)]
+    usadas = cuerpo.get("usadas") if isinstance(cuerpo.get("usadas"), list) else []
+    conversiones = cuerpo.get("conversiones") if isinstance(cuerpo.get("conversiones"), dict) else {}
     return {**base, "cuando": str(cuerpo.get("cuando", base["cuando"]))[:32], "cuando_ms": _entero(cuerpo.get("cuando_ms")),
             "desde": str(cuerpo.get("desde", base["desde"]))[:32], "desde_ms": _entero(cuerpo.get("desde_ms")),
             "modo": cuerpo.get("modo") if cuerpo.get("modo") in MODOS else MODO_FRENADO,
@@ -195,7 +199,9 @@ def sanear(cuerpo, ambiente, ahora_ms=None):
             "desbloqueo": {"n": _entero(des.get("n")), "pedido_ms": _entero(des.get("pedido_ms")),
                            "hasta_ms": _entero(des.get("hasta_ms"))} if des else {},
             "pausado": bool(cuerpo.get("pausado")), "frenos": frenos[:FRENOS_MAXIMOS],
-            "reinicios": _entero(cuerpo.get("reinicios"))}
+            "reinicios": _entero(cuerpo.get("reinicios")),
+            "usadas": [u for u in usadas if isinstance(u, str)][-USADAS_MAXIMAS:],
+            "conversiones": dict([(k, _entero(v)) for k, v in conversiones.items() if isinstance(k, str)][-USADAS_MAXIMAS:])}
 
 
 def cuerpo_de(cuenta):

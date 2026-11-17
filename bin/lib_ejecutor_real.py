@@ -345,8 +345,19 @@ def _entrar(opcion, ahora_ms, tamano_, frenos, com, calibracion, cliente):
         falta = p["monto"] - saldo.get(MONEDA_PAR, 0.0)
         if falta > TOLERANCIA:
             pedir = math.ceil(falta * 1.002 * 100) / 100           # un poco más: la conversión también cobra
+            conversiones = cuerpo.get("conversiones") if isinstance(cuerpo.get("conversiones"), dict) else {}
+            previa = _entero(conversiones.get(base))
+            if previa:
+                # Ya se mandó la conversión de esta oportunidad y el saldo aún no llega: nunca se manda dos veces. Se
+                # pregunta por su id; si Binance no la muestra, se espera antes de darla por perdida.
+                hecha = _orden_o_nada(cli, CONVERSION, i["conversion"])
+                if hecha is not None or ms - previa < ESPERA_ENVIO_MS:
+                    return _rechazo(o, "sin_conexion", ms, t)
             if saldo.get("USDT", 0.0) + TOLERANCIA < pedir:
                 return _rechazo(o, "sin_saldo", ms, t)
+            # Escritura adelantada: la conversión queda anotada antes de mandarla.
+            conversiones = dict(list({**conversiones, base: ms}.items())[-USADAS:])
+            cuerpo = _guardar({**cuerpo, "conversiones": conversiones}, nuestras(cuerpo), ms)
             cli.comprar_con(CONVERSION, bp.texto(pedir, 0.01), i["conversion"])
     except bp.ErrorBinance:
         return _rechazo(o, "binance", ms, t)
@@ -459,11 +470,18 @@ def _vender(cli, cuerpo, p, filtros, ms, por, motivo=""):
     por = por if por != "manual" or not por_patas else por_patas
     o = _orden_o_nada(cli, p["par"], i["salida"])
     if o is None:
+        # Una venta ya mandada que Binance todavía no muestra puede estar llena: su id ya no bloquea un reenvío (Binance
+        # solo rechaza ids repetidos de órdenes abiertas) y la segunda venta usaría monedas de la persona. Se espera.
+        enviada = _entero(p.get("venta_ms"))
+        if enviada and ms - enviada < ESPERA_ENVIO_MS:
+            return _con(cuerpo, {**p, "revisado_ms": ms}, ms)
         falta = _numero(p.get("comprada")) - vendido
         cantidad = bajar(min(falta, libres(cli).get(moneda, 0.0)), paso)
         if cantidad > 0 and _bajo_minimo(filtros, cantidad, _numero(p.get("precio"))):
             motivo = motivo or "polvo"           # bajo los mínimos: Binance no lo vende; queda en la cuenta, anotado
         elif cantidad > 0:
+            p = {**p, "venta_ms": ms}
+            cuerpo = _con(cuerpo, p, ms)         # escritura adelantada: la venta queda anotada antes de mandarla
             o = cli.vender_mercado(p["par"], bp.texto(cantidad, paso), i["salida"])
     if o is not None:
         v = llenado(cli, p["par"], o, moneda)
