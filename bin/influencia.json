@@ -1,6 +1,6 @@
 {
  "formato": 1,
- "al": "2026-11-14",
+ "al": "2026-11-25",
  "fuente": "https://github.com/pilota-app/influencia",
  "personas": [
   {
@@ -436,6 +436,19 @@
    "movimiento": {
     "dia": -0.043,
     "d1": -0.063,
+    "d5": -0.16,
+    "d20": null,
+    "d60": null
+   }
+  },
+  {
+   "persona": "jensen-huang",
+   "fecha": "2026-11-23",
+   "que": "La junta de Nvidia reintegra a Jensen Huang como CEO",
+   "activo": "NVDA",
+   "movimiento": {
+    "dia": 0.315,
+    "d1": 0.238,
     "d5": null,
     "d20": null,
     "d60": null
@@ -445,6 +458,14 @@
  "ranking": [
   {
    "puesto": 1,
+   "id": "jensen-huang",
+   "puntaje": 11.86,
+   "eventos": 2,
+   "ultimo_evento": "2026-11-23",
+   "duro_20d": null
+  },
+  {
+   "puesto": 2,
    "id": "donald-trump",
    "puntaje": 3.88,
    "eventos": 14,
@@ -452,17 +473,9 @@
    "duro_20d": 0.429
   },
   {
-   "puesto": 2,
-   "id": "jensen-huang",
-   "puntaje": 1.43,
-   "eventos": 1,
-   "ultimo_evento": "2026-11-12",
-   "duro_20d": null
-  },
-  {
    "puesto": 3,
    "id": "elon-musk",
-   "puntaje": 0.64,
+   "puntaje": 0.62,
    "eventos": 4,
    "ultimo_evento": "2026-02-03",
    "duro_20d": 1.0
